@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 class SupportScreen extends StatefulWidget {
@@ -19,13 +19,18 @@ class _SupportScreenState extends State<SupportScreen>
   late Animation<double> _scaleAnimation;
 
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController(text: 'GoPayna@gmail.com');
+  final _emailController = TextEditingController(text: 'support@gopayna.com');
   final _userEmailController = TextEditingController();
   final _mobileController = TextEditingController();
   final _nameController = TextEditingController();
   final _messageController = TextEditingController();
 
   bool _isLoading = false;
+
+  ColorScheme get _colorScheme => Theme.of(context).colorScheme;
+  bool get _isDark => Theme.of(context).brightness == Brightness.dark;
+  Color get _shadowColor => Colors.black.withValues(alpha: _isDark ? 0.45 : 0.08);
+  Color get _mutedText => _colorScheme.onSurface.withValues(alpha: 0.7);
 
   @override
   void initState() {
@@ -92,7 +97,7 @@ class _SupportScreenState extends State<SupportScreen>
     final statusBarHeight = MediaQuery.of(context).padding.top;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Column(
         children: [
           _buildCustomStatusBar(statusBarHeight),
@@ -108,7 +113,7 @@ class _SupportScreenState extends State<SupportScreen>
   Widget _buildCustomStatusBar(double statusBarHeight) {
     return Container(
       height: statusBarHeight,
-      color: const Color(0xFFF8F9FA),
+      color: Theme.of(context).scaffoldBackgroundColor,
     );
   }
 
@@ -127,19 +132,19 @@ class _SupportScreenState extends State<SupportScreen>
               child: Container(
                 padding: EdgeInsets.all(isTablet ? 12 : 8),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: _colorScheme.surface,
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.1),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
+                      color: _shadowColor,
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
                     ),
                   ],
                 ),
                 child: Icon(
                   Icons.arrow_back,
-                  color: Colors.black87,
+                  color: _colorScheme.onSurface,
                   size: isTablet ? 24 : 20,
                 ),
               ),
@@ -147,7 +152,7 @@ class _SupportScreenState extends State<SupportScreen>
             SizedBox(width: isTablet ? 16 : 12),
             Icon(
               Icons.headset_mic,
-              color: Colors.black87,
+              color: _colorScheme.primary,
               size: isTablet ? 28 : 24,
             ),
             SizedBox(width: isTablet ? 12 : 8),
@@ -156,7 +161,7 @@ class _SupportScreenState extends State<SupportScreen>
               style: TextStyle(
                 fontSize: isTablet ? 24 : 20,
                 fontWeight: FontWeight.bold,
-                color: Colors.black87,
+                color: _colorScheme.onSurface,
               ),
             ),
           ],
@@ -254,9 +259,9 @@ class _SupportScreenState extends State<SupportScreen>
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 5),
+              color: _shadowColor,
+              blurRadius: 12,
+              offset: const Offset(0, 6),
             ),
           ],
         ),
@@ -267,51 +272,51 @@ class _SupportScreenState extends State<SupportScreen>
           validator: validator,
           style: TextStyle(
             fontSize: isTablet ? 16 : 14,
-            color: isReadOnly ? const Color(0xFF00B82E) : Colors.black87,
+            color: isReadOnly ? _colorScheme.primary : _colorScheme.onSurface,
             fontWeight: isReadOnly ? FontWeight.w600 : FontWeight.w500,
           ),
           decoration: InputDecoration(
             labelText: label,
             labelStyle: TextStyle(
-              color: const Color(0xFF00B82E),
+              color: _colorScheme.primary,
               fontSize: isTablet ? 16 : 14,
               fontWeight: FontWeight.w500,
             ),
             floatingLabelBehavior: FloatingLabelBehavior.always,
             filled: true,
-            fillColor: Colors.white,
+            fillColor: _colorScheme.surface,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(
-                color: Color(0xFF00B82E),
+              borderSide: BorderSide(
+                color: _colorScheme.primary,
                 width: 2,
               ),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(
-                color: Color(0xFF00B82E),
+              borderSide: BorderSide(
+                color: _colorScheme.primary,
                 width: 2,
               ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(
-                color: Color(0xFF00B82E),
+              borderSide: BorderSide(
+                color: _colorScheme.secondary,
                 width: 2,
               ),
             ),
             errorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(
-                color: Colors.red,
+              borderSide: BorderSide(
+                color: _colorScheme.error,
                 width: 2,
               ),
             ),
             focusedErrorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(
-                color: Colors.red,
+              borderSide: BorderSide(
+                color: _colorScheme.error,
                 width: 2,
               ),
             ),
@@ -336,7 +341,7 @@ class _SupportScreenState extends State<SupportScreen>
             style: TextStyle(
               fontSize: isTablet ? 18 : 16,
               fontWeight: FontWeight.w600,
-              color: Colors.black87,
+              color: _colorScheme.onSurface,
             ),
           ),
           SizedBox(height: isTablet ? 12 : 8),
@@ -345,9 +350,9 @@ class _SupportScreenState extends State<SupportScreen>
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, 5),
+                  color: _shadowColor,
+                  blurRadius: 12,
+                  offset: const Offset(0, 6),
                 ),
               ],
             ),
@@ -356,7 +361,7 @@ class _SupportScreenState extends State<SupportScreen>
               maxLines: isTablet ? 6 : 5,
               style: TextStyle(
                 fontSize: isTablet ? 16 : 14,
-                color: Colors.black87,
+                color: _colorScheme.onSurface,
               ),
               validator: (value) {
                 if (value == null || value.isEmpty) {
@@ -367,43 +372,43 @@ class _SupportScreenState extends State<SupportScreen>
               decoration: InputDecoration(
                 hintText: 'Type your message here...',
                 hintStyle: TextStyle(
-                  color: Colors.grey.shade500,
+                  color: _mutedText,
                   fontSize: isTablet ? 16 : 14,
                 ),
                 filled: true,
-                fillColor: Colors.white,
+                fillColor: _colorScheme.surface,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide(
-                    color: Colors.grey.shade300,
+                    color: _colorScheme.outlineVariant,
                     width: 1,
                   ),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide(
-                    color: Colors.grey.shade300,
+                    color: _colorScheme.outlineVariant,
                     width: 1,
                   ),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(
-                    color: Color(0xFF00B82E),
+                  borderSide: BorderSide(
+                    color: _colorScheme.primary,
                     width: 2,
                   ),
                 ),
                 errorBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(
-                    color: Colors.red,
+                  borderSide: BorderSide(
+                    color: _colorScheme.error,
                     width: 2,
                   ),
                 ),
                 focusedErrorBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(
-                    color: Colors.red,
+                  borderSide: BorderSide(
+                    color: _colorScheme.error,
                     width: 2,
                   ),
                 ),
@@ -426,10 +431,10 @@ class _SupportScreenState extends State<SupportScreen>
         child: ElevatedButton(
           onPressed: _isLoading ? null : _handleSend,
           style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF00B82E),
+            backgroundColor: const Color(0xFF00CA44),
             foregroundColor: Colors.white,
             elevation: _isLoading ? 0 : 8,
-            shadowColor: const Color(0xFF00B82E).withValues(alpha: 0.3),
+            shadowColor: const Color(0xFF00CA44).withValues(alpha: 0.3),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(isTablet ? 16 : 12),
             ),
@@ -503,13 +508,13 @@ class _SupportScreenState extends State<SupportScreen>
                   height: 80,
                   width: 80,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF00B82E).withValues(alpha: 0.1),
+                    color: const Color(0xFF00CA44).withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(
                     Icons.check_circle_outline,
                     size: 40,
-                    color: Color(0xFF00B82E),
+                    color: Color(0xFF00CA44),
                   ),
                 ),
                 const SizedBox(height: 20),
@@ -541,7 +546,7 @@ class _SupportScreenState extends State<SupportScreen>
                       Navigator.of(context).pop(); // Go back to previous screen
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF00B82E),
+                      backgroundColor: const Color(0xFF00CA44),
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
@@ -565,3 +570,4 @@ class _SupportScreenState extends State<SupportScreen>
     );
   }
 }
+

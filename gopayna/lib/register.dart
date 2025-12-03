@@ -1,15 +1,19 @@
+﻿import 'dart:async';
 import 'dart:developer'; // Import for logging
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:uni_links/uni_links.dart';
 import 'login.dart';
 
 import 'api_service.dart';
 import 'otp_verification.dart';
-
-import 'package:uni_links/uni_links.dart'; // Import for handling universal links
+import 'app_settings.dart';
 
 class RegisterScreen extends StatefulWidget {
-  const RegisterScreen({super.key});
+  const RegisterScreen({super.key, this.initialReferralCode});
+
+  final String? initialReferralCode;
 
   @override
   State<RegisterScreen> createState() => _RegisterScreenState();
@@ -33,10 +37,11 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
   late Animation<Offset> _slideAnimation;
   late Animation<double> _buttonScale;
 
-  final Color _brandColor = const Color(0xFF00B82E);
+  final Color _brandColor = AppSettings.brandColorLight;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _isLoading = false;
+  StreamSubscription<String?>? _linkSubscription;
 
   @override
   void initState() {
@@ -47,27 +52,18 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(CurvedAnimation(parent: _fadeController, curve: Curves.easeOut));
     _slideAnimation = Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(CurvedAnimation(parent: _slideController, curve: Curves.easeOutCubic));
     _buttonScale = Tween<double>(begin: 0.8, end: 1.0).animate(CurvedAnimation(parent: _buttonController, curve: Curves.elasticOut));
-    _handleReferralLink(); // Handle referral links in initState
+    if (widget.initialReferralCode != null && widget.initialReferralCode!.isNotEmpty) {
+      _referralCodeController.text = widget.initialReferralCode!;
+    }
+    _initializeDeepLinks();
     _startAnimations();
   }
-
-  void _startAnimations() async {
+  Future<void> _startAnimations() async {
     await Future.delayed(const Duration(milliseconds: 100));
     _fadeController.forward();
     _slideController.forward();
     await Future.delayed(const Duration(milliseconds: 600));
     _buttonController.forward();
-  }
-
-  void _handleReferralLink() async {
-    final initialLink = await getInitialLink(); // Use uni_links or firebase_dynamic_links
-    if (initialLink != null) {
-      final uri = Uri.parse(initialLink);
-      final referralCode = uri.queryParameters['referral'];
-      if (referralCode != null) {
-        _referralCodeController.text = referralCode;
-      }
-    }
   }
 
   @override
@@ -81,7 +77,8 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
-    _referralCodeController.dispose(); // Dispose the referral code controller
+    _referralCodeController.dispose();
+    _linkSubscription?.cancel();
     super.dispose();
   }
 
@@ -93,6 +90,7 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
     Widget? suffixIcon,
     Widget? prefixIcon,
     String? Function(String?)? validator,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
@@ -101,7 +99,7 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
         children: [
           Text(
             label,
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: Colors.black87, letterSpacing: 0.2),
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: Colors.black87, letterSpacing: 0.2),
           ),
           const SizedBox(height: 8),
           Container(
@@ -116,6 +114,7 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
               keyboardType: keyboardType,
               obscureText: obscureText,
               validator: validator,
+              inputFormatters: inputFormatters,
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: Colors.black87),
               decoration: InputDecoration(
                 filled: true,
@@ -134,14 +133,6 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide(color: _brandColor, width: 2),
                 ),
-                errorBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Colors.red, width: 1.5),
-                ),
-                focusedErrorBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Colors.red, width: 2),
-                ),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
               ),
             ),
@@ -149,6 +140,32 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
         ],
       ),
     );
+  }
+
+  Future<void> _initializeDeepLinks() async {
+    if (kIsWeb) return; // uni_links not supported on web
+    await _handleReferralLink();
+    _linkSubscription = linkStream.listen(
+      (link) => _applyReferralCodeFromLink(link),
+      onError: (_) {},
+    );
+  }
+
+  Future<void> _handleReferralLink() async {
+    final initialLink = await getInitialLink();
+    _applyReferralCodeFromLink(initialLink);
+  }
+
+  void _applyReferralCodeFromLink(String? link) {
+    if (link == null || link.isEmpty) return;
+    final uri = Uri.tryParse(link);
+    if (uri == null) return;
+    final referralCode = uri.queryParameters['referral'];
+    if (referralCode != null && referralCode.isNotEmpty) {
+      setState(() {
+        _referralCodeController.text = referralCode;
+      });
+    }
   }
 
   @override
@@ -228,7 +245,19 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
                             label: 'Phone Number',
                             controller: _phoneController,
                             keyboardType: TextInputType.phone,
-                            validator: (value) => value == null || value.isEmpty ? 'Please enter your phone number' : null,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                              LengthLimitingTextInputFormatter(11),
+                            ],
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'Please enter your phone number';
+                                }
+                                if (!RegExp(r'^\d{11}$').hasMatch(value)) {
+                                  return 'Phone number must be exactly 11 digits';
+                                }
+                                return null;
+                              },
                           ),
                           _buildTextField(
                             label: 'Email',
@@ -318,7 +347,10 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
                                       } else {
                                         if (!context.mounted) return;
                                         ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(content: Text('Registration successful! Please verify your email.'), backgroundColor: Colors.green),
+                                          const SnackBar(
+                                            content: Text('Registration successful! Please verify your email.'),
+                                            backgroundColor: Color(0xFF00CA44),
+                                          ),
                                         );
                                         await Future.delayed(const Duration(seconds: 2));
                                         if (!context.mounted) return; // Check if the widget is still mounted before navigation
@@ -382,3 +414,4 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
     );
   }
 }
+

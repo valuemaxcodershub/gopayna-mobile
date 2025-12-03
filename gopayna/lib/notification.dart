@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 class NotificationScreen extends StatefulWidget {
@@ -22,7 +22,7 @@ class _NotificationScreenState extends State<NotificationScreen>
       message: 'Your airtime purchase of ₦1000 was successful',
       time: '2 minutes ago',
       icon: Icons.check_circle,
-      iconColor: const Color(0xFF00B82E),
+      iconColor: const Color(0xFF00CA44),
       isRead: false,
     ),
     NotificationItem(
@@ -46,7 +46,7 @@ class _NotificationScreenState extends State<NotificationScreen>
       message: 'Your wallet has been credited with ₦5000',
       time: 'Yesterday',
       icon: Icons.account_balance_wallet,
-      iconColor: const Color(0xFF00B82E),
+      iconColor: const Color(0xFF00CA44),
       isRead: true,
     ),
     NotificationItem(
@@ -62,7 +62,7 @@ class _NotificationScreenState extends State<NotificationScreen>
       message: 'Successfully purchased 2GB data for ₦1200',
       time: '3 days ago',
       icon: Icons.wifi,
-      iconColor: const Color(0xFF00B82E),
+      iconColor: const Color(0xFF00CA44),
       isRead: true,
     ),
     NotificationItem(
@@ -133,7 +133,7 @@ class _NotificationScreenState extends State<NotificationScreen>
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('All notifications marked as read'),
-        backgroundColor: Color(0xFF00B82E),
+        backgroundColor: Color(0xFF00CA44),
       ),
     );
   }
@@ -246,7 +246,7 @@ class _NotificationScreenState extends State<NotificationScreen>
                 SizedBox(width: isTablet ? 16 : 12),
                 Icon(
                   Icons.notifications,
-                  color: const Color(0xFF00B82E),
+                  color: const Color(0xFF00CA44),
                   size: isTablet ? 28 : 24,
                 ),
                 SizedBox(width: isTablet ? 12 : 8),
@@ -391,7 +391,7 @@ class _NotificationScreenState extends State<NotificationScreen>
             borderRadius: BorderRadius.circular(isTablet ? 16 : 12),
             border: notification.isRead 
                 ? Border.all(color: Colors.grey.shade200, width: 1)
-                : Border.all(color: const Color(0xFF00B82E).withValues(alpha: 0.3), width: 2),
+                : Border.all(color: const Color(0xFF00CA44).withValues(alpha: 0.3), width: 2),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: notification.isRead ? 0.03 : 0.05),
@@ -438,7 +438,7 @@ class _NotificationScreenState extends State<NotificationScreen>
                             width: isTablet ? 8 : 6,
                             height: isTablet ? 8 : 6,
                             decoration: const BoxDecoration(
-                              color: Color(0xFF00B82E),
+                              color: Color(0xFF00CA44),
                               shape: BoxShape.circle,
                             ),
                           ),
@@ -492,3 +492,5 @@ class NotificationItem {
     this.isRead = false,
   });
 }
+
+

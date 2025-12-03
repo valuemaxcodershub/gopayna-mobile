@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+﻿import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -8,6 +8,11 @@ import 'package:url_launcher/url_launcher_string.dart';
 import 'package:intl/intl.dart';
 
 import 'api_service.dart';
+import 'widgets/wallet_visibility_builder.dart';
+import 'widgets/themed_screen_helpers.dart';
+
+const _brandGreen = Color(0xFF00CA44);
+const _brandGreenDeep = Color(0xFF00CA44);
 
 class FundWalletScreen extends StatefulWidget {
   const FundWalletScreen({super.key});
@@ -16,7 +21,8 @@ class FundWalletScreen extends StatefulWidget {
   State<FundWalletScreen> createState() => _FundWalletScreenState();
 }
 
-class _FundWalletScreenState extends State<FundWalletScreen> with TickerProviderStateMixin {
+class _FundWalletScreenState extends State<FundWalletScreen>
+  with TickerProviderStateMixin, ThemedScreenHelpers {
   late AnimationController _fadeController;
   late AnimationController _slideController;
   late AnimationController _scaleController;
@@ -37,7 +43,7 @@ class _FundWalletScreenState extends State<FundWalletScreen> with TickerProvider
     {'amount': 40000, 'label': '₦40,000'},
   ];
   final NumberFormat _currencyFormat = NumberFormat.currency(locale: 'en_NG', symbol: '₦');
-  final DateFormat _transactionDateFormat = DateFormat('MMM d, yyyy • h:mma');
+  final DateFormat _transactionDateFormat = DateFormat('MMM d, yyyy â€¢ h:mma');
   List<Map<String, dynamic>> _recentTransactions = [];
   bool _transactionsLoading = false;
   String? _transactionsError;
@@ -98,7 +104,7 @@ class _FundWalletScreenState extends State<FundWalletScreen> with TickerProvider
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: isError ? Colors.red : const Color(0xFF00B82E),
+        backgroundColor: isError ? colorScheme.error : _brandGreen,
       ),
     );
   }
@@ -189,6 +195,7 @@ class _FundWalletScreenState extends State<FundWalletScreen> with TickerProvider
   }
 
   Widget _buildPreviewRow(String label, String value, {TextStyle? valueStyle}) {
+    final muted = mutedTextColor;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
@@ -196,7 +203,7 @@ class _FundWalletScreenState extends State<FundWalletScreen> with TickerProvider
         children: [
           Text(
             label,
-            style: const TextStyle(fontSize: 14, color: Colors.black54),
+            style: TextStyle(fontSize: 14, color: muted),
           ),
           Text(
             value,
@@ -235,11 +242,11 @@ class _FundWalletScreenState extends State<FundWalletScreen> with TickerProvider
   Color _statusColor(String status) {
     switch (status.toLowerCase()) {
       case 'success':
-        return const Color(0xFF00B82E);
+        return _brandGreen;
       case 'failed':
-        return Colors.red;
+        return colorScheme.error;
       default:
-        return Colors.orange;
+        return colorScheme.tertiary;
     }
   }
 
@@ -260,13 +267,16 @@ class _FundWalletScreenState extends State<FundWalletScreen> with TickerProvider
     final reference = (tx['reference'] ?? '--').toString();
     final createdAt = tx['created_at']?.toString();
     final channel = (tx['channel'] ?? 'Paystack').toString();
+    final card = cardColor;
+    final muted = mutedTextColor;
+    final border = borderColor;
 
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: card,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.withValues(alpha: 0.08)),
+        border: Border.all(color: border.withValues(alpha: 0.4)),
       ),
       child: Row(
         children: [
@@ -296,22 +306,26 @@ class _FundWalletScreenState extends State<FundWalletScreen> with TickerProvider
                     ),
                     Text(
                       _formatTransactionDate(createdAt),
-                      style: const TextStyle(fontSize: 12, color: Colors.black54),
+                      style: TextStyle(fontSize: 12, color: muted),
                     ),
                   ],
                 ),
                 const SizedBox(height: 4),
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      '${_statusLabel(status)} • $channel',
-                      style: TextStyle(fontSize: 13, color: _statusColor(status)),
+                    Expanded(
+                      child: Text(
+                        '${_statusLabel(status)} - $channel',
+                        style:
+                            TextStyle(fontSize: 13, color: _statusColor(status)),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
+                    const SizedBox(width: 8),
                     Flexible(
                       child: Text(
                         'Ref: ${reference.length > 12 ? reference.substring(reference.length - 12) : reference}',
-                        style: const TextStyle(fontSize: 12, color: Colors.black54),
+                        style: TextStyle(fontSize: 12, color: muted),
                         textAlign: TextAlign.end,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -436,6 +450,10 @@ class _FundWalletScreenState extends State<FundWalletScreen> with TickerProvider
   }
 
   Widget _buildRecentTransactionsSection() {
+    final card = cardColor;
+    final shadow = shadowColor;
+    final muted = mutedTextColor;
+    final cs = colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -458,11 +476,11 @@ class _FundWalletScreenState extends State<FundWalletScreen> with TickerProvider
           width: double.infinity,
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: card,
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
+                color: shadow,
                 blurRadius: 12,
                 offset: const Offset(0, 6),
               ),
@@ -476,7 +494,7 @@ class _FundWalletScreenState extends State<FundWalletScreen> with TickerProvider
                       children: [
                         Text(
                           _transactionsError!,
-                          style: const TextStyle(color: Colors.red),
+                          style: TextStyle(color: cs.error),
                         ),
                         const SizedBox(height: 8),
                         OutlinedButton.icon(
@@ -487,9 +505,9 @@ class _FundWalletScreenState extends State<FundWalletScreen> with TickerProvider
                       ],
                     )
                   : _recentTransactions.isEmpty
-                      ? const Text(
+                      ? Text(
                           'Your wallet transactions will appear here once you start funding.',
-                          style: TextStyle(color: Colors.black54),
+                          style: TextStyle(color: muted),
                         )
                       : ListView.separated(
                           shrinkWrap: true,
@@ -542,30 +560,34 @@ class _FundWalletScreenState extends State<FundWalletScreen> with TickerProvider
   Widget build(BuildContext context) {
     final screenSize = MediaQuery.of(context).size;
     final isTablet = screenSize.width > 600;
+    final cs = colorScheme;
+    final card = cardColor;
+    final muted = mutedTextColor;
+    final shadow = shadowColor;
 
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: cs.surface,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: cs.primary,
         elevation: 0,
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
-          icon: const Icon(
+          icon: Icon(
             Icons.arrow_back_ios,
-            color: Colors.black87,
+            color: cs.onPrimary,
             size: 20,
           ),
         ),
-        title: const Text(
+        title: Text(
           'Fund Wallet',
           style: TextStyle(
-            color: Colors.black87,
+            color: cs.onPrimary,
             fontSize: 18,
             fontWeight: FontWeight.w600,
           ),
         ),
         centerTitle: true,
-        systemOverlayStyle: SystemUiOverlayStyle.dark,
+        systemOverlayStyle: statusBarStyle,
       ),
       body: FadeTransition(
         opacity: _fadeAnimation,
@@ -588,12 +610,12 @@ class _FundWalletScreenState extends State<FundWalletScreen> with TickerProvider
                         gradient: const LinearGradient(
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
-                          colors: [Color(0xFF00B82E), Color(0xFF00A327)],
+                          colors: [_brandGreen, _brandGreenDeep],
                         ),
                         borderRadius: BorderRadius.circular(20),
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFF00B82E).withValues(alpha: 0.3),
+                            color: _brandGreen.withValues(alpha: 0.3),
                             blurRadius: 15,
                             offset: const Offset(0, 8),
                           ),
@@ -607,12 +629,12 @@ class _FundWalletScreenState extends State<FundWalletScreen> with TickerProvider
                               Container(
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.2),
+                                  color: cs.onPrimary.withValues(alpha: 0.2),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
-                                child: const Icon(
+                                child: Icon(
                                   Icons.account_balance_wallet,
-                                  color: Colors.white,
+                                  color: cs.onPrimary,
                                   size: 24,
                                 ),
                               ),
@@ -623,13 +645,13 @@ class _FundWalletScreenState extends State<FundWalletScreen> with TickerProvider
                                   vertical: 6,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.2),
+                                  color: cs.onPrimary.withValues(alpha: 0.2),
                                   borderRadius: BorderRadius.circular(20),
                                 ),
-                                child: const Text(
+                                child: Text(
                                   'Main Wallet',
                                   style: TextStyle(
-                                    color: Colors.white,
+                                    color: cs.onPrimary,
                                     fontSize: 12,
                                     fontWeight: FontWeight.w500,
                                   ),
@@ -638,21 +660,25 @@ class _FundWalletScreenState extends State<FundWalletScreen> with TickerProvider
                             ],
                           ),
                           const SizedBox(height: 16),
-                          const Text(
+                          Text(
                             'Current Balance',
                             style: TextStyle(
-                              color: Colors.white,
+                              color: cs.onPrimary.withValues(alpha: 0.9),
                               fontSize: 14,
                               fontWeight: FontWeight.w400,
                             ),
                           ),
                           const SizedBox(height: 8),
-                          Text(
-                            '₦${_walletBalance?.toStringAsFixed(2) ?? '0.00'}',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
+                          WalletVisibilityBuilder(
+                            builder: (_, showBalance) => Text(
+                              showBalance
+                                  ? '₦${_walletBalance?.toStringAsFixed(2) ?? '0.00'}'
+                                  : '************',
+                              style: TextStyle(
+                                color: cs.onPrimary,
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
                         ],
@@ -663,12 +689,12 @@ class _FundWalletScreenState extends State<FundWalletScreen> with TickerProvider
                   const SizedBox(height: 32),
 
                   // Amount Section
-                  const Text(
+                  Text(
                     'Amount',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
-                      color: Colors.black87,
+                      color: cs.onSurface,
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -676,11 +702,11 @@ class _FundWalletScreenState extends State<FundWalletScreen> with TickerProvider
                   // Quick Amount Selection
                   Container(
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: card,
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.grey.withValues(alpha: 0.1),
+                          color: shadow,
                           blurRadius: 10,
                           offset: const Offset(0, 4),
                         ),
@@ -690,12 +716,12 @@ class _FundWalletScreenState extends State<FundWalletScreen> with TickerProvider
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           'Quick Select',
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
-                            color: Colors.grey,
+                            color: muted,
                           ),
                         ),
                         const SizedBox(height: 12),
@@ -711,10 +737,10 @@ class _FundWalletScreenState extends State<FundWalletScreen> with TickerProvider
                                   vertical: 8,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF00B82E).withValues(alpha: 0.1),
+                                  color: _brandGreen.withValues(alpha: 0.1),
                                   borderRadius: BorderRadius.circular(20),
                                   border: Border.all(
-                                    color: const Color(0xFF00B82E).withValues(alpha: 0.3),
+                                    color: _brandGreen.withValues(alpha: 0.3),
                                   ),
                                 ),
                                 child: Text(
@@ -722,7 +748,7 @@ class _FundWalletScreenState extends State<FundWalletScreen> with TickerProvider
                                   style: const TextStyle(
                                     fontSize: 14,
                                     fontWeight: FontWeight.w500,
-                                    color: Color(0xFF00B82E),
+                                    color: _brandGreen,
                                   ),
                                 ),
                               ),
@@ -738,11 +764,11 @@ class _FundWalletScreenState extends State<FundWalletScreen> with TickerProvider
                   // Custom Amount Input
                   Container(
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: card,
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.grey.withValues(alpha: 0.1),
+                          color: shadow,
                           blurRadius: 10,
                           offset: const Offset(0, 4),
                         ),
@@ -753,26 +779,26 @@ class _FundWalletScreenState extends State<FundWalletScreen> with TickerProvider
                       keyboardType: TextInputType.number,
                       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                       onChanged: _onAmountChanged,
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: 'Enter Amount',
                         prefixText: '₦ ',
-                        prefixStyle: TextStyle(
+                        prefixStyle: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
-                          color: Color(0xFF00B82E),
+                          color: _brandGreen,
                         ),
-                        border: OutlineInputBorder(
+                        border: const OutlineInputBorder(
                           borderRadius: BorderRadius.all(Radius.circular(16)),
                           borderSide: BorderSide.none,
                         ),
                         filled: true,
-                        fillColor: Colors.white,
-                        contentPadding: EdgeInsets.all(20),
+                        fillColor: card,
+                        contentPadding: const EdgeInsets.all(20),
                       ),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w600,
-                        color: Colors.black87,
+                        color: cs.onSurface,
                       ),
                       validator: (value) {
                         if (value == null || value.isEmpty) {
@@ -798,22 +824,22 @@ class _FundWalletScreenState extends State<FundWalletScreen> with TickerProvider
                     child: ElevatedButton(
                       onPressed: _loading ? null : _fundWallet,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF00B82E),
-                        foregroundColor: Colors.white,
+                        backgroundColor: _brandGreen,
+                        foregroundColor: cs.onPrimary,
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16),
                         ),
                         elevation: 8,
-                        shadowColor: const Color(0xFF00B82E).withValues(alpha: 0.3),
+                        shadowColor: _brandGreen.withValues(alpha: 0.3),
                       ),
                       child: _loading
-                          ? const SizedBox(
+                          ? SizedBox(
                               height: 20,
                               width: 20,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                valueColor: AlwaysStoppedAnimation<Color>(cs.onPrimary),
                               ),
                             )
                           : const Text(
@@ -1019,3 +1045,6 @@ class _PaystackWebViewPageState extends State<PaystackWebViewPage> {
     );
   }
 }
+
+
+

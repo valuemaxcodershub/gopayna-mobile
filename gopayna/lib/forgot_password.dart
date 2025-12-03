@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 // Removed unused import
 import 'api_service.dart';
@@ -35,7 +35,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF00B82E),
+        backgroundColor: const Color(0xFF00CA44),
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
         title: const Text(
@@ -64,14 +64,14 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Icon(Icons.lock_outline, color: Color(0xFF00B82E), size: 48),
+                  const Icon(Icons.lock_outline, color: Color(0xFF00CA44), size: 48),
                   const SizedBox(height: 16),
                   const Text(
                     'Reset Your Password',
                     style: TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF00B82E),
+                      color: Color(0xFF00CA44),
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -87,15 +87,15 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     keyboardType: TextInputType.text,
                     decoration: InputDecoration(
                       labelText: 'Email or Phone',
-                      labelStyle: const TextStyle(color: Color(0xFF00B82E)),
-                      prefixIcon: const Icon(Icons.person_outline, color: Color(0xFF00B82E)),
+                      labelStyle: const TextStyle(color: Color(0xFF00CA44)),
+                      prefixIcon: const Icon(Icons.person_outline, color: Color(0xFF00CA44)),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Color(0xFF00B82E)),
+                        borderSide: const BorderSide(color: Color(0xFF00CA44)),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Color(0xFF00B82E)),
+                        borderSide: const BorderSide(color: Color(0xFF00CA44)),
                       ),
                     ),
                   ),
@@ -109,7 +109,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     child: ElevatedButton(
                       onPressed: _isLoading ? null : _sendOtp,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF00B82E),
+                        backgroundColor: const Color(0xFF00CA44),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -170,3 +170,4 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   }
   // Password reset logic now handled in OtpVerificationScreen
 }
+

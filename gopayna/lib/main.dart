@@ -1,7 +1,8 @@
-import 'package:flutter/foundation.dart';
+﻿import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter_platform_interface/webview_flutter_platform_interface.dart';
 import 'package:webview_flutter_web/webview_flutter_web.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'intro_screen.dart';
 import 'app_settings.dart';
 import 'login.dart';
@@ -24,12 +25,14 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   late AppSettings _appSettings;
+  late Future<_StartDestination> _startDestinationFuture;
 
   @override
   void initState() {
     super.initState();
     _appSettings = AppSettings();
     _appSettings.addListener(_onThemeChanged);
+    _startDestinationFuture = _determineStartDestination();
   }
 
   @override
@@ -42,6 +45,17 @@ class _MyAppState extends State<MyApp> {
     setState(() {});
   }
 
+  Future<_StartDestination> _determineStartDestination() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('jwt');
+
+    if (token != null && token.isNotEmpty) {
+      return _StartDestination.dashboard;
+    }
+
+    return _StartDestination.onboarding;
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -49,7 +63,24 @@ class _MyAppState extends State<MyApp> {
       theme: _appSettings.lightTheme,
       darkTheme: _appSettings.darkTheme,
       themeMode: _appSettings.isDarkMode ? ThemeMode.dark : ThemeMode.light,
-      home: const GoPaynaHomePage(),
+      home: FutureBuilder<_StartDestination>(
+        future: _startDestinationFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) {
+            return const Scaffold(
+              body: Center(
+                child: CircularProgressIndicator(),
+              ),
+            );
+          }
+
+          if (snapshot.data == _StartDestination.dashboard) {
+            return const DashboardScreen();
+          }
+
+          return const GoPaynaHomePage();
+        },
+      ),
       debugShowCheckedModeBanner: false,
       routes: {
         '/login': (context) => LoginScreen(),
@@ -62,6 +93,8 @@ class _MyAppState extends State<MyApp> {
     );
   }
 }
+
+enum _StartDestination { onboarding, dashboard }
 
 class GoPaynaHomePage extends StatefulWidget {
   const GoPaynaHomePage({super.key});
@@ -79,9 +112,6 @@ class _GoPaynaHomePageState extends State<GoPaynaHomePage> with TickerProviderSt
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _buttonSlide;
   late Animation<double> _buttonScale;
-
-  // GoPayna brand color
-  static const Color brandColor = Color(0xFF00B82E);
 
   @override
   void initState() {
@@ -156,6 +186,7 @@ class _GoPaynaHomePageState extends State<GoPaynaHomePage> with TickerProviderSt
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
     final isTablet = size.width > 600;
+    final brandColor = Theme.of(context).colorScheme.primary;
     
     return Scaffold(
       backgroundColor: brandColor,
@@ -295,3 +326,4 @@ class _GoPaynaHomePageState extends State<GoPaynaHomePage> with TickerProviderSt
     );
   }
 }
+

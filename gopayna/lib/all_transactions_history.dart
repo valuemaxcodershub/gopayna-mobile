@@ -1,5 +1,10 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import 'api_service.dart';
+import 'widgets/transaction_receipt.dart';
 
 class TransactionHistoryScreen extends StatefulWidget {
   const TransactionHistoryScreen({super.key});
@@ -27,138 +32,64 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
     'This Year',
     'Custom Date'
   ];
-
-  final Map<String, List<TransactionItem>> _groupedTransactions = {
-    'This Month': [
-      TransactionItem(
-        type: 'Referral Earnings',
-        amount: 500.00,
-        date: 'Nov 18th, 15:30:12',
-        status: 'Completed',
-        icon: Icons.group,
-        isIncoming: true,
-      ),
-      TransactionItem(
-        type: 'Airtime',
-        amount: 500.00,
-        date: 'Nov 18th, 17:23:07',
-        status: 'Successful',
-        icon: Icons.phone,
-      ),
-      TransactionItem(
-        type: 'Referral Earnings',
-        amount: 250.00,
-        date: 'Nov 17th, 12:45:33',
-        status: 'Completed',
-        icon: Icons.group,
-        isIncoming: true,
-      ),
-      TransactionItem(
-        type: 'Data Purchase',
-        amount: 1200.00,
-        date: 'Nov 17th, 14:15:22',
-        status: 'Successful',
-        icon: Icons.wifi,
-      ),
-      TransactionItem(
-        type: 'Electricity Bill',
-        amount: 5000.00,
-        date: 'Nov 15th, 09:30:45',
-        status: 'Successful',
-        icon: Icons.electrical_services,
-      ),
-      TransactionItem(
-        type: 'TV Subscription',
-        amount: 4500.00,
-        date: 'Nov 10th, 16:45:12',
-        status: 'Successful',
-        icon: Icons.tv,
-      ),
-      TransactionItem(
-        type: 'Education Pin',
-        amount: 2000.00,
-        date: 'Nov 8th, 11:20:33',
-        status: 'Successful',
-        icon: Icons.school,
-      ),
-    ],
-    'Last Month': [
-      TransactionItem(
-        type: 'Referral Earnings',
-        amount: 500.00,
-        date: 'Oct 30th, 09:15:22',
-        status: 'Completed',
-        icon: Icons.group,
-        isIncoming: true,
-      ),
-      TransactionItem(
-        type: 'Airtime',
-        amount: 1000.00,
-        date: 'Oct 28th, 12:45:07',
-        status: 'Successful',
-        icon: Icons.phone,
-      ),
-      TransactionItem(
-        type: 'Data Purchase',
-        amount: 2000.00,
-        date: 'Oct 25th, 15:30:22',
-        status: 'Failed',
-        icon: Icons.wifi,
-      ),
-      TransactionItem(
-        type: 'Wallet Funding',
-        amount: 10000.00,
-        date: 'Oct 20th, 08:15:45',
-        status: 'Successful',
-        icon: Icons.account_balance_wallet,
-        isIncoming: true,
-      ),
-    ],
-    'Jul 2025': [
-      TransactionItem(
-        type: 'Referral Earnings',
-        amount: 300.00,
-        date: 'Jul 10th, 16:20:15',
-        status: 'Completed',
-        icon: Icons.group,
-        isIncoming: true,
-      ),
-      TransactionItem(
-        type: 'Airtime',
-        amount: 500.00,
-        date: 'Jul 9th,13:25:08',
-        status: 'Successful',
-        icon: Icons.phone,
-      ),
-      TransactionItem(
-        type: 'Airtime',
-        amount: 500.00,
-        date: 'Jul 8th,18:25:08',
-        status: 'Successful',
-        icon: Icons.phone,
-      ),
-      TransactionItem(
-        type: 'Airtime',
-        amount: 500.00,
-        date: 'Jul 7th,17:25:08',
-        status: 'Successful',
-        icon: Icons.phone,
-      ),
-      TransactionItem(
-        type: 'Airtime',
-        amount: 400.00,
-        date: 'Jul 6th,19:25:08',
-        status: 'Successful',
-        icon: Icons.phone,
-      ),
-    ],
-  };
+  bool _loading = false;
+  String? _error;
+  DateTimeRange? _customRange;
+  final DateFormat _dateFormatter = DateFormat('MMM d, yyyy â€¢ h:mma');
+  List<WalletTransactionItem> _transactions = [];
 
   @override
   void initState() {
     super.initState();
     _initializeAnimations();
     _startAnimations();
+    _loadTransactions();
+  }
+
+  Future<void> _loadTransactions() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('jwt');
+    if (token == null || token.isEmpty) {
+      if (!mounted) return;
+      setState(() {
+        _error = 'Please log in again to view your history.';
+        _loading = false;
+      });
+      return;
+    }
+
+    final response = await fetchWalletTransactions(token: token, limit: 50);
+    if (!mounted) return;
+
+    if (response['error'] != null) {
+      setState(() {
+        _error = response['error'].toString();
+        _loading = false;
+      });
+      return;
+    }
+
+    final dataRaw = response['data'] as List<dynamic>? ?? [];
+    final parsed = dataRaw
+        .cast<Map<String, dynamic>>()
+        .map((tx) => WalletTransactionItem.fromMap(tx, _dateFormatter))
+        .toList()
+      ..sort((a, b) {
+        if (a.createdAt == null && b.createdAt == null) return 0;
+        if (a.createdAt == null) return 1;
+        if (b.createdAt == null) return -1;
+        return b.createdAt!.compareTo(a.createdAt!);
+      });
+
+    setState(() {
+      _transactions = parsed;
+      _loading = false;
+    });
   }
 
   void _initializeAnimations() {
@@ -203,59 +134,71 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(20),
-            topRight: Radius.circular(20),
+      builder: (context) {
+        final cs = Theme.of(context).colorScheme;
+        return SafeArea(
+          top: false,
+          child: Container(
+            decoration: BoxDecoration(
+              color: cs.surface,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(20),
+                topRight: Radius.circular(20),
+              ),
+            ),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.only(bottom: 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    margin: const EdgeInsets.only(top: 12),
+                    height: 4,
+                    width: 40,
+                    decoration: BoxDecoration(
+                      color: cs.outlineVariant,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.all(20),
+                    child: Text(
+                      'Select Period',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  ..._periods.map((period) => ListTile(
+                        leading: Icon(
+                          period == _selectedPeriod
+                              ? Icons.radio_button_checked
+                              : Icons.radio_button_unchecked,
+                          color: cs.primary,
+                        ),
+                        title: Text(period),
+                        onTap: () => _handlePeriodSelection(period),
+                      )),
+                ],
+              ),
+            ),
           ),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              margin: const EdgeInsets.only(top: 12),
-              height: 4,
-              width: 40,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const Padding(
-              padding: EdgeInsets.all(20),
-              child: Text(
-                'Select Period',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            ..._periods.map((period) => ListTile(
-              leading: Icon(
-                period == _selectedPeriod 
-                    ? Icons.radio_button_checked 
-                    : Icons.radio_button_unchecked,
-                color: const Color(0xFF00B82E),
-              ),
-              title: Text(period),
-              onTap: () {
-                setState(() {
-                  _selectedPeriod = period;
-                });
-                Navigator.pop(context);
-                if (period == 'Custom Date') {
-                  _showCustomDatePicker();
-                }
-              },
-            )),
-            const SizedBox(height: 20),
-          ],
-        ),
-      ),
+        );
+      },
     );
+  }
+
+  void _handlePeriodSelection(String period) {
+    Navigator.pop(context);
+    if (period == 'Custom Date') {
+      _showCustomDatePicker();
+      return;
+    }
+    setState(() {
+      _selectedPeriod = period;
+      _customRange = null;
+    });
   }
 
   void _showCustomDatePicker() async {
@@ -267,7 +210,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
         return Theme(
           data: Theme.of(context).copyWith(
             colorScheme: Theme.of(context).colorScheme.copyWith(
-              primary: const Color(0xFF00B82E),
+              primary: const Color(0xFF00CA44),
             ),
           ),
           child: child!,
@@ -277,13 +220,62 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
     
     if (picked != null) {
       setState(() {
+        _customRange = DateTimeRange(
+          start: picked.start,
+          end: picked.end,
+        );
         _selectedPeriod = 'Custom: ${_formatDateRange(picked)}';
       });
-    } else {
-      setState(() {
-        _selectedPeriod = 'This Month';
-      });
     }
+  }
+
+  List<WalletTransactionItem> _filteredTransactions() {
+    if (_transactions.isEmpty) return [];
+    final range = _currentRange();
+    if (range == null) {
+      return List<WalletTransactionItem>.from(_transactions);
+    }
+    return _transactions.where((tx) {
+      final created = tx.createdAt;
+      if (created == null) return false;
+      return !created.isBefore(range.start) && !created.isAfter(range.end);
+    }).toList();
+  }
+
+  DateTimeRange? _currentRange() {
+    if (_selectedPeriod.startsWith('Custom') && _customRange != null) {
+      return DateTimeRange(start: _customRange!.start, end: _endOfDay(_customRange!.end));
+    }
+
+    final now = DateTime.now();
+    switch (_selectedPeriod) {
+      case 'This Month':
+        return DateTimeRange(
+          start: DateTime(now.year, now.month, 1),
+          end: _endOfDay(DateTime(now.year, now.month + 1, 0)),
+        );
+      case 'Last Month':
+        final lastMonthStart = DateTime(now.year, now.month - 1, 1);
+        final lastMonthEnd = DateTime(now.year, now.month, 0);
+        return DateTimeRange(start: lastMonthStart, end: _endOfDay(lastMonthEnd));
+      case 'Last 3 Months':
+        final start = DateTime(now.year, now.month - 2, 1);
+        return DateTimeRange(start: start, end: _endOfDay(DateTime(now.year, now.month + 1, 0)));
+      case 'Last 6 Months':
+        final start = DateTime(now.year, now.month - 5, 1);
+        return DateTimeRange(start: start, end: _endOfDay(DateTime(now.year, now.month + 1, 0)));
+      case 'This Year':
+        return DateTimeRange(
+          start: DateTime(now.year, 1, 1),
+          end: _endOfDay(DateTime(now.year, 12, 31)),
+        );
+      default:
+        return null;
+    }
+  }
+
+  DateTime _endOfDay(DateTime date) {
+    return DateTime(date.year, date.month, date.day, 23, 59, 59, 999);
   }
 
   String _formatDateRange(DateTimeRange range) {
@@ -371,7 +363,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
             SizedBox(width: isTablet ? 16 : 12),
             Icon(
               Icons.history,
-              color: const Color(0xFF00B82E),
+              color: const Color(0xFF00CA44),
               size: isTablet ? 28 : 24,
             ),
             SizedBox(width: isTablet ? 12 : 8),
@@ -392,7 +384,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
   }
 
   Widget _buildTransactionList(bool isTablet) {
-    final transactions = _groupedTransactions[_selectedPeriod] ?? [];
+    final transactions = _filteredTransactions();
     
     return Container(
       margin: EdgeInsets.symmetric(
@@ -417,50 +409,60 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
       child: Column(
         children: [
           _buildPeriodSelector(isTablet),
-          transactions.isEmpty ? Expanded(child: _buildEmptyState(isTablet)) : Expanded(
-            child: Column(
-              children: [
-                Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: isTablet ? 24 : 20,
-                    vertical: isTablet ? 16 : 12,
-                  ),
-                  child: Row(
-                    children: [
-                      Text(
-                        _selectedPeriod,
-                        style: TextStyle(
-                          fontSize: isTablet ? 20 : 18,
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).colorScheme.onSurface,
-                        ),
-                      ),
-                      const Spacer(),
-                      Text(
-                        '${transactions.length} transactions',
-                        style: TextStyle(
-                          fontSize: isTablet ? 14 : 12,
-                          color: Colors.grey.shade600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Expanded(
-                  child: ListView.builder(
-                    padding: EdgeInsets.only(
-                      left: isTablet ? 24 : 20,
-                      right: isTablet ? 24 : 20,
-                      bottom: isTablet ? 24 : 20,
-                    ),
-                    itemCount: transactions.length,
-                    itemBuilder: (context, index) {
-                      return _buildTransactionCard(transactions[index], isTablet, index, 0);
-                    },
-                  ),
-                ),
-              ],
-            ),
+          Expanded(
+            child: _loading
+                ? const Center(child: CircularProgressIndicator())
+                : _error != null
+                    ? _buildErrorState(isTablet)
+                    : transactions.isEmpty
+                        ? _buildEmptyState(isTablet)
+                        : Column(
+                            children: [
+                              Padding(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: isTablet ? 24 : 20,
+                                  vertical: isTablet ? 16 : 12,
+                                ),
+                                child: Row(
+                                  children: [
+                                    Text(
+                                      _selectedPeriod,
+                                      style: TextStyle(
+                                        fontSize: isTablet ? 20 : 18,
+                                        fontWeight: FontWeight.bold,
+                                        color: Theme.of(context).colorScheme.onSurface,
+                                      ),
+                                    ),
+                                    const Spacer(),
+                                    Text(
+                                      '${transactions.length} transactions',
+                                      style: TextStyle(
+                                        fontSize: isTablet ? 14 : 12,
+                                        color: Colors.grey.shade600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Expanded(
+                                child: RefreshIndicator(
+                                  onRefresh: _loadTransactions,
+                                  child: ListView.builder(
+                                    physics: const AlwaysScrollableScrollPhysics(),
+                                    padding: EdgeInsets.only(
+                                      left: isTablet ? 24 : 20,
+                                      right: isTablet ? 24 : 20,
+                                      bottom: isTablet ? 24 : 20,
+                                    ),
+                                    itemCount: transactions.length,
+                                    itemBuilder: (context, index) {
+                                      return _buildTransactionCard(transactions[index], isTablet, index, 0);
+                                    },
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
           ),
         ],
       ),
@@ -482,7 +484,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
         children: [
           Icon(
             Icons.calendar_today,
-            color: const Color(0xFF00B82E),
+            color: const Color(0xFF00CA44),
             size: isTablet ? 24 : 20,
           ),
           SizedBox(width: isTablet ? 12 : 8),
@@ -503,10 +505,10 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
                 vertical: isTablet ? 10 : 8,
               ),
               decoration: BoxDecoration(
-                color: const Color(0xFF00B82E).withValues(alpha: 0.1),
+                color: const Color(0xFF00CA44).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
-                  color: const Color(0xFF00B82E),
+                  color: const Color(0xFF00CA44),
                   width: 1,
                 ),
               ),
@@ -516,7 +518,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
                   Text(
                     _selectedPeriod,
                     style: TextStyle(
-                      color: const Color(0xFF00B82E),
+                      color: const Color(0xFF00CA44),
                       fontSize: isTablet ? 14 : 12,
                       fontWeight: FontWeight.w600,
                     ),
@@ -524,7 +526,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
                   SizedBox(width: isTablet ? 8 : 4),
                   Icon(
                     Icons.keyboard_arrow_down,
-                    color: const Color(0xFF00B82E),
+                    color: const Color(0xFF00CA44),
                     size: isTablet ? 18 : 16,
                   ),
                 ],
@@ -569,8 +571,44 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
     );
   }
 
-  Widget _buildTransactionCard(TransactionItem transaction, bool isTablet, int index, int sectionIndex) {
+  Widget _buildErrorState(bool isTablet) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.error_outline,
+            size: isTablet ? 80 : 64,
+            color: Colors.red.withValues(alpha: 0.7),
+          ),
+          SizedBox(height: isTablet ? 20 : 16),
+          Text(
+            _error ?? 'Unable to load transactions right now.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: isTablet ? 18 : 16,
+              color: Colors.red,
+            ),
+          ),
+          SizedBox(height: isTablet ? 16 : 12),
+          ElevatedButton.icon(
+            onPressed: _loading ? null : _loadTransactions,
+            icon: const Icon(Icons.refresh),
+            label: const Text('Try again'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF00CA44),
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTransactionCard(WalletTransactionItem transaction, bool isTablet, int index, int sectionIndex) {
     final isIncoming = transaction.isIncoming;
+    final statusColor = transaction.statusColor;
+    const brandColor = Color(0xFF00CA44);
     return AnimatedContainer(
       duration: Duration(milliseconds: 400 + (index * 100) + (sectionIndex * 200)),
       curve: Curves.easeOutCubic,
@@ -578,19 +616,18 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
       child: GestureDetector(
         onTap: () {
           HapticFeedback.lightImpact();
-          _showTransactionDetails(transaction);
+          showTransactionReceipt(
+            context: context,
+            data: transaction.toReceiptData(),
+          );
         },
         child: Container(
           padding: EdgeInsets.all(isTablet ? 20 : 16),
           decoration: BoxDecoration(
-            color: isIncoming 
-                ? Colors.green.shade50
-                : const Color(0xFF00B82E).withValues(alpha: 0.05),
+            color: brandColor.withValues(alpha: isIncoming ? 0.08 : 0.05),
             borderRadius: BorderRadius.circular(isTablet ? 16 : 12),
             border: Border.all(
-              color: isIncoming
-                  ? Colors.green.withValues(alpha: 0.3)
-                  : const Color(0xFF00B82E).withValues(alpha: 0.1),
+                  color: brandColor.withValues(alpha: isIncoming ? 0.3 : 0.1),
               width: 1,
             ),
           ),
@@ -599,14 +636,12 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
               Container(
                 padding: EdgeInsets.all(isTablet ? 14 : 12),
                 decoration: BoxDecoration(
-                  color: isIncoming
-                      ? Colors.green.withValues(alpha: 0.1)
-                      : const Color(0xFF00B82E).withValues(alpha: 0.1),
+                  color: brandColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(isTablet ? 14 : 12),
                 ),
                 child: Icon(
                   transaction.icon,
-                  color: isIncoming ? Colors.green.shade600 : const Color(0xFF00B82E),
+                  color: brandColor,
                   size: isTablet ? 24 : 20,
                 ),
               ),
@@ -616,7 +651,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      transaction.type,
+                      transaction.title,
                       style: TextStyle(
                         fontSize: isTablet ? 18 : 16,
                         fontWeight: FontWeight.w600,
@@ -625,7 +660,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
                     ),
                     SizedBox(height: isTablet ? 6 : 4),
                     Text(
-                      transaction.date,
+                      transaction.dateLabel,
                       style: TextStyle(
                         fontSize: isTablet ? 14 : 12,
                         color: Colors.grey.shade600,
@@ -643,16 +678,16 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
                       if (isIncoming)
                         Icon(
                           Icons.add_circle,
-                          color: Colors.green.shade600,
+                          color: brandColor,
                           size: isTablet ? 16 : 14,
                         ),
                       if (isIncoming) SizedBox(width: 4),
                       Text(
-                        '${isIncoming ? '+' : ''}₦${transaction.amount.toStringAsFixed(2)}',
+                        '${isIncoming ? '+' : '-'}₦${transaction.amount.toStringAsFixed(2)}',
                         style: TextStyle(
                           fontSize: isTablet ? 18 : 16,
                           fontWeight: FontWeight.bold,
-                          color: isIncoming ? Colors.green.shade600 : Colors.black87,
+                          color: isIncoming ? brandColor : Colors.black87,
                         ),
                       ),
                     ],
@@ -664,11 +699,11 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
                       vertical: isTablet ? 6 : 4,
                     ),
                     decoration: BoxDecoration(
-                      color: isIncoming ? Colors.green.shade600 : const Color(0xFF00B82E),
+                      color: statusColor,
                       borderRadius: BorderRadius.circular(isTablet ? 8 : 6),
                     ),
                     child: Text(
-                      transaction.status,
+                      transaction.statusLabel,
                       style: TextStyle(
                         fontSize: isTablet ? 12 : 10,
                         fontWeight: FontWeight.w600,
@@ -685,128 +720,120 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
     );
   }
 
-  void _showTransactionDetails(TransactionItem transaction) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (context) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(20),
-            topRight: Radius.circular(20),
-          ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                height: 4,
-                width: 40,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(height: 24),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF00B82E).withValues(alpha: 0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  transaction.icon,
-                  color: const Color(0xFF00B82E),
-                  size: 32,
-                ),
-              ),
-              const SizedBox(height: 20),
-              Text(
-                'Transaction Details',
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 24),
-              _buildDetailRow('Type', transaction.type),
-              _buildDetailRow('Amount', '₦${transaction.amount.toStringAsFixed(2)}'),
-              _buildDetailRow('Date', transaction.date),
-              _buildDetailRow('Status', transaction.status),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.pop(context),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF00B82E),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Text(
-                    'Close',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDetailRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey.shade600,
-            ),
-          ),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: Colors.black87,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
-class TransactionItem {
-  final String type;
+class WalletTransactionItem {
+  final String title;
   final double amount;
-  final String date;
-  final String status;
+  final String dateLabel;
+  final DateTime? createdAt;
+  final String statusLabel;
+  final String statusKey;
   final IconData icon;
   final bool isIncoming;
+  final String reference;
+  final String channelLabel;
 
-  TransactionItem({
-    required this.type,
+  WalletTransactionItem({
+    required this.title,
     required this.amount,
-    required this.date,
-    required this.status,
+    required this.dateLabel,
+    required this.createdAt,
+    required this.statusLabel,
+    required this.statusKey,
     required this.icon,
-    this.isIncoming = false,
+    required this.isIncoming,
+    required this.reference,
+    required this.channelLabel,
   });
+
+  factory WalletTransactionItem.fromMap(Map<String, dynamic> data, DateFormat formatter) {
+    final rawStatus = (data['status'] ?? 'pending').toString();
+    final createdAt = DateTime.tryParse(data['created_at']?.toString() ?? '')?.toLocal();
+    final amountValue = double.tryParse(data['amount']?.toString() ?? '') ?? 0;
+    final direction = (data['type'] ?? data['transaction_type'] ?? data['direction'] ?? '')
+        .toString()
+        .toLowerCase();
+    final isIncoming = direction.isNotEmpty ? direction != 'debit' : amountValue >= 0;
+    final metadata = data['metadata'];
+    final metadataChannel = metadata is Map<String, dynamic> ? metadata['channel'] : null;
+    final channel = (data['channel'] ?? metadataChannel ?? 'Wallet transaction')
+      .toString()
+      .trim();
+    final reference = (data['reference'] ?? '').toString();
+    final title = channel.isEmpty ? 'Wallet transaction' : _titleCase(channel);
+    final formattedDate = createdAt != null ? formatter.format(createdAt) : '--';
+
+    return WalletTransactionItem(
+      title: title,
+      amount: amountValue.abs(),
+      dateLabel: formattedDate,
+      createdAt: createdAt,
+      statusLabel: _formatStatus(rawStatus),
+      statusKey: rawStatus.toLowerCase(),
+      icon: _iconForChannel(channel),
+      isIncoming: isIncoming,
+      reference: reference,
+      channelLabel: channel.isEmpty ? 'Wallet transaction' : _titleCase(channel),
+    );
+  }
+
+  TransactionReceiptData toReceiptData() {
+    final amountPrefix = isIncoming ? '+' : '-';
+    return TransactionReceiptData(
+      title: title,
+      amountDisplay: '$amountPrefix₦${amount.toStringAsFixed(2)}',
+      isCredit: isIncoming,
+      statusLabel: statusLabel,
+      statusColor: statusColor,
+      dateLabel: dateLabel,
+      channel: channelLabel,
+      reference: reference,
+      icon: icon,
+    );
+  }
+
+  Color get statusColor {
+    switch (statusKey) {
+      case 'success':
+        return const Color(0xFF00CA44);
+      case 'failed':
+        return Colors.red;
+      default:
+        return Colors.orange;
+    }
+  }
+
+  static IconData _iconForChannel(String channel) {
+    final value = channel.toLowerCase();
+    if (value.contains('airtime')) return Icons.phone;
+    if (value.contains('data')) return Icons.wifi;
+    if (value.contains('electric')) return Icons.electrical_services;
+    if (value.contains('tv')) return Icons.tv;
+    if (value.contains('education')) return Icons.school;
+    return Icons.account_balance_wallet;
+  }
+
+  static String _titleCase(String value) {
+    if (value.isEmpty) return value;
+    return value
+        .split(' ')
+        .where((word) => word.isNotEmpty)
+        .map((word) => word[0].toUpperCase() + word.substring(1).toLowerCase())
+        .join(' ');
+  }
+
+  static String _formatStatus(String status) {
+    switch (status.toLowerCase()) {
+      case 'success':
+        return 'Successful';
+      case 'failed':
+        return 'Failed';
+      default:
+        return status.isEmpty ? 'Pending' : status[0].toUpperCase() + status.substring(1).toLowerCase();
+    }
+  }
 }
+
+
+

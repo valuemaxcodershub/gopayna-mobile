@@ -30,6 +30,12 @@ migrate_working_dir/
 .pub-cache/
 .pub/
 /build/
+api/.env
+api/node_modules/
+mobile/gopayna/.dart_tool/
+mobile/gopayna/build/
+mobile/gopayna/ios/Flutter/Generated.xcconfig
+mobile/gopayna/android/local.properties
 
 # Symbolication related
 app.*.symbols

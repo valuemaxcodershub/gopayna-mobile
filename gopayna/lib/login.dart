@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:developer';
 import 'register.dart';
@@ -7,9 +7,12 @@ import 'otp_verification.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dashboard.dart';
 import 'forgot_password.dart';
+import 'intro_screen.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  const LoginScreen({super.key, this.redirectToIntroOnExit = false});
+
+  final bool redirectToIntroOnExit;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -27,7 +30,22 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
   late Animation<double> _buttonScale;
-  final Color _brandColor = const Color(0xFF00B82E);
+  final Color _brandColor = const Color(0xFF00CA44);
+
+  bool _handleBackNavigation() {
+    if (!widget.redirectToIntroOnExit) {
+      return true;
+    }
+
+    if (Navigator.of(context).canPop()) {
+      return true;
+    }
+
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => const LoadingPage()),
+    );
+    return false;
+  }
 
   @override
   void initState() {
@@ -175,12 +193,20 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     final screenSize = MediaQuery.of(context).size;
     final isTablet = screenSize.width > 600;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Header with back button and logo
+    return PopScope(
+      canPop: !widget.redirectToIntroOnExit,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop || !widget.redirectToIntroOnExit) {
+          return;
+        }
+        _handleBackNavigation();
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF8F9FA),
+        body: SafeArea(
+          child: Column(
+            children: [
+              // Header with back button and logo
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               child: Row(
@@ -193,7 +219,11 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                     ),
                     child: IconButton(
                       icon: Icon(Icons.arrow_back, color: Colors.black87),
-                      onPressed: () => Navigator.pop(context),
+                      onPressed: () {
+                        if (_handleBackNavigation() && Navigator.of(context).canPop()) {
+                          Navigator.pop(context);
+                        }
+                      },
                     ),
                   ),
                   Expanded(
@@ -216,121 +246,154 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
               ),
             ),
 
-            // Form content
-            Expanded(
-              child: SlideTransition(
-                position: _slideAnimation,
-                child: FadeTransition(
-                  opacity: _fadeAnimation,
-                  child: SingleChildScrollView(
-                    padding: EdgeInsets.symmetric(horizontal: isTablet ? 40 : 24, vertical: 20),
-                    child: Form(
-                      key: _formKey,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildTextField(
-                            label: 'Email or Phone Number',
-                            controller: _usernameController,
-                            keyboardType: TextInputType.text,
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Please enter your email or phone number';
-                              }
-                              return null;
-                            },
-                          ),
-                          _buildTextField(
-                            label: 'Password',
-                            controller: _passwordController,
-                            obscureText: _obscurePassword,
-                            suffixIcon: IconButton(
-                              icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility, color: Colors.grey[600]),
-                              onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
-                            ),
-                            validator: (value) {
-                              if (value == null || value.isEmpty) return 'Please enter your password';
-                              if (value.length < 6) return 'Password must be at least 6 characters';
-                              return null;
-                            },
-                          ),
-                          const SizedBox(height: 20),
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: TextButton(
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(builder: (_) => ForgotPasswordScreen()),
-                                );
+              // Form content
+              Expanded(
+                child: SlideTransition(
+                  position: _slideAnimation,
+                  child: FadeTransition(
+                    opacity: _fadeAnimation,
+                    child: SingleChildScrollView(
+                      padding: EdgeInsets.symmetric(horizontal: isTablet ? 40 : 24, vertical: 20),
+                      child: Form(
+                        key: _formKey,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildTextField(
+                              label: 'Email or Phone Number',
+                              controller: _usernameController,
+                              keyboardType: TextInputType.text,
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'Please enter your email or phone number';
+                                }
+                                return null;
                               },
-                              child: Text(
-                                'Forgot Password?',
-                                style: TextStyle(
-                                  color: _brandColor,
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 14,
-                                ),
-                              ),
                             ),
-                          ),
-                          ScaleTransition(
-                            scale: _buttonScale,
-                            child: SizedBox(
-                              width: double.infinity,
-                              height: isTablet ? 58 : 54,
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(27),
-                                  boxShadow: [BoxShadow(color: _brandColor.withValues(alpha: 0.4), blurRadius: 16, offset: const Offset(0, 6))],
-                                ),
-                                child: ElevatedButton(
-                                  onPressed: _isLoading ? null : _handleLogin,
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: _brandColor,
-                                    foregroundColor: Colors.white,
-                                    elevation: 0,
-                                    shadowColor: Colors.transparent,
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(27)),
-                                  ),
-                                  child: _isLoading
-                                      ? const CircularProgressIndicator(color: Colors.white)
-                                      : Text('LOGIN', style: TextStyle(fontSize: isTablet ? 18 : 16, fontWeight: FontWeight.w700, letterSpacing: 1.2)),
-                                ),
+                            _buildTextField(
+                              label: 'Password',
+                              controller: _passwordController,
+                              obscureText: _obscurePassword,
+                              suffixIcon: IconButton(
+                                icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility, color: Colors.grey[600]),
+                                onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                               ),
+                              validator: (value) {
+                                if (value == null || value.isEmpty) return 'Please enter your password';
+                                if (value.length < 6) return 'Password must be at least 6 characters';
+                                return null;
+                              },
                             ),
-                          ),
-                          const SizedBox(height: 24),
-                          Center(
-                            child: FadeTransition(
-                              opacity: _fadeAnimation,
-                              child: GestureDetector(
-                                onTap: () {
-                                  Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const RegisterScreen()));
+                            const SizedBox(height: 20),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: TextButton(
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(builder: (_) => ForgotPasswordScreen()),
+                                  );
                                 },
-                                child: RichText(
-                                  text: TextSpan(
-                                    text: "Don't have an Account? ",
-                                    style: TextStyle(fontSize: 14, color: Colors.black87, fontWeight: FontWeight.w400),
-                                    children: [
-                                      TextSpan(text: 'Register', style: TextStyle(color: _brandColor, fontWeight: FontWeight.w600)),
+                                child: Text(
+                                  'Forgot Password?',
+                                  style: TextStyle(
+                                    color: _brandColor,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            ScaleTransition(
+                              scale: _buttonScale,
+                              child: SizedBox(
+                                width: double.infinity,
+                                height: isTablet ? 58 : 54,
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(27),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: _brandColor.withValues(alpha: 0.4),
+                                        blurRadius: 16,
+                                        offset: const Offset(0, 6),
+                                      ),
                                     ],
                                   ),
+                                  child: ElevatedButton(
+                                    onPressed: _isLoading ? null : _handleLogin,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: _brandColor,
+                                      foregroundColor: Colors.white,
+                                      elevation: 0,
+                                      shadowColor: Colors.transparent,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(27),
+                                      ),
+                                    ),
+                                    child: _isLoading
+                                        ? const CircularProgressIndicator(color: Colors.white)
+                                        : Text(
+                                            'LOGIN',
+                                            style: TextStyle(
+                                              fontSize: isTablet ? 18 : 16,
+                                              fontWeight: FontWeight.w700,
+                                              letterSpacing: 1.2,
+                                            ),
+                                          ),
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                          SizedBox(height: isTablet ? 40 : 30),
-                        ],
+                            const SizedBox(height: 24),
+                            Center(
+                              child: FadeTransition(
+                                opacity: _fadeAnimation,
+                                child: GestureDetector(
+                                  onTap: () {
+                                    Navigator.pushReplacement(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => const RegisterScreen(),
+                                      ),
+                                    );
+                                  },
+                                  child: RichText(
+                                    text: TextSpan(
+                                      text: "Don't have an Account? ",
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.black87,
+                                        fontWeight: FontWeight.w400,
+                                      ),
+                                      children: [
+                                        TextSpan(
+                                          text: 'Register',
+                                          style: TextStyle(
+                                            color: _brandColor,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            SizedBox(height: isTablet ? 40 : 30),
+                          ],
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 }
+
+

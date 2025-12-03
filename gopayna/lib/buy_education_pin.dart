@@ -1,5 +1,8 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+
+import 'widgets/wallet_visibility_builder.dart';
+import 'widgets/themed_screen_helpers.dart';
 
 class EducationTransaction {
   final String id;
@@ -32,7 +35,8 @@ class BuyEducationPinScreen extends StatefulWidget {
   State<BuyEducationPinScreen> createState() => _BuyEducationPinScreenState();
 }
 
-class _BuyEducationPinScreenState extends State<BuyEducationPinScreen> {
+class _BuyEducationPinScreenState extends State<BuyEducationPinScreen>
+    with ThemedScreenHelpers {
   final _formKey = GlobalKey<FormState>();
   final _candidateNumberController = TextEditingController();
   final _phoneController = TextEditingController();
@@ -123,12 +127,14 @@ class _BuyEducationPinScreenState extends State<BuyEducationPinScreen> {
   }
 
   void _buyEducationPin() {
+    final colorScheme = this.colorScheme;
     if (_formKey.currentState!.validate()) {
       if (_selectedPackage.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Please select a package'),
-            backgroundColor: Colors.red,
+          SnackBar(
+            content: const Text('Please select a package'),
+            backgroundColor: colorScheme.error,
+            behavior: SnackBarBehavior.floating,
           ),
         );
         return;
@@ -142,6 +148,10 @@ class _BuyEducationPinScreenState extends State<BuyEducationPinScreen> {
     final selectedPackage = _packages[_selectedProvider]!.firstWhere(
       (package) => '${package['bundle']} - ${package['type']}' == _selectedPackage,
     );
+    final colorScheme = this.colorScheme;
+    final cardColor = this.cardColor;
+    final borderColor = this.borderColor;
+    final mutedTextColor = this.mutedTextColor;
     
     showDialog(
       context: context,
@@ -150,30 +160,35 @@ class _BuyEducationPinScreenState extends State<BuyEducationPinScreen> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(isTablet ? 20 : 16),
           ),
+          backgroundColor: cardColor,
           title: Text(
             'Confirm Purchase',
             style: TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: isTablet ? 22 : 18,
+              color: colorScheme.onSurface,
             ),
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Please confirm your education pin details:',
                 style: TextStyle(
                   fontSize: 14,
-                  color: Colors.black54,
+                  color: mutedTextColor,
                 ),
               ),
               const SizedBox(height: 16),
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade50,
+                  color: colorScheme.surface.withValues(
+                    alpha: isDarkMode ? 0.35 : 0.5,
+                  ),
                   borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: borderColor),
                 ),
                 child: Column(
                   children: [
@@ -194,10 +209,11 @@ class _BuyEducationPinScreenState extends State<BuyEducationPinScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text(
+              child: Text(
                 'Cancel',
                 style: TextStyle(
-                  color: Colors.grey,
+                  color: mutedTextColor,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
             ),
@@ -207,8 +223,8 @@ class _BuyEducationPinScreenState extends State<BuyEducationPinScreen> {
                 _processPurchase();
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF00B82E),
-                foregroundColor: Colors.white,
+                backgroundColor: colorScheme.primary,
+                foregroundColor: colorScheme.onPrimary,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
@@ -228,21 +244,21 @@ class _BuyEducationPinScreenState extends State<BuyEducationPinScreen> {
           width: 80,
           child: Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w500,
-              color: Colors.black87,
+              color: mutedTextColor,
             ),
           ),
         ),
-        const Text(': '),
+        const SizedBox(width: 8),
         Expanded(
           child: Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w600,
-              color: Colors.black87,
+              color: colorScheme.onSurface,
             ),
           ),
         ),
@@ -271,6 +287,7 @@ class _BuyEducationPinScreenState extends State<BuyEducationPinScreen> {
     final selectedPackage = _packages[_selectedProvider]!.firstWhere(
       (package) => '${package['bundle']} - ${package['type']}' == _selectedPackage,
     );
+    final colorScheme = this.colorScheme;
 
     showDialog(
       context: context,
@@ -284,10 +301,10 @@ class _BuyEducationPinScreenState extends State<BuyEducationPinScreen> {
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(20),
-              gradient: const LinearGradient(
+              gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [Color(0xFF00B82E), Color(0xFF00A327)],
+                colors: [colorScheme.primary, colorScheme.primaryContainer],
               ),
             ),
             child: Column(
@@ -297,31 +314,31 @@ class _BuyEducationPinScreenState extends State<BuyEducationPinScreen> {
                   width: 80,
                   height: 80,
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
+                    color: colorScheme.onPrimary.withValues(alpha: 0.2),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.check_circle,
-                    color: Colors.white,
+                    color: colorScheme.onPrimary,
                     size: 50,
                   ),
                 ),
                 const SizedBox(height: 20),
-                const Text(
+                Text(
                   'Purchase Successful!',
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                    color: colorScheme.onPrimary,
                   ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 12),
                 Text(
                   'You successfully purchased ${selectedPackage['bundle']} for ${selectedProviderData['fullName']}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
-                    color: Colors.white,
+                    color: colorScheme.onPrimary,
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -334,8 +351,8 @@ class _BuyEducationPinScreenState extends State<BuyEducationPinScreen> {
                       Navigator.of(context).pop();
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: const Color(0xFF00B82E),
+                      backgroundColor: colorScheme.onPrimary,
+                      foregroundColor: colorScheme.primary,
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -380,24 +397,30 @@ class _BuyEducationPinScreenState extends State<BuyEducationPinScreen> {
   @override
   Widget build(BuildContext context) {
     final isTablet = MediaQuery.of(context).size.width > 600;
+    final theme = Theme.of(context);
+    final colorScheme = this.colorScheme;
+    final cardColor = this.cardColor;
+    final borderColor = this.borderColor;
+    final mutedTextColor = this.mutedTextColor;
+    final shadowColor = this.shadowColor;
     
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF00B82E),
+        backgroundColor: colorScheme.primary,
         elevation: 0,
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
           icon: Icon(
             Icons.arrow_back,
-            color: Colors.white,
+            color: colorScheme.onPrimary,
             size: isTablet ? 28 : 20,
           ),
         ),
         title: Text(
           'Education Pin',
           style: TextStyle(
-            color: Colors.white,
+            color: colorScheme.onPrimary,
             fontSize: isTablet ? 24 : 18,
             fontWeight: FontWeight.w600,
           ),
@@ -409,14 +432,14 @@ class _BuyEducationPinScreenState extends State<BuyEducationPinScreen> {
             child: Text(
               'History',
               style: TextStyle(
-                color: Colors.white,
+                color: colorScheme.onPrimary,
                 fontSize: isTablet ? 20 : 16,
                 fontWeight: FontWeight.w500,
               ),
             ),
           ),
         ],
-        systemOverlayStyle: SystemUiOverlayStyle.light,
+        systemOverlayStyle: statusBarStyle,
       ),
       body: SingleChildScrollView(
         padding: EdgeInsets.all(isTablet ? 32 : 20),
@@ -425,85 +448,50 @@ class _BuyEducationPinScreenState extends State<BuyEducationPinScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Wallet Balance Card
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Color(0xFF00B82E), Color(0xFF00A327)],
-                  ),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Wallet Balance',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 14,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            '₦${_walletBalance.toStringAsFixed(2)}',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
+              WalletVisibilityBuilder(
+                builder: (_, showBalance) {
+                  final balanceText = showBalance
+                      ? '₦${_walletBalance.toStringAsFixed(2)}'
+                      : '*************';
+                  return Text(
+                    'Wallet Balance: $balanceText',
+                    style: TextStyle(
+                      fontSize: isTablet ? 14 : 12,
+                      color: mutedTextColor,
                     ),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(
-                        Icons.account_balance_wallet,
-                        color: Colors.white,
-                        size: 24,
-                      ),
-                    ),
-                  ],
-                ),
+                  );
+                },
               ),
 
-              const SizedBox(height: 24),
+              SizedBox(height: isTablet ? 24 : 16),
 
               // Provider Selection
               Container(
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: cardColor,
                   borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.grey.withValues(alpha: 0.1),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
+                  border: Border.all(color: borderColor),
+                  boxShadow: isDarkMode
+                      ? null
+                      : [
+                          BoxShadow(
+                            color: shadowColor,
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Padding(
-                      padding: EdgeInsets.all(20),
+                    Padding(
+                      padding: const EdgeInsets.all(20),
                       child: Text(
                         'Select Exam Body',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
-                          color: Colors.black87,
+                          color: colorScheme.onSurface,
                         ),
                       ),
                     ),
@@ -577,14 +565,14 @@ class _BuyEducationPinScreenState extends State<BuyEducationPinScreen> {
                               duration: const Duration(milliseconds: 200),
                               padding: const EdgeInsets.all(16),
                               decoration: BoxDecoration(
-                                color: isSelected 
-                                    ? provider['color'].withValues(alpha: 0.1)
-                                    : Colors.grey.shade50,
+                                color: isSelected
+                                    ? provider['color'].withValues(alpha: 0.12)
+                                    : cardColor,
                                 borderRadius: BorderRadius.circular(8),
                                 border: Border.all(
-                                  color: isSelected 
+                                  color: isSelected
                                       ? provider['color']
-                                      : Colors.grey.shade300,
+                                      : borderColor,
                                   width: isSelected ? 2 : 1,
                                 ),
                               ),
@@ -614,7 +602,7 @@ class _BuyEducationPinScreenState extends State<BuyEducationPinScreen> {
                                           Text(
                                             provider['fullName'],
                                             style: TextStyle(
-                                              color: provider['color'].withValues(alpha: 0.7),
+                                              color: provider['color'].withValues(alpha: 0.75),
                                               fontSize: 11,
                                             ),
                                             overflow: TextOverflow.ellipsis,
@@ -637,41 +625,97 @@ class _BuyEducationPinScreenState extends State<BuyEducationPinScreen> {
 
               const SizedBox(height: 20),
 
+              // Candidate Number Field
+              Container(
+                decoration: BoxDecoration(
+                  color: cardColor,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: borderColor),
+                  boxShadow: isDarkMode
+                      ? null
+                      : [
+                          BoxShadow(
+                            color: shadowColor,
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                ),
+                child: TextFormField(
+                  controller: _candidateNumberController,
+                  keyboardType: TextInputType.text,
+                  textCapitalization: TextCapitalization.characters,
+                  decoration: InputDecoration(
+                    labelText: 'Candidate Number',
+                    prefixIcon: Icon(
+                      Icons.badge_outlined,
+                      color: colorScheme.primary,
+                    ),
+                    border: const OutlineInputBorder(
+                      borderRadius: BorderRadius.all(Radius.circular(16)),
+                      borderSide: BorderSide.none,
+                    ),
+                    filled: true,
+                    fillColor: cardColor,
+                    contentPadding: const EdgeInsets.all(20),
+                  ),
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                    color: colorScheme.onSurface,
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Enter candidate number';
+                    }
+                    if (value.length < 7) {
+                      return 'Candidate number looks too short';
+                    }
+                    return null;
+                  },
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
               // Phone Number Field
               Container(
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: cardColor,
                   borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.grey.withValues(alpha: 0.1),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
+                  border: Border.all(color: borderColor),
+                  boxShadow: isDarkMode
+                      ? null
+                      : [
+                          BoxShadow(
+                            color: shadowColor,
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
                 ),
                 child: TextFormField(
                   controller: _phoneController,
                   keyboardType: TextInputType.phone,
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Phone Number',
                     prefixIcon: Icon(
                       Icons.phone,
-                      color: Color(0xFF00B82E),
+                      color: colorScheme.primary,
                     ),
-                    border: OutlineInputBorder(
+                    border: const OutlineInputBorder(
                       borderRadius: BorderRadius.all(Radius.circular(16)),
                       borderSide: BorderSide.none,
                     ),
                     filled: true,
-                    fillColor: Colors.white,
-                    contentPadding: EdgeInsets.all(20),
+                    fillColor: cardColor,
+                    contentPadding: const EdgeInsets.all(20),
                   ),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w500,
-                    color: Colors.black87,
+                    color: colorScheme.onSurface,
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
@@ -690,27 +734,30 @@ class _BuyEducationPinScreenState extends State<BuyEducationPinScreen> {
               // Package Selection
               Container(
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: cardColor,
                   borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.grey.withValues(alpha: 0.1),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
+                  border: Border.all(color: borderColor),
+                  boxShadow: isDarkMode
+                      ? null
+                      : [
+                          BoxShadow(
+                            color: shadowColor,
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Padding(
-                      padding: EdgeInsets.all(20),
+                    Padding(
+                      padding: const EdgeInsets.all(20),
                       child: Text(
                         'Select Service',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
-                          color: Colors.black87,
+                          color: colorScheme.onSurface,
                         ),
                       ),
                     ),
@@ -743,14 +790,14 @@ class _BuyEducationPinScreenState extends State<BuyEducationPinScreen> {
                               margin: const EdgeInsets.all(3),
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
-                                color: isSelected 
-                                    ? const Color(0xFF00B82E).withValues(alpha: 0.1)
-                                    : Colors.grey.shade50,
+                                  color: isSelected
+                                      ? colorScheme.primary.withValues(alpha: 0.12)
+                                      : cardColor,
                                 borderRadius: BorderRadius.circular(8),
                                 border: Border.all(
-                                  color: isSelected 
-                                      ? const Color(0xFF00B82E)
-                                      : Colors.grey.shade300,
+                                    color: isSelected
+                                        ? colorScheme.primary
+                                        : borderColor,
                                   width: isSelected ? 2 : 1,
                                 ),
                               ),
@@ -763,18 +810,18 @@ class _BuyEducationPinScreenState extends State<BuyEducationPinScreen> {
                                       children: [
                                         Text(
                                           package['bundle'],
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             fontWeight: FontWeight.bold,
                                             fontSize: 14,
-                                            color: Colors.black87,
+                                            color: colorScheme.onSurface,
                                           ),
                                         ),
                                         const SizedBox(height: 2),
                                         Text(
                                           package['type'],
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             fontSize: 12,
-                                            color: Colors.black54,
+                                            color: mutedTextColor,
                                           ),
                                         ),
                                       ],
@@ -782,17 +829,17 @@ class _BuyEducationPinScreenState extends State<BuyEducationPinScreen> {
                                   ),
                                   Text(
                                     '₦${package['price']}',
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 14,
-                                      color: Colors.black87,
+                                      color: colorScheme.onSurface,
                                     ),
                                   ),
                                   const SizedBox(width: 8),
                                   if (isSelected)
-                                    const Icon(
+                                    Icon(
                                       Icons.check_circle,
-                                      color: Color(0xFF00B82E),
+                                      color: colorScheme.primary,
                                       size: 16,
                                     ),
                                 ],
@@ -815,29 +862,31 @@ class _BuyEducationPinScreenState extends State<BuyEducationPinScreen> {
                 child: ElevatedButton(
                   onPressed: _isLoading ? null : _buyEducationPin,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF00B82E),
-                    foregroundColor: Colors.white,
+                    backgroundColor: colorScheme.primary,
+                    foregroundColor: colorScheme.onPrimary,
                     padding: EdgeInsets.symmetric(vertical: isTablet ? 20 : 16),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(isTablet ? 20 : 16),
                     ),
-                    elevation: 8,
-                    shadowColor: const Color(0xFF00B82E).withValues(alpha: 0.3),
+                    elevation: isDarkMode ? 0 : 8,
+                    shadowColor: colorScheme.primary.withValues(alpha: 0.3),
                   ),
                   child: _isLoading
                       ? SizedBox(
                           height: isTablet ? 28 : 20,
                           width: isTablet ? 28 : 20,
-                          child: const CircularProgressIndicator(
+                          child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            valueColor:
+                                AlwaysStoppedAnimation<Color>(colorScheme.onPrimary),
                           ),
                         )
                       : Text(
-                          'Buy Education Pin',
+                          'Purchase PIN',
                           style: TextStyle(
                             fontSize: isTablet ? 22 : 18,
                             fontWeight: FontWeight.w600,
+                            color: colorScheme.onPrimary,
                           ),
                         ),
                 ),
@@ -849,15 +898,18 @@ class _BuyEducationPinScreenState extends State<BuyEducationPinScreen> {
               if (_recentTransactions.isNotEmpty) ...[
                 Container(
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: cardColor,
                     borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.grey.withValues(alpha: 0.1),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
+                    border: Border.all(color: borderColor),
+                    boxShadow: isDarkMode
+                        ? null
+                        : [
+                            BoxShadow(
+                              color: shadowColor,
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -866,19 +918,19 @@ class _BuyEducationPinScreenState extends State<BuyEducationPinScreen> {
                         padding: const EdgeInsets.all(20),
                         child: Row(
                           children: [
-                            const Icon(
+                            Icon(
                               Icons.history,
-                              color: Color(0xFF00B82E),
+                              color: colorScheme.primary,
                               size: 20,
                             ),
                             const SizedBox(width: 8),
-                            const Expanded(
+                            Expanded(
                               child: Text(
                                 'Recent Education Pins',
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w600,
-                                  color: Colors.black87,
+                                  color: colorScheme.onSurface,
                                 ),
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -890,10 +942,10 @@ class _BuyEducationPinScreenState extends State<BuyEducationPinScreen> {
                                 minimumSize: Size.zero,
                                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                               ),
-                              child: const Text(
+                              child: Text(
                                 'View All',
                                 style: TextStyle(
-                                  color: Color(0xFF00B82E),
+                                  color: colorScheme.primary,
                                   fontSize: 14,
                                   fontWeight: FontWeight.w500,
                                 ),
@@ -907,7 +959,7 @@ class _BuyEducationPinScreenState extends State<BuyEducationPinScreen> {
                         physics: const NeverScrollableScrollPhysics(),
                         itemCount: _recentTransactions.take(3).length,
                         separatorBuilder: (context, index) => Divider(
-                          color: Colors.grey.shade100,
+                          color: borderColor,
                           height: 1,
                         ),
                         itemBuilder: (context, index) {
@@ -943,26 +995,26 @@ class _BuyEducationPinScreenState extends State<BuyEducationPinScreen> {
                                     children: [
                                       Text(
                                         transaction.package,
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           fontSize: 14,
                                           fontWeight: FontWeight.w600,
-                                          color: Colors.black87,
+                                          color: colorScheme.onSurface,
                                         ),
                                       ),
                                       const SizedBox(height: 2),
                                       Text(
                                         transaction.provider,
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           fontSize: 12,
-                                          color: Colors.black54,
+                                          color: mutedTextColor,
                                         ),
                                       ),
                                       const SizedBox(height: 2),
                                       Text(
                                         _formatDate(transaction.date),
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           fontSize: 12,
-                                          color: Colors.black54,
+                                          color: mutedTextColor,
                                         ),
                                       ),
                                     ],
@@ -973,10 +1025,10 @@ class _BuyEducationPinScreenState extends State<BuyEducationPinScreen> {
                                   children: [
                                     Text(
                                       '₦${transaction.amount.toStringAsFixed(0)}',
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontSize: 14,
                                         fontWeight: FontWeight.bold,
-                                        color: Colors.black87,
+                                        color: colorScheme.onSurface,
                                       ),
                                     ),
                                     const SizedBox(height: 4),
@@ -986,17 +1038,18 @@ class _BuyEducationPinScreenState extends State<BuyEducationPinScreen> {
                                         vertical: 2,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: transaction.status == 'Successful'
-                                            ? Colors.green.shade100
-                                            : Colors.red.shade100,
+                                        color: (transaction.status == 'Successful'
+                                                ? colorScheme.primary
+                                                : colorScheme.error)
+                                            .withValues(alpha: 0.15),
                                         borderRadius: BorderRadius.circular(4),
                                       ),
                                       child: Text(
                                         transaction.status,
                                         style: TextStyle(
                                           color: transaction.status == 'Successful'
-                                              ? Colors.green.shade700
-                                              : Colors.red.shade700,
+                                              ? colorScheme.primary
+                                              : colorScheme.error,
                                           fontSize: 10,
                                           fontWeight: FontWeight.w500,
                                         ),
@@ -1020,3 +1073,4 @@ class _BuyEducationPinScreenState extends State<BuyEducationPinScreen> {
     );
   }
 }
+

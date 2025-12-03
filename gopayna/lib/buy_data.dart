@@ -1,5 +1,8 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+
+import 'widgets/wallet_visibility_builder.dart';
+import 'widgets/themed_screen_helpers.dart';
 
 class DataTransaction {
   final String network;
@@ -28,9 +31,9 @@ class BuyDataScreen extends StatefulWidget {
   State<BuyDataScreen> createState() => _BuyDataScreenState();
 }
 
-class _BuyDataScreenState extends State<BuyDataScreen> {
+class _BuyDataScreenState extends State<BuyDataScreen> with ThemedScreenHelpers {
   final _formKey = GlobalKey<FormState>();
-  final _phoneController = TextEditingController(text: '08051237666');
+  final TextEditingController _phoneController = TextEditingController(text: '08051237666');
 
   String _selectedNetwork = 'glo';
   String _selectedDataPlan = '';
@@ -56,14 +59,14 @@ class _BuyDataScreenState extends State<BuyDataScreen> {
     {
       'id': 'glo',
       'name': 'GLO',
-      'color': const Color(0xFF00B82E),
+      'color': const Color(0xFF00CA44),
       'icon': Icons.sim_card,
       'textColor': Colors.white,
     },
     {
       'id': '9mobile',
       'name': '9Mobile',
-      'color': const Color(0xFF006633),
+      'color': const Color(0xFF00CA44),
       'icon': Icons.sim_card,
       'textColor': Colors.white,
     },
@@ -121,7 +124,7 @@ class _BuyDataScreenState extends State<BuyDataScreen> {
       amount: '1900',
       date: DateTime.now().subtract(const Duration(days: 1)),
       isSuccessful: true,
-      networkColor: const Color(0xFF00B82E),
+      networkColor: const Color(0xFF00CA44),
     ),
     DataTransaction(
       network: 'Airtel',
@@ -144,9 +147,9 @@ class _BuyDataScreenState extends State<BuyDataScreen> {
     if (_formKey.currentState!.validate()) {
       if (_selectedDataPlan.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Please select a data plan'),
-            backgroundColor: Colors.red,
+          SnackBar(
+            content: const Text('Please select a data plan'),
+            backgroundColor: colorScheme.error,
           ),
         );
         return;
@@ -160,6 +163,9 @@ class _BuyDataScreenState extends State<BuyDataScreen> {
     final selectedPlan = _dataPlans[_selectedNetwork]!.firstWhere(
       (plan) => '${plan['bundle']} - ₦${plan['price']}' == _selectedDataPlan,
     );
+    final cs = colorScheme;
+    final card = cardColor;
+    final muted = mutedTextColor;
     
     showDialog(
       context: context,
@@ -173,24 +179,25 @@ class _BuyDataScreenState extends State<BuyDataScreen> {
             style: TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: isTablet ? 22 : 18,
+              color: cs.onSurface,
             ),
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Please confirm your data purchase details:',
                 style: TextStyle(
                   fontSize: 14,
-                  color: Colors.black54,
+                  color: muted,
                 ),
               ),
               const SizedBox(height: 16),
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade50,
+                  color: card,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Column(
@@ -212,10 +219,10 @@ class _BuyDataScreenState extends State<BuyDataScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text(
+              child: Text(
                 'Cancel',
                 style: TextStyle(
-                  color: Colors.grey,
+                  color: muted,
                 ),
               ),
             ),
@@ -225,8 +232,8 @@ class _BuyDataScreenState extends State<BuyDataScreen> {
                 _processPurchase();
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF00B82E),
-                foregroundColor: Colors.white,
+                backgroundColor: cs.primary,
+                foregroundColor: cs.onPrimary,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
@@ -246,10 +253,10 @@ class _BuyDataScreenState extends State<BuyDataScreen> {
           width: 80,
           child: Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w500,
-              color: Colors.black87,
+              color: colorScheme.onSurface,
             ),
           ),
         ),
@@ -257,10 +264,10 @@ class _BuyDataScreenState extends State<BuyDataScreen> {
         Expanded(
           child: Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w600,
-              color: Colors.black87,
+              color: colorScheme.onSurface,
             ),
           ),
         ),
@@ -290,6 +297,7 @@ class _BuyDataScreenState extends State<BuyDataScreen> {
     final selectedPlan = _dataPlans[_selectedNetwork]!.firstWhere(
       (plan) => '${plan['bundle']} - ₦${plan['price']}' == _selectedDataPlan,
     );
+    final cs = colorScheme;
     
     showDialog(
       context: context,
@@ -303,10 +311,10 @@ class _BuyDataScreenState extends State<BuyDataScreen> {
             padding: EdgeInsets.all(isTablet ? 32 : 24),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(isTablet ? 24 : 20),
-              gradient: const LinearGradient(
+              gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [Color(0xFF00B82E), Color(0xFF00A327)],
+                colors: [cs.primary, cs.primary.withValues(alpha: 0.85)],
               ),
             ),
             child: Column(
@@ -316,31 +324,31 @@ class _BuyDataScreenState extends State<BuyDataScreen> {
                   width: isTablet ? 100 : 80,
                   height: isTablet ? 100 : 80,
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
+                    color: cs.onPrimary.withValues(alpha: 0.2),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
                     Icons.check_circle,
-                    color: Colors.white,
+                    color: cs.onPrimary,
                     size: isTablet ? 60 : 50,
                   ),
                 ),
                 const SizedBox(height: 20),
-                const Text(
+                Text(
                   'Data Purchase Successful!',
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                    color: cs.onPrimary,
                   ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 12),
                 Text(
                   'You successfully purchased ${selectedPlan['bundle']} ${selectedNetworkData['name']} data for ${_phoneController.text}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
-                    color: Colors.white,
+                    color: cs.onPrimary,
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -353,18 +361,19 @@ class _BuyDataScreenState extends State<BuyDataScreen> {
                       Navigator.of(context).pop();
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: const Color(0xFF00B82E),
+                      backgroundColor: cs.onPrimary,
+                      foregroundColor: cs.primary,
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    child: const Text(
+                    child: Text(
                       'Done',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
+                        color: cs.primary,
                       ),
                     ),
                   ),
@@ -399,24 +408,30 @@ class _BuyDataScreenState extends State<BuyDataScreen> {
   @override
   Widget build(BuildContext context) {
     final isTablet = MediaQuery.of(context).size.width > 600;
+    final cs = colorScheme;
+    final muted = mutedTextColor;
+    final card = cardColor;
+    final border = borderColor;
+    final shadow = shadowColor;
+    final surfaceVariant = cs.surfaceContainerHighest;
     
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: cs.surface,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF00B82E),
+        backgroundColor: cs.primary,
         elevation: 0,
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
           icon: Icon(
             Icons.arrow_back,
-            color: Colors.white,
+            color: cs.onPrimary,
             size: isTablet ? 28 : 20,
           ),
         ),
         title: Text(
           'Data',
           style: TextStyle(
-            color: Colors.white,
+            color: cs.onPrimary,
             fontSize: isTablet ? 24 : 18,
             fontWeight: FontWeight.w600,
           ),
@@ -428,14 +443,14 @@ class _BuyDataScreenState extends State<BuyDataScreen> {
             child: Text(
               'History',
               style: TextStyle(
-                color: Colors.white,
+                color: cs.onPrimary,
                 fontSize: isTablet ? 20 : 16,
                 fontWeight: FontWeight.w500,
               ),
             ),
           ),
         ],
-        systemOverlayStyle: SystemUiOverlayStyle.light,
+        systemOverlayStyle: statusBarStyle,
       ),
       body: SingleChildScrollView(
         padding: EdgeInsets.all(isTablet ? 32 : 20),
@@ -444,14 +459,31 @@ class _BuyDataScreenState extends State<BuyDataScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              WalletVisibilityBuilder(
+                builder: (_, showBalance) {
+                  final balanceText = showBalance
+                      ? '₦${_walletBalance.toStringAsFixed(2)}'
+                      : '*************';
+                  return Text(
+                    'Wallet Balance: $balanceText',
+                    style: TextStyle(
+                      fontSize: isTablet ? 14 : 12,
+                      color: muted,
+                    ),
+                  );
+                },
+              ),
+
+              SizedBox(height: isTablet ? 24 : 16),
+
               // Network Selection
               Container(
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: card,
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.grey.withValues(alpha: 0.1),
+                      color: shadow,
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),
@@ -486,10 +518,10 @@ class _BuyDataScreenState extends State<BuyDataScreen> {
                             const SizedBox(width: 12),
                             Text(
                               _selectedNetworkData['name'],
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w600,
-                                color: Colors.black87,
+                                color: cs.onSurface,
                               ),
                             ),
                             const Spacer(),
@@ -497,7 +529,7 @@ class _BuyDataScreenState extends State<BuyDataScreen> {
                               _showNetworkList 
                                   ? Icons.keyboard_arrow_up
                                   : Icons.keyboard_arrow_down,
-                              color: Colors.grey.shade600,
+                              color: muted,
                             ),
                           ],
                         ),
@@ -508,7 +540,7 @@ class _BuyDataScreenState extends State<BuyDataScreen> {
                       Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: Colors.grey.shade50,
+                          color: surfaceVariant,
                           borderRadius: const BorderRadius.only(
                             bottomLeft: Radius.circular(16),
                             bottomRight: Radius.circular(16),
@@ -530,12 +562,12 @@ class _BuyDataScreenState extends State<BuyDataScreen> {
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
                                   color: _selectedNetwork == network['id']
-                                      ? const Color(0xFF00B82E).withValues(alpha: 0.1)
-                                      : Colors.white,
+                                      ? cs.primary.withValues(alpha: 0.08)
+                                      : card,
                                   borderRadius: BorderRadius.circular(12),
                                   border: Border.all(
                                     color: _selectedNetwork == network['id']
-                                        ? const Color(0xFF00B82E)
+                                        ? cs.primary
                                         : Colors.transparent,
                                     width: 2,
                                   ),
@@ -562,15 +594,15 @@ class _BuyDataScreenState extends State<BuyDataScreen> {
                                         fontSize: 14,
                                         fontWeight: FontWeight.w500,
                                         color: _selectedNetwork == network['id']
-                                            ? const Color(0xFF00B82E)
-                                            : Colors.black87,
+                                            ? cs.primary
+                                            : cs.onSurface,
                                       ),
                                     ),
                                     const Spacer(),
                                     if (_selectedNetwork == network['id'])
-                                      const Icon(
+                                      Icon(
                                         Icons.check_circle,
-                                        color: Color(0xFF00B82E),
+                                        color: cs.primary,
                                         size: 20,
                                       ),
                                   ],
@@ -589,11 +621,11 @@ class _BuyDataScreenState extends State<BuyDataScreen> {
               // Phone Number Field
               Container(
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: card,
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.grey.withValues(alpha: 0.1),
+                      color: shadow,
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),
@@ -603,24 +635,41 @@ class _BuyDataScreenState extends State<BuyDataScreen> {
                   controller: _phoneController,
                   keyboardType: TextInputType.phone,
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Phone Number',
+                    labelStyle: TextStyle(color: muted),
                     prefixIcon: Icon(
                       Icons.phone,
-                      color: Color(0xFF00B82E),
+                      color: cs.primary,
                     ),
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.all(Radius.circular(16)),
-                      borderSide: BorderSide.none,
+                      borderRadius: const BorderRadius.all(Radius.circular(16)),
+                      borderSide: BorderSide(color: border),
                     ),
                     filled: true,
-                    fillColor: Colors.white,
-                    contentPadding: EdgeInsets.all(20),
+                    fillColor: card,
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: const BorderRadius.all(Radius.circular(16)),
+                      borderSide: BorderSide(color: border),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: const BorderRadius.all(Radius.circular(16)),
+                      borderSide: BorderSide(color: cs.primary, width: 2),
+                    ),
+                    errorBorder: OutlineInputBorder(
+                      borderRadius: const BorderRadius.all(Radius.circular(16)),
+                      borderSide: BorderSide(color: cs.error, width: 2),
+                    ),
+                    focusedErrorBorder: OutlineInputBorder(
+                      borderRadius: const BorderRadius.all(Radius.circular(16)),
+                      borderSide: BorderSide(color: cs.error, width: 2),
+                    ),
+                    contentPadding: const EdgeInsets.all(20),
                   ),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w500,
-                    color: Colors.black87,
+                    color: cs.onSurface,
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
@@ -639,15 +688,15 @@ class _BuyDataScreenState extends State<BuyDataScreen> {
               // Data Plans Section
               Container(
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: card,
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: const Color(0xFF00B82E),
+                    color: cs.primary,
                     width: 2,
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.grey.withValues(alpha: 0.1),
+                      color: shadow,
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),
@@ -657,8 +706,8 @@ class _BuyDataScreenState extends State<BuyDataScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Container(
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF00B82E),
+                      decoration: BoxDecoration(
+                        color: cs.primary,
                         borderRadius: BorderRadius.only(
                           topLeft: Radius.circular(14),
                           topRight: Radius.circular(14),
@@ -667,9 +716,9 @@ class _BuyDataScreenState extends State<BuyDataScreen> {
                       padding: const EdgeInsets.all(16),
                       child: Row(
                         children: [
-                          const Icon(
+                          Icon(
                             Icons.data_usage,
-                            color: Colors.white,
+                            color: cs.onPrimary,
                             size: 20,
                           ),
                           const SizedBox(width: 8),
@@ -677,8 +726,8 @@ class _BuyDataScreenState extends State<BuyDataScreen> {
                             _selectedDataPlan.isEmpty 
                                 ? 'Select Data Plan'
                                 : _selectedDataPlan,
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: TextStyle(
+                              color: cs.onPrimary,
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
                             ),
@@ -687,13 +736,13 @@ class _BuyDataScreenState extends State<BuyDataScreen> {
                           if (_selectedDataPlan.isNotEmpty)
                             Container(
                               padding: const EdgeInsets.all(4),
-                              decoration: const BoxDecoration(
-                                color: Colors.white,
+                              decoration: BoxDecoration(
+                                color: cs.onPrimary,
                                 shape: BoxShape.circle,
                               ),
-                              child: const Icon(
+                              child: Icon(
                                 Icons.check,
-                                color: Color(0xFF00B82E),
+                                color: cs.primary,
                                 size: 16,
                               ),
                             ),
@@ -705,12 +754,12 @@ class _BuyDataScreenState extends State<BuyDataScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
+                          Text(
                             'Available Data Plans',
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
-                              color: Colors.black87,
+                              color: cs.onSurface,
                             ),
                           ),
                           const SizedBox(height: 12),
@@ -740,13 +789,13 @@ class _BuyDataScreenState extends State<BuyDataScreen> {
                                   padding: EdgeInsets.all(isTablet ? 10 : 6),
                                   decoration: BoxDecoration(
                                     color: isSelected
-                                        ? const Color(0xFF00B82E).withValues(alpha: 0.1)
-                                        : Colors.grey.shade50,
+                                        ? cs.primary.withValues(alpha: 0.1)
+                                        : surfaceVariant,
                                     borderRadius: BorderRadius.circular(isTablet ? 16 : 12),
                                     border: Border.all(
                                       color: isSelected
-                                          ? const Color(0xFF00B82E)
-                                          : Colors.grey.shade200,
+                                          ? cs.primary
+                                          : border,
                                       width: 2,
                                     ),
                                   ),
@@ -757,8 +806,8 @@ class _BuyDataScreenState extends State<BuyDataScreen> {
                                       Icon(
                                         Icons.data_usage,
                                         color: isSelected
-                                            ? const Color(0xFF00B82E)
-                                            : Colors.grey.shade600,
+                                            ? cs.primary
+                                            : muted,
                                         size: 16,
                                       ),
                                       const SizedBox(height: 2),
@@ -768,8 +817,8 @@ class _BuyDataScreenState extends State<BuyDataScreen> {
                                           fontSize: 10,
                                           fontWeight: FontWeight.w600,
                                           color: isSelected
-                                              ? const Color(0xFF00B82E)
-                                              : Colors.black87,
+                                              ? cs.primary
+                                              : cs.onSurface,
                                         ),
                                         textAlign: TextAlign.center,
                                         maxLines: 1,
@@ -780,8 +829,8 @@ class _BuyDataScreenState extends State<BuyDataScreen> {
                                         style: TextStyle(
                                           fontSize: 7,
                                           color: isSelected
-                                              ? const Color(0xFF00B82E).withValues(alpha: 0.8)
-                                              : Colors.grey.shade600,
+                                              ? cs.primary.withValues(alpha: 0.8)
+                                              : muted,
                                         ),
                                         textAlign: TextAlign.center,
                                         maxLines: 1,
@@ -798,15 +847,15 @@ class _BuyDataScreenState extends State<BuyDataScreen> {
                                               fontSize: 12,
                                               fontWeight: FontWeight.bold,
                                               color: isSelected
-                                                  ? const Color(0xFF00B82E)
-                                                  : Colors.black87,
+                                                  ? cs.primary
+                                                  : cs.onSurface,
                                             ),
                                           ),
                                           if (isSelected) ...[
                                             const SizedBox(width: 3),
-                                            const Icon(
+                                            Icon(
                                               Icons.check_circle,
-                                              color: Color(0xFF00B82E),
+                                              color: cs.primary,
                                               size: 8,
                                             ),
                                           ],
@@ -825,20 +874,6 @@ class _BuyDataScreenState extends State<BuyDataScreen> {
                 ),
               ),
 
-              SizedBox(height: isTablet ? 16 : 12),
-
-              // Wallet Balance Info
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: Text(
-                  'Wallet Balance: ₦${_walletBalance.toStringAsFixed(2)}',
-                  style: TextStyle(
-                    fontSize: isTablet ? 14 : 12,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-              ),
-
               SizedBox(height: isTablet ? 48 : 40),
 
               // Buy Button
@@ -847,22 +882,22 @@ class _BuyDataScreenState extends State<BuyDataScreen> {
                 child: ElevatedButton(
                   onPressed: (_isLoading || _selectedDataPlan.isEmpty) ? null : _buyData,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF00B82E),
-                    foregroundColor: Colors.white,
+                    backgroundColor: cs.primary,
+                    foregroundColor: cs.onPrimary,
                     padding: EdgeInsets.symmetric(vertical: isTablet ? 20 : 16),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(isTablet ? 20 : 16),
                     ),
                     elevation: 8,
-                    shadowColor: const Color(0xFF00B82E).withValues(alpha: 0.3),
+                    shadowColor: cs.primary.withValues(alpha: 0.3),
                   ),
                   child: _isLoading
                       ? SizedBox(
                           height: isTablet ? 28 : 20,
                           width: isTablet ? 28 : 20,
-                          child: const CircularProgressIndicator(
+                          child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            valueColor: AlwaysStoppedAnimation<Color>(cs.onPrimary),
                           ),
                         )
                       : Text(
@@ -881,11 +916,11 @@ class _BuyDataScreenState extends State<BuyDataScreen> {
               if (_recentTransactions.isNotEmpty) ...[
                 Container(
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: card,
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.grey.withValues(alpha: 0.1),
+                        color: shadow,
                         blurRadius: 10,
                         offset: const Offset(0, 4),
                       ),
@@ -898,19 +933,19 @@ class _BuyDataScreenState extends State<BuyDataScreen> {
                         padding: const EdgeInsets.all(20),
                         child: Row(
                           children: [
-                            const Icon(
+                            Icon(
                               Icons.history,
-                              color: Color(0xFF00B82E),
+                              color: cs.primary,
                               size: 20,
                             ),
                             const SizedBox(width: 8),
-                            const Expanded(
+                            Expanded(
                               child: Text(
                                 'Recent Data Purchases',
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w600,
-                                  color: Colors.black87,
+                                  color: cs.onSurface,
                                 ),
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -922,10 +957,10 @@ class _BuyDataScreenState extends State<BuyDataScreen> {
                                 minimumSize: Size.zero,
                                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                               ),
-                              child: const Text(
+                              child: Text(
                                 'View All',
                                 style: TextStyle(
-                                  color: Color(0xFF00B82E),
+                                  color: cs.primary,
                                   fontSize: 14,
                                   fontWeight: FontWeight.w500,
                                 ),
@@ -939,7 +974,7 @@ class _BuyDataScreenState extends State<BuyDataScreen> {
                         physics: const NeverScrollableScrollPhysics(),
                         itemCount: _recentTransactions.take(3).length,
                         separatorBuilder: (context, index) => Divider(
-                          color: Colors.grey.shade100,
+                          color: border,
                           height: 1,
                         ),
                         itemBuilder: (context, index) {
@@ -978,19 +1013,19 @@ class _BuyDataScreenState extends State<BuyDataScreen> {
                                           Expanded(
                                             child: Text(
                                               '${transaction.network} Data',
-                                              style: const TextStyle(
+                                              style: TextStyle(
                                                 fontSize: 14,
                                                 fontWeight: FontWeight.w600,
-                                                color: Colors.black87,
+                                                color: cs.onSurface,
                                               ),
                                             ),
                                           ),
                                           Text(
                                             '₦${transaction.amount}',
-                                            style: const TextStyle(
+                                            style: TextStyle(
                                               fontSize: 14,
                                               fontWeight: FontWeight.w600,
-                                              color: Colors.black87,
+                                              color: cs.onSurface,
                                             ),
                                           ),
                                         ],
@@ -1000,7 +1035,7 @@ class _BuyDataScreenState extends State<BuyDataScreen> {
                                         transaction.dataBundle,
                                         style: TextStyle(
                                           fontSize: 12,
-                                          color: Colors.grey.shade600,
+                                          color: muted,
                                         ),
                                       ),
                                       const SizedBox(height: 4),
@@ -1010,7 +1045,7 @@ class _BuyDataScreenState extends State<BuyDataScreen> {
                                             transaction.phoneNumber,
                                             style: TextStyle(
                                               fontSize: 12,
-                                              color: Colors.grey.shade600,
+                                              color: muted,
                                             ),
                                           ),
                                           const Spacer(),
@@ -1021,8 +1056,8 @@ class _BuyDataScreenState extends State<BuyDataScreen> {
                                             ),
                                             decoration: BoxDecoration(
                                               color: transaction.isSuccessful
-                                                  ? const Color(0xFF00B82E).withValues(alpha: 0.1)
-                                                  : Colors.red.withValues(alpha: 0.1),
+                                                  ? cs.primary.withValues(alpha: 0.1)
+                                                  : cs.error.withValues(alpha: 0.1),
                                               borderRadius: BorderRadius.circular(12),
                                             ),
                                             child: Text(
@@ -1031,8 +1066,8 @@ class _BuyDataScreenState extends State<BuyDataScreen> {
                                                 fontSize: 10,
                                                 fontWeight: FontWeight.w500,
                                                 color: transaction.isSuccessful
-                                                    ? const Color(0xFF00B82E)
-                                                    : Colors.red,
+                                                    ? cs.primary
+                                                    : cs.error,
                                               ),
                                             ),
                                           ),
@@ -1043,7 +1078,7 @@ class _BuyDataScreenState extends State<BuyDataScreen> {
                                         _formatDate(transaction.date),
                                         style: TextStyle(
                                           fontSize: 11,
-                                          color: Colors.grey.shade500,
+                                          color: muted,
                                         ),
                                       ),
                                     ],
@@ -1067,3 +1102,5 @@ class _BuyDataScreenState extends State<BuyDataScreen> {
     );
   }
 }
+
+

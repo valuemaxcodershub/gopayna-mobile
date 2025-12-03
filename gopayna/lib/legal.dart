@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 class LegalScreen extends StatefulWidget {
   const LegalScreen({super.key});
@@ -14,6 +14,12 @@ class _LegalScreenState extends State<LegalScreen>
   
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
+
+  ColorScheme get _colorScheme => Theme.of(context).colorScheme;
+  bool get _isDark => Theme.of(context).brightness == Brightness.dark;
+  Color get _cardColor => _colorScheme.surface;
+  Color get _mutedText => _colorScheme.onSurface.withValues(alpha: 0.72);
+  Color get _shadowColor => Colors.black.withValues(alpha: _isDark ? 0.4 : 0.08);
 
   @override
   void initState() {
@@ -72,7 +78,7 @@ class _LegalScreenState extends State<LegalScreen>
             onPressed: () => Navigator.pop(context),
             child: Text(
               'Cancel',
-              style: TextStyle(color: Colors.grey.shade600),
+              style: TextStyle(color: _mutedText),
             ),
           ),
           TextButton(
@@ -80,15 +86,15 @@ class _LegalScreenState extends State<LegalScreen>
               Navigator.pop(context); // Close dialog
               Navigator.popUntil(context, (route) => route.isFirst); // Go to main screen
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Logged out successfully'),
-                  backgroundColor: Colors.red,
+                SnackBar(
+                  content: const Text('Logged out successfully'),
+                  backgroundColor: _colorScheme.error,
                 ),
               );
             },
-            child: const Text(
+            child: Text(
               'Logout',
-              style: TextStyle(color: Colors.red),
+              style: TextStyle(color: _colorScheme.error, fontWeight: FontWeight.w600),
             ),
           ),
         ],
@@ -103,7 +109,7 @@ class _LegalScreenState extends State<LegalScreen>
     final statusBarHeight = MediaQuery.of(context).padding.top;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Column(
         children: [
           _buildCustomStatusBar(statusBarHeight),
@@ -119,7 +125,7 @@ class _LegalScreenState extends State<LegalScreen>
   Widget _buildCustomStatusBar(double statusBarHeight) {
     return Container(
       height: statusBarHeight,
-      color: const Color(0xFFF8F9FA),
+      color: Theme.of(context).scaffoldBackgroundColor,
     );
   }
 
@@ -132,12 +138,12 @@ class _LegalScreenState extends State<LegalScreen>
           vertical: isTablet ? 20 : 16,
         ),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: _cardColor,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
+              color: _shadowColor,
+              blurRadius: 12,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
@@ -148,12 +154,14 @@ class _LegalScreenState extends State<LegalScreen>
               child: Container(
                 padding: EdgeInsets.all(isTablet ? 12 : 8),
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
+                  color: _isDark
+                      ? _colorScheme.surfaceContainerHighest
+                      : _colorScheme.surface,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
                   Icons.arrow_back,
-                  color: Colors.black87,
+                  color: _colorScheme.onSurface,
                   size: isTablet ? 24 : 20,
                 ),
               ),
@@ -161,7 +169,7 @@ class _LegalScreenState extends State<LegalScreen>
             SizedBox(width: isTablet ? 16 : 12),
             Icon(
               Icons.gavel,
-              color: const Color(0xFF00B82E),
+              color: _colorScheme.primary,
               size: isTablet ? 28 : 24,
             ),
             SizedBox(width: isTablet ? 12 : 8),
@@ -171,7 +179,7 @@ class _LegalScreenState extends State<LegalScreen>
                 style: TextStyle(
                   fontSize: isTablet ? 24 : 20,
                   fontWeight: FontWeight.bold,
-                  color: Colors.black87,
+                  color: _colorScheme.onSurface,
                 ),
               ),
             ),
@@ -183,10 +191,10 @@ class _LegalScreenState extends State<LegalScreen>
                   vertical: isTablet ? 10 : 8,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.red.withValues(alpha: 0.1),
+                  color: _colorScheme.error.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
-                    color: Colors.red,
+                    color: _colorScheme.error,
                     width: 1,
                   ),
                 ),
@@ -195,14 +203,14 @@ class _LegalScreenState extends State<LegalScreen>
                   children: [
                     Icon(
                       Icons.logout,
-                      color: Colors.red,
+                      color: _colorScheme.error,
                       size: isTablet ? 18 : 16,
                     ),
                     SizedBox(width: isTablet ? 8 : 4),
                     Text(
                       'Logout',
                       style: TextStyle(
-                        color: Colors.red,
+                        color: _colorScheme.error,
                         fontSize: isTablet ? 14 : 12,
                         fontWeight: FontWeight.w600,
                       ),
@@ -261,13 +269,13 @@ class _LegalScreenState extends State<LegalScreen>
     return Container(
       padding: EdgeInsets.all(isTablet ? 24 : 20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: _cardColor,
         borderRadius: BorderRadius.circular(isTablet ? 16 : 12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            color: _shadowColor,
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -279,7 +287,7 @@ class _LegalScreenState extends State<LegalScreen>
             style: TextStyle(
               fontSize: isTablet ? 20 : 18,
               fontWeight: FontWeight.bold,
-              color: const Color(0xFF00B82E),
+              color: _colorScheme.primary,
             ),
           ),
           SizedBox(height: isTablet ? 16 : 12),
@@ -287,7 +295,7 @@ class _LegalScreenState extends State<LegalScreen>
             content,
             style: TextStyle(
               fontSize: isTablet ? 14 : 12,
-              color: Colors.grey.shade700,
+              color: _mutedText,
               height: 1.6,
             ),
           ),

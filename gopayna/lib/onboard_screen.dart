@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'register.dart';
 import 'login.dart';
@@ -27,7 +27,7 @@ class _OnboardScreenState extends State<OnboardScreen>
   late Animation<double> _buttonsFade;
   late Animation<double> _buttonScale;
 
-  final Color _brandColor = const Color(0xFF00B82E);
+  final Color _brandColor = const Color(0xFF00CA44);
 
   @override
   void initState() {
@@ -404,3 +404,5 @@ class _OnboardScreenState extends State<OnboardScreen>
     );
   }
 }
+
+

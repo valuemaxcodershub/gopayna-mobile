@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'dart:async';
 import 'api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -22,6 +23,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
   late final List<TextEditingController> _controllers;
   late final List<FocusNode> _focusNodes;
   bool _isLoading = false;
+  bool _isBulkFilling = false;
   late DateTime _otpExpiry;
   late Duration _remaining;
   Timer? _timer;
@@ -91,24 +93,58 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
   }
 
   void _onOtpChanged(int idx, String value) {
-    
-    if (value.length > 1) {
-      for (int i = 0; i < otpLength; i++) {
-        _controllers[i].text = i < value.length ? value[i] : '';
-      }
-      
-      if (value.length >= otpLength) {
-        _focusNodes[otpLength - 1].requestFocus();
-      } else {
-        _focusNodes[value.length].requestFocus();
+    if (_isBulkFilling) return;
+
+    final sanitized = value.replaceAll(RegExp(r'[^0-9]'), '');
+
+    if (sanitized.length > 1) {
+      _applyBulkOtpInput(sanitized);
+      return;
+    }
+
+    if (sanitized.isEmpty) {
+      _controllers[idx].clear();
+      if (idx > 0) {
+        _focusNodes[idx - 1].requestFocus();
       }
       return;
     }
-   
-    if (value.length == 1 && idx < otpLength - 1) {
+
+    if (sanitized != value) {
+      _isBulkFilling = true;
+      _controllers[idx]
+        ..text = sanitized
+        ..selection = TextSelection.collapsed(offset: sanitized.length);
+      _isBulkFilling = false;
+    }
+
+    if (idx < otpLength - 1) {
       _focusNodes[idx + 1].requestFocus();
-    } else if (value.isEmpty && idx > 0) {
-      _focusNodes[idx - 1].requestFocus();
+    } else {
+      _focusNodes[idx].unfocus();
+    }
+  }
+
+  void _applyBulkOtpInput(String rawInput) {
+    final digitsOnly = rawInput.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digitsOnly.isEmpty) return;
+
+    final trimmed = digitsOnly.length > otpLength
+        ? digitsOnly.substring(0, otpLength)
+        : digitsOnly;
+
+    _isBulkFilling = true;
+    for (int i = 0; i < otpLength; i++) {
+      final char = i < trimmed.length ? trimmed[i] : '';
+      _controllers[i]
+        ..text = char
+        ..selection = TextSelection.collapsed(offset: char.length);
+    }
+    _isBulkFilling = false;
+
+    final focusIndex = trimmed.length >= otpLength ? otpLength - 1 : trimmed.length;
+    if (focusIndex >= 0 && focusIndex < _focusNodes.length) {
+      _focusNodes[focusIndex].requestFocus();
     }
   }
 
@@ -160,7 +196,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final brandColor = const Color(0xFF00B82E);
+    final brandColor = const Color(0xFF00CA44);
     return Scaffold(
       appBar: AppBar(
         title: const Text('Verify Email', style: TextStyle(color: Colors.white)),
@@ -206,7 +242,10 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                   focusNode: _focusNodes[idx],
                   keyboardType: TextInputType.number,
                   textAlign: TextAlign.center,
-                  maxLength: 1,
+                  maxLengthEnforcement: MaxLengthEnforcement.none,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  textInputAction:
+                      idx == otpLength - 1 ? TextInputAction.done : TextInputAction.next,
                   style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, letterSpacing: 2),
                   decoration: const InputDecoration(
                     counterText: '',
@@ -259,3 +298,4 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
     );
   }
 }
+

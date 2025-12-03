@@ -1,5 +1,6 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'login.dart';
 import 'dart:convert';
@@ -16,6 +17,9 @@ import 'buy_tv_subscription.dart';
 import 'buy_education_pin.dart';
 import 'notification.dart';
 import 'dart:developer';
+import 'api_service.dart';
+import 'app_settings.dart';
+import 'widgets/transaction_receipt.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -28,6 +32,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     with TickerProviderStateMixin {
   String? _userName;
   double? _walletBalance;
+  late final AppSettings _appSettings;
 
   late AnimationController _fadeController;
   late AnimationController _slideController;
@@ -41,57 +46,57 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   bool _balanceVisible = false;
   int _selectedTab = 0;
+  bool _transactionsLoading = false;
+  String? _transactionsError;
+  final DateFormat _transactionDateFormat = DateFormat('MMM d, yyyy â€¢ h:mma');
+  List<Transaction> _transactions = [];
+  DateTime? _lastActivity;
 
   @override
   void initState() {
     super.initState();
+    _appSettings = AppSettings();
+    _balanceVisible = _appSettings.showWalletBalance;
     _initializeAnimations();
+    _balanceController.value = _balanceVisible ? 1 : 0;
+    _appSettings.addListener(_handleWalletVisibilityChanged);
     _startAnimations();
     _checkAuthentication();
-    // _lastActivity = DateTime.now();
-    // Removed observer logic and undefined _DashboardLifecycleObserver
   }
 
   void _updateActivity() {
-    setState(() {
-      // _lastActivity = DateTime.now();
-    });
+    final now = DateTime.now();
+    final previous = _lastActivity;
+    if (previous == null || now.difference(previous).inSeconds >= 30) {
+      log(
+        'User activity detected after ${previous == null ? 'app launch' : '${now.difference(previous).inSeconds}s idle'}',
+        name: '_DashboardScreenState',
+      );
+    }
+    _lastActivity = now;
   }
 
+  void _handleWalletVisibilityChanged() {
+    if (!mounted) return;
+    final shouldShow = _appSettings.showWalletBalance;
+    if (_balanceVisible == shouldShow) {
+      return;
+    }
+    setState(() {
+      _balanceVisible = shouldShow;
+    });
+    if (shouldShow) {
+      if (!_balanceController.isAnimating) {
+        _balanceController.forward();
+      }
+    } else {
+      if (!_balanceController.isAnimating) {
+        _balanceController.reverse();
+      }
+    }
+  }
 
   // Removed lifecycle observer method
-  final List<Transaction> _transactions = [
-    Transaction(
-      title: 'Transfer to FATIMOH FOLAKE A......',
-      amount: -2100.00,
-      date: 'Jun 3rd, 09:56',
-      status: 'Successful',
-      isIncoming: false,
-    ),
-    Transaction(
-      title: 'Transfer to AMINAT OLUWAKE......',
-      amount: -14700.00,
-      date: 'Jun 2nd, 09:56',
-      status: 'Successful',
-      isIncoming: false,
-    ),
-    Transaction(
-      title: 'Transfer to IFEOLUWA OLUWAKE......',
-      amount: -2100.00,
-      date: 'Jun 2nd, 09:56',
-      status: 'Successful',
-      isIncoming: false,
-    ),
-    Transaction(
-      title: 'Transfer to EBERE NNOILI......',
-      amount: -4100.00,
-      date: 'Jun 2nd, 09:56',
-      status: 'Successful',
-      isIncoming: false,
-    ),
-  ];
-
-  // Remove duplicate initState
 
   Future<void> _checkAuthentication() async {
     final prefs = await SharedPreferences.getInstance();
@@ -105,9 +110,55 @@ class _DashboardScreenState extends State<DashboardScreen>
       );
     } else {
       _loadUserInfo(token);
+      _refreshWalletBalance(token: token);
+      _loadRecentTransactions(token: token);
       // Reset activity time on login
       // _lastActivity = DateTime.now();
     }
+  }
+
+  Future<void> _loadRecentTransactions({String? token}) async {
+    token ??= (await SharedPreferences.getInstance()).getString('jwt');
+    if (token == null || token.isEmpty) return;
+    if (!mounted) return;
+    setState(() {
+      _transactionsLoading = true;
+      _transactionsError = null;
+    });
+
+    final response = await fetchWalletTransactions(token: token, limit: 20);
+    if (!mounted) return;
+
+    if (response['error'] != null) {
+      setState(() {
+        _transactionsError = response['error'].toString();
+        _transactionsLoading = false;
+      });
+      return;
+    }
+
+    final dataRaw = response['data'] as List<dynamic>? ?? [];
+    final parsed = dataRaw
+        .cast<Map<String, dynamic>>()
+        .map((tx) => Transaction.fromApi(tx, _transactionDateFormat))
+        .where((tx) => tx.isDisplayable)
+        .take(8)
+        .toList();
+
+    setState(() {
+      _transactions = parsed;
+      _transactionsLoading = false;
+    });
+  }
+
+  Future<void> _refreshWalletBalance({String? token}) async {
+    token ??= (await SharedPreferences.getInstance()).getString('jwt');
+    if (token == null || token.isEmpty) return;
+    final balance = await fetchWalletBalance(token);
+    if (!mounted) return;
+    setState(() {
+      _walletBalance = balance;
+    });
   }
 
   Future<void> _loadUserInfo(String token) async {
@@ -117,7 +168,8 @@ class _DashboardScreenState extends State<DashboardScreen>
         throw const FormatException('Invalid token format');
       }
 
-      final payload = utf8.decode(base64Url.decode(base64Url.normalize(parts[1])));
+      final payload =
+          utf8.decode(base64Url.decode(base64Url.normalize(parts[1])));
       final data = json.decode(payload);
 
       // Accept tokens with id, email, phone (from backend)
@@ -125,29 +177,15 @@ class _DashboardScreenState extends State<DashboardScreen>
         throw const FormatException('Invalid token payload');
       }
 
-      String? name;
-      if (data.containsKey('firstName') && data['firstName'] != null && data['firstName'].toString().isNotEmpty) {
-        name = data['firstName'];
-      } else if (data.containsKey('lastName') && data['lastName'] != null && data['lastName'].toString().isNotEmpty) {
-        name = data['lastName'];
-      } else if (data.containsKey('email')) {
-        // Only fallback to email if no name is available
-        name = '';
-      } else if (data.containsKey('phone')) {
-        name = '';
-      } else if (data.containsKey('id')) {
-        name = '';
-      } else {
-        throw const FormatException('Invalid token payload');
-      }
+      final name = _deriveDisplayName(data);
 
       double? walletBalance;
       if (data.containsKey('wallet_balance')) {
         walletBalance = double.tryParse(data['wallet_balance'].toString());
       }
       setState(() {
-        _userName = name ?? '';
-        _walletBalance = walletBalance;
+        _userName = name;
+        _walletBalance = walletBalance ?? _walletBalance;
       });
     } catch (e) {
       log('Failed to load user info: $e', name: '_DashboardScreenState');
@@ -157,13 +195,49 @@ class _DashboardScreenState extends State<DashboardScreen>
     }
   }
 
+  String _deriveDisplayName(Map<dynamic, dynamic> data) {
+    String? sanitize(dynamic value) {
+      if (value == null) return null;
+      final text = value.toString().trim();
+      return text.isEmpty ? null : text;
+    }
+
+    final candidates = [
+      sanitize(data['firstName']),
+      sanitize(data['first_name']),
+      sanitize(data['lastName']),
+      sanitize(data['last_name']),
+    ];
+
+    for (final candidate in candidates) {
+      if (candidate != null) return candidate;
+    }
+
+    final email = sanitize(data['email']);
+    if (email != null && email.contains('@')) {
+      return email.split('@').first;
+    }
+
+    final phone = sanitize(data['phone']);
+    if (phone != null) return phone;
+
+    final idValue = sanitize(data['id']);
+    if (idValue != null) {
+      return 'User $idValue';
+    }
+
+    return 'there';
+  }
+
   Future<void> _logout() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('jwt');
     if (!mounted) return;
     Navigator.pushAndRemoveUntil(
       context,
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      MaterialPageRoute(
+        builder: (_) => const LoginScreen(redirectToIntroOnExit: true),
+      ),
       (route) => false,
     );
   }
@@ -220,23 +294,14 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   void _toggleBalance() {
-    setState(() {
-      _balanceVisible = !_balanceVisible;
-    });
-    if (_balanceVisible) {
-      if (mounted && !_balanceController.isAnimating) {
-        _balanceController.forward();
-      }
-    } else {
-      if (mounted && !_balanceController.isAnimating) {
-        _balanceController.reverse();
-      }
-    }
+    final nextValue = !_appSettings.showWalletBalance;
+    _appSettings.toggleWalletBalance(nextValue);
     HapticFeedback.lightImpact();
   }
 
   @override
   void dispose() {
+    _appSettings.removeListener(_handleWalletVisibilityChanged);
     _fadeController.dispose();
     _slideController.dispose();
     _scaleController.dispose();
@@ -249,6 +314,8 @@ class _DashboardScreenState extends State<DashboardScreen>
     final size = MediaQuery.of(context).size;
     final isTablet = size.width > 600;
     final statusBarHeight = MediaQuery.of(context).padding.top;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
     // Listen for user activity
     return GestureDetector(
@@ -257,7 +324,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       child: Scaffold(
         appBar: AppBar(
           automaticallyImplyLeading: false,
-          backgroundColor: const Color(0xFF00B82E),
+          backgroundColor: colorScheme.primary,
           elevation: 0,
           title: Row(
             children: [
@@ -275,12 +342,15 @@ class _DashboardScreenState extends State<DashboardScreen>
                   height: 40,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    border: Border.all(color: Color.fromRGBO(255,255,255,0.3), width: 2),
-                    color: Color.fromRGBO(255,255,255,0.15),
+                    border: Border.all(
+                      color: colorScheme.onPrimary.withValues(alpha: 0.35),
+                      width: 2,
+                    ),
+                    color: colorScheme.onPrimary.withValues(alpha: 0.18),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.person,
-                    color: Colors.white,
+                    color: colorScheme.onPrimary,
                     size: 22,
                   ),
                 ),
@@ -291,8 +361,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                   (_userName != null && _userName!.isNotEmpty)
                       ? 'Hello, ${_userName!.split(' ').first}'
                       : 'Hello',
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: colorScheme.onPrimary,
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
                   ),
@@ -303,7 +373,7 @@ class _DashboardScreenState extends State<DashboardScreen>
           ),
           actions: [
             IconButton(
-              icon: const Icon(Icons.notifications, color: Colors.white),
+              icon: Icon(Icons.notifications, color: colorScheme.onPrimary),
               onPressed: () {
                 Navigator.push(
                   context,
@@ -315,14 +385,14 @@ class _DashboardScreenState extends State<DashboardScreen>
               tooltip: 'Notifications',
             ),
             IconButton(
-              icon: const Icon(Icons.logout, color: Colors.white),
+              icon: Icon(Icons.logout, color: colorScheme.onPrimary),
               onPressed: _logout,
               tooltip: 'Logout',
             ),
           ],
           systemOverlayStyle: SystemUiOverlayStyle.light,
         ),
-        backgroundColor: const Color(0xFFF8F9FA),
+        backgroundColor: theme.scaffoldBackgroundColor,
         body: SingleChildScrollView(
           child: Column(
             children: [
@@ -346,6 +416,8 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   Widget _buildBalanceCard(bool isTablet) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return SlideTransition(
       position: _slideAnimation,
       child: Container(
@@ -356,17 +428,19 @@ class _DashboardScreenState extends State<DashboardScreen>
         padding: EdgeInsets.all(isTablet ? 24 : 20),
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: Theme.of(context).brightness == Brightness.dark
-                ? [const Color(0xFF1E3A1E), const Color(0xFF0F5F0F)]
-                : [const Color(0xFF00B82E), const Color(0xFF00A525)],
+            colors: [
+              colorScheme.primary,
+              colorScheme.secondary,
+            ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
           borderRadius: BorderRadius.circular(isTablet ? 20 : 16),
           boxShadow: [
             BoxShadow(
-              color: Color.fromRGBO(0,184,46,0.3),
-              blurRadius: 20,
+              color:
+                  colorScheme.primary.withValues(alpha: isDark ? 0.45 : 0.25),
+              blurRadius: 22,
               offset: const Offset(0, 10),
             ),
           ],
@@ -378,14 +452,14 @@ class _DashboardScreenState extends State<DashboardScreen>
               children: [
                 Icon(
                   Icons.account_balance_wallet,
-                  color: Colors.white,
+                  color: colorScheme.onPrimary,
                   size: isTablet ? 24 : 20,
                 ),
                 SizedBox(width: isTablet ? 12 : 8),
                 Text(
                   'Available Balance',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: colorScheme.onPrimary,
                     fontSize: isTablet ? 16 : 14,
                     fontWeight: FontWeight.w500,
                   ),
@@ -395,7 +469,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                   onTap: _toggleBalance,
                   child: Icon(
                     _balanceVisible ? Icons.visibility_off : Icons.visibility,
-                    color: Colors.white,
+                    color: colorScheme.onPrimary,
                     size: isTablet ? 24 : 20,
                   ),
                 ),
@@ -406,7 +480,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => const TransactionHistoryScreen(),
+                          builder: (context) =>
+                              const TransactionHistoryScreen(),
                         ),
                       );
                     },
@@ -417,7 +492,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                           child: Text(
                             'Transaction History',
                             style: TextStyle(
-                              color: Colors.white,
+                              color: colorScheme.onPrimary,
                               fontSize: isTablet ? 12 : 9,
                               fontWeight: FontWeight.w500,
                             ),
@@ -427,7 +502,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                         SizedBox(width: isTablet ? 6 : 2),
                         Icon(
                           Icons.arrow_forward_ios,
-                          color: Colors.white,
+                          color: colorScheme.onPrimary,
                           size: isTablet ? 14 : 12,
                         ),
                       ],
@@ -445,11 +520,13 @@ class _DashboardScreenState extends State<DashboardScreen>
                     Expanded(
                       child: Text(
                         _balanceVisible
-                            ? (_walletBalance != null ? '₦${_walletBalance!.toStringAsFixed(2)}' : '₦0.00')
+                            ? (_walletBalance != null
+                                ? '₦${_walletBalance!.toStringAsFixed(2)}'
+                                : '₦0.00')
                             : '*************',
                         style: TextStyle(
-                          color: Colors.white,
-                          fontSize: _balanceVisible 
+                          color: colorScheme.onPrimary,
+                          fontSize: _balanceVisible
                               ? (isTablet ? 32 : 28)
                               : (isTablet ? 20 : 18),
                           fontWeight: FontWeight.bold,
@@ -474,10 +551,12 @@ class _DashboardScreenState extends State<DashboardScreen>
                           vertical: isTablet ? 12 : 10,
                         ),
                         decoration: BoxDecoration(
-                          color: Color.fromRGBO(255,255,255,0.2),
-                          borderRadius: BorderRadius.circular(isTablet ? 25 : 20),
+                          color: colorScheme.onPrimary.withValues(alpha: 0.2),
+                          borderRadius:
+                              BorderRadius.circular(isTablet ? 25 : 20),
                           border: Border.all(
-                            color: Color.fromRGBO(255,255,255,0.3),
+                            color:
+                                colorScheme.onPrimary.withValues(alpha: 0.35),
                             width: 1,
                           ),
                         ),
@@ -486,14 +565,14 @@ class _DashboardScreenState extends State<DashboardScreen>
                           children: [
                             Icon(
                               Icons.add,
-                              color: Colors.white,
+                              color: colorScheme.onPrimary,
                               size: isTablet ? 20 : 16,
                             ),
                             SizedBox(width: isTablet ? 8 : 4),
                             Text(
                               'Add Money',
                               style: TextStyle(
-                                color: Colors.white,
+                                color: colorScheme.onPrimary,
                                 fontSize: isTablet ? 14 : 12,
                                 fontWeight: FontWeight.w600,
                               ),
@@ -514,12 +593,27 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   Widget _buildServiceGrid(bool isTablet) {
     final services = [
-      ServiceItem(icon: Icons.credit_card, title: 'Data', color: const Color(0xFF00B82E)),
-      ServiceItem(icon: Icons.airplanemode_active, title: 'Airtime', color: const Color(0xFF00B82E)),
-      ServiceItem(icon: Icons.electrical_services, title: 'Electricity', color: const Color(0xFF00B82E)),
-      ServiceItem(icon: Icons.tv, title: 'TV', color: const Color(0xFF00B82E)),
-      ServiceItem(icon: Icons.school, title: 'Education', color: const Color(0xFF00B82E)),
-      ServiceItem(icon: Icons.money, title: 'Withdraw Fund', color: const Color(0xFF00B82E)),
+      ServiceItem(
+          icon: Icons.credit_card,
+          title: 'Data',
+          color: const Color(0xFF00CA44)),
+      ServiceItem(
+          icon: Icons.airplanemode_active,
+          title: 'Airtime',
+          color: const Color(0xFF00CA44)),
+      ServiceItem(
+          icon: Icons.electrical_services,
+          title: 'Electricity',
+          color: const Color(0xFF00CA44)),
+      ServiceItem(icon: Icons.tv, title: 'TV', color: const Color(0xFF00CA44)),
+      ServiceItem(
+          icon: Icons.school,
+          title: 'Education',
+          color: const Color(0xFF00CA44)),
+      ServiceItem(
+          icon: Icons.money,
+          title: 'Withdraw Fund',
+          color: const Color(0xFF00CA44)),
     ];
 
     return ScaleTransition(
@@ -548,104 +642,108 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   Widget _buildServiceCard(ServiceItem service, bool isTablet, int index) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return AnimatedContainer(
-      duration: Duration(milliseconds: 200 + (index * 50)),
-      curve: Curves.easeOutCubic,
-      child: GestureDetector(
-        onTap: () {
-          HapticFeedback.lightImpact();
-          if (service.title == 'Withdraw Fund') {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const WithdrawFundScreen(),
-              ),
-            );
-          } else if (service.title == 'Airtime') {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const BuyAirtimeScreen(),
-              ),
-            );
-          } else if (service.title == 'Data') {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const BuyDataScreen(),
-              ),
-            );
-          } else if (service.title == 'Electricity') {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const BuyElectricityScreen(),
-              ),
-            );
-          } else if (service.title == 'TV') {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const BuyTVSubscriptionScreen(),
-              ),
-            );
-          } else if (service.title == 'Education') {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const BuyEducationPinScreen(),
-              ),
-            );
-          }
-        },
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(isTablet ? 16 : 12),
-            boxShadow: [
-              BoxShadow(
-                color: Color.fromRGBO(0,0,0,0.05),
-                blurRadius: 10,
-                offset: const Offset(0, 5),
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                padding: EdgeInsets.all(isTablet ? 14 : 10),
-                decoration: BoxDecoration(
-                  color: Color.fromRGBO((service.color.r * 255.0).round() & 0xff, (service.color.g * 255.0).round() & 0xff, (service.color.b * 255.0).round() & 0xff, 0.1),
-                  shape: BoxShape.circle,
+        duration: Duration(milliseconds: 200 + (index * 50)),
+        curve: Curves.easeOutCubic,
+        child: GestureDetector(
+          onTap: () {
+            HapticFeedback.lightImpact();
+            if (service.title == 'Withdraw Fund') {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const WithdrawFundScreen(),
                 ),
-                child: Icon(
-                  service.icon,
-                  color: service.color,
-                  size: isTablet ? 26 : 20,
+              );
+            } else if (service.title == 'Airtime') {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const BuyAirtimeScreen(),
                 ),
-              ),
-              SizedBox(height: isTablet ? 10 : 6),
-              Flexible(
-                child: Text(
-                  service.title,
-                  style: TextStyle(
-                    fontSize: isTablet ? 14 : 12,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black87,
+              );
+            } else if (service.title == 'Data') {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const BuyDataScreen(),
+                ),
+              );
+            } else if (service.title == 'Electricity') {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const BuyElectricityScreen(),
+                ),
+              );
+            } else if (service.title == 'TV') {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const BuyTVSubscriptionScreen(),
+                ),
+              );
+            } else if (service.title == 'Education') {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const BuyEducationPinScreen(),
+                ),
+              );
+            }
+          },
+          child: Container(
+            decoration: BoxDecoration(
+              color: colorScheme.surface,
+              borderRadius: BorderRadius.circular(isTablet ? 16 : 12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: isDark ? 0.4 : 0.06),
+                  blurRadius: 14,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: EdgeInsets.all(isTablet ? 14 : 10),
+                  decoration: BoxDecoration(
+                    color: service.color.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
                   ),
-                  textAlign: TextAlign.center,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  child: Icon(
+                    service.icon,
+                    color: service.color,
+                    size: isTablet ? 26 : 20,
+                  ),
                 ),
-              ),
-            ],
+                SizedBox(height: isTablet ? 10 : 6),
+                Flexible(
+                  child: Text(
+                    service.title,
+                    style: TextStyle(
+                      fontSize: isTablet ? 14 : 12,
+                      fontWeight: FontWeight.w600,
+                      color: colorScheme.onSurface,
+                    ),
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-      ));
+        ));
   }
 
   Widget _buildTransactionHistory(bool isTablet) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return FadeTransition(
       opacity: _fadeAnimation,
       child: Container(
@@ -655,16 +753,16 @@ class _DashboardScreenState extends State<DashboardScreen>
           top: isTablet ? 24 : 20,
         ),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: colorScheme.surface,
           borderRadius: BorderRadius.only(
             topLeft: Radius.circular(isTablet ? 24 : 20),
             topRight: Radius.circular(isTablet ? 24 : 20),
           ),
           boxShadow: [
             BoxShadow(
-              color: Color.fromRGBO(0,0,0,0.1),
-              blurRadius: 20,
-              offset: const Offset(0, -5),
+              color: Colors.black.withValues(alpha: isDark ? 0.45 : 0.08),
+              blurRadius: 18,
+              offset: const Offset(0, -4),
             ),
           ],
         ),
@@ -679,16 +777,30 @@ class _DashboardScreenState extends State<DashboardScreen>
                     style: TextStyle(
                       fontSize: isTablet ? 20 : 18,
                       fontWeight: FontWeight.bold,
-                      color: Colors.black87,
+                      color: colorScheme.onSurface,
                     ),
                   ),
                   const Spacer(),
+                  IconButton(
+                    onPressed: _transactionsLoading
+                        ? null
+                        : () => _loadRecentTransactions(),
+                    icon: Icon(
+                      Icons.refresh,
+                      color: _transactionsLoading
+                          ? colorScheme.onSurface.withValues(alpha: 0.3)
+                          : colorScheme.primary,
+                      size: isTablet ? 22 : 20,
+                    ),
+                    tooltip: 'Refresh transactions',
+                  ),
                   GestureDetector(
                     onTap: () {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => const TransactionHistoryScreen(),
+                          builder: (context) =>
+                              const TransactionHistoryScreen(),
                         ),
                       );
                     },
@@ -696,7 +808,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                       'See all',
                       style: TextStyle(
                         fontSize: isTablet ? 16 : 14,
-                        color: const Color(0xFF00B82E),
+                        color: colorScheme.primary,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -706,17 +818,25 @@ class _DashboardScreenState extends State<DashboardScreen>
             ),
             SizedBox(
               height: isTablet ? 260 : 180, // Fixed height for transaction list
-              child: ListView.builder(
-                padding: EdgeInsets.only(
-                  left: isTablet ? 24 : 20,
-                  right: isTablet ? 24 : 20,
-                  bottom: isTablet ? 100 : 80,
-                ),
-                itemCount: _transactions.length,
-                itemBuilder: (context, index) {
-                  return _buildTransactionItem(_transactions[index], isTablet, index);
-                },
-              ),
+              child: _transactionsLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _transactionsError != null
+                      ? _buildTransactionErrorState(isTablet)
+                      : _transactions.isEmpty
+                          ? _buildTransactionEmptyState(isTablet)
+                          : ListView.builder(
+                              padding: EdgeInsets.only(
+                                left: isTablet ? 24 : 20,
+                                right: isTablet ? 24 : 20,
+                                bottom: isTablet ? 100 : 80,
+                              ),
+                              itemCount: _transactions.length,
+                              itemBuilder: (context, index) {
+                                final transaction = _transactions[index];
+                                return _buildTransactionItem(
+                                    transaction, isTablet, index);
+                              },
+                            ),
             ),
           ],
         ),
@@ -724,100 +844,164 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
-  Widget _buildTransactionItem(Transaction transaction, bool isTablet, int index) {
+  Widget _buildTransactionEmptyState(bool isTablet) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Center(
+      child: Text(
+        'No recent transactions yet.',
+        style: TextStyle(
+          color: colorScheme.onSurface.withValues(alpha: 0.6),
+          fontSize: isTablet ? 16 : 14,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTransactionErrorState(bool isTablet) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            _transactionsError ?? 'Unable to load transactions',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: colorScheme.error,
+              fontSize: isTablet ? 16 : 14,
+            ),
+          ),
+          const SizedBox(height: 10),
+          OutlinedButton(
+            onPressed:
+                _transactionsLoading ? null : () => _loadRecentTransactions(),
+            child: const Text('Try again'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTransactionItem(
+      Transaction transaction, bool isTablet, int index) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final statusColor = transaction.statusKey == 'success'
+        ? colorScheme.primary
+        : transaction.statusKey == 'failed'
+            ? colorScheme.error
+            : transaction.statusColor;
+    final tileColor = isDark
+        ? colorScheme.surfaceContainerHighest
+        : colorScheme.surfaceContainerLow;
     return AnimatedContainer(
       duration: Duration(milliseconds: 300 + (index * 100)),
       curve: Curves.easeOutCubic,
       margin: EdgeInsets.only(bottom: isTablet ? 16 : 12),
-      child: Container(
-        padding: EdgeInsets.all(isTablet ? 16 : 12),
-        decoration: BoxDecoration(
-          color: Colors.grey.shade50,
-          borderRadius: BorderRadius.circular(isTablet ? 12 : 8),
-          border: Border.all(color: Colors.grey.shade200),
+      child: GestureDetector(
+        onTap: () => showTransactionReceipt(
+          context: context,
+          data: transaction.toReceiptData(_transactionDateFormat),
         ),
-        child: Row(
-          children: [
-            Container(
-              padding: EdgeInsets.all(isTablet ? 12 : 8),
-              decoration: const BoxDecoration(
-                color: Color(0xFF00B82E),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                transaction.isIncoming ? Icons.arrow_downward : Icons.arrow_upward,
-                color: Colors.white,
-                size: isTablet ? 20 : 16,
-              ),
+        child: Container(
+          padding: EdgeInsets.all(isTablet ? 16 : 12),
+          decoration: BoxDecoration(
+            color: tileColor,
+            borderRadius: BorderRadius.circular(isTablet ? 12 : 8),
+            border: Border.all(
+              color: colorScheme.outlineVariant,
             ),
-            SizedBox(width: isTablet ? 16 : 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: EdgeInsets.all(isTablet ? 12 : 8),
+                decoration: BoxDecoration(
+                  color: colorScheme.primary,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  transaction.isIncoming
+                      ? Icons.arrow_downward
+                      : Icons.arrow_upward,
+                  color: colorScheme.onPrimary,
+                  size: isTablet ? 20 : 16,
+                ),
+              ),
+              SizedBox(width: isTablet ? 16 : 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      transaction.title,
+                      style: TextStyle(
+                        fontSize: isTablet ? 16 : 14,
+                        fontWeight: FontWeight.w600,
+                        color: colorScheme.onSurface,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    SizedBox(height: isTablet ? 6 : 4),
+                    Text(
+                      transaction.date,
+                      style: TextStyle(
+                        fontSize: isTablet ? 14 : 12,
+                        color: colorScheme.onSurface.withValues(alpha: 0.7),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    transaction.title,
+                    '₦${transaction.amount.abs().toStringAsFixed(2)}',
                     style: TextStyle(
                       fontSize: isTablet ? 16 : 14,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black87,
+                      fontWeight: FontWeight.bold,
+                      color: transaction.isIncoming
+                          ? colorScheme.primary
+                          : colorScheme.error,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                   ),
                   SizedBox(height: isTablet ? 6 : 4),
                   Text(
-                    transaction.date,
+                    transaction.status,
                     style: TextStyle(
-                      fontSize: isTablet ? 14 : 12,
-                      color: Colors.grey.shade600,
+                      fontSize: isTablet ? 12 : 10,
+                      color: statusColor,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ],
               ),
-            ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  '₦${transaction.amount.abs().toStringAsFixed(2)}',
-                  style: TextStyle(
-                    fontSize: isTablet ? 16 : 14,
-                    fontWeight: FontWeight.bold,
-                    color: transaction.isIncoming ? const Color(0xFF00B82E) : Colors.red,
-                  ),
-                ),
-                SizedBox(height: isTablet ? 6 : 4),
-                Text(
-                  transaction.status,
-                  style: TextStyle(
-                    fontSize: isTablet ? 12 : 10,
-                    color: const Color(0xFF00B82E),
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
   Widget _buildBottomNavigation(bool isTablet) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       height: isTablet ? 90 : 80,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: colorScheme.surface,
         borderRadius: BorderRadius.only(
           topLeft: Radius.circular(isTablet ? 24 : 20),
           topRight: Radius.circular(isTablet ? 24 : 20),
         ),
         boxShadow: [
           BoxShadow(
-            color: Color.fromRGBO(0,0,0,0.1),
-            blurRadius: 20,
-            offset: const Offset(0, -5),
+            color: Colors.black.withValues(alpha: isDark ? 0.4 : 0.08),
+            blurRadius: 18,
+            offset: const Offset(0, -4),
           ),
         ],
       ),
@@ -837,13 +1021,15 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   Widget _buildNavItem(IconData icon, String label, int index, bool isTablet) {
     final isSelected = _selectedTab == index;
+    final colorScheme = Theme.of(context).colorScheme;
+    final unselectedColor = colorScheme.onSurface.withValues(alpha: 0.55);
     return GestureDetector(
       onTap: () {
         setState(() {
           _selectedTab = index;
         });
         HapticFeedback.lightImpact();
-        
+
         // Navigate to Settings screen when Settings tab is tapped
         if (index == 3 && label == 'Settings') {
           Navigator.push(
@@ -853,7 +1039,7 @@ class _DashboardScreenState extends State<DashboardScreen>
             ),
           );
         }
-        
+
         // Navigate to Referrer page when Reffer tab is tapped
         if (index == 2 && label == 'Reffer') {
           Navigator.push(
@@ -863,7 +1049,7 @@ class _DashboardScreenState extends State<DashboardScreen>
             ),
           );
         }
-        
+
         // Navigate to Support page when Help tab is tapped
         if (index == 1 && label == 'Help') {
           Navigator.push(
@@ -886,7 +1072,7 @@ class _DashboardScreenState extends State<DashboardScreen>
           children: [
             Icon(
               icon,
-              color: isSelected ? const Color(0xFF00B82E) : Colors.grey.shade600,
+              color: isSelected ? colorScheme.primary : unselectedColor,
               size: isTablet ? 28 : 24,
             ),
             SizedBox(height: isTablet ? 6 : 4),
@@ -894,7 +1080,7 @@ class _DashboardScreenState extends State<DashboardScreen>
               label,
               style: TextStyle(
                 fontSize: isTablet ? 14 : 12,
-                color: isSelected ? const Color(0xFF00B82E) : Colors.grey.shade600,
+                color: isSelected ? colorScheme.primary : unselectedColor,
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
               ),
             ),
@@ -923,6 +1109,11 @@ class Transaction {
   final String date;
   final String status;
   final bool isIncoming;
+  final String statusKey;
+  final String channel;
+  final String reference;
+  final IconData icon;
+  final DateTime? createdAt;
 
   Transaction({
     required this.title,
@@ -930,5 +1121,122 @@ class Transaction {
     required this.date,
     required this.status,
     required this.isIncoming,
+    required this.statusKey,
+    required this.channel,
+    required this.reference,
+    required this.icon,
+    required this.createdAt,
   });
+
+  factory Transaction.fromApi(Map<String, dynamic> data, DateFormat formatter) {
+    final rawStatus = (data['status'] ?? 'pending').toString();
+    final createdAt =
+        DateTime.tryParse(data['created_at']?.toString() ?? '')?.toLocal();
+    final rawAmount = double.tryParse(data['amount']?.toString() ?? '') ?? 0;
+    final direction =
+        (data['type'] ?? data['transaction_type'] ?? data['direction'] ?? '')
+            .toString()
+            .toLowerCase();
+    final isIncoming =
+        direction.isNotEmpty ? direction != 'debit' : rawAmount >= 0;
+    final metadata = data['metadata'];
+    final metadataChannel =
+        metadata is Map<String, dynamic> ? metadata['channel'] : null;
+    final channel = (data['channel'] ?? metadataChannel ?? 'Wallet transaction')
+        .toString()
+        .trim();
+    final reference = (data['reference'] ?? '').toString();
+
+    final formattedTitle = _composeTitle(channel, reference);
+    final formattedDate =
+        createdAt != null ? formatter.format(createdAt) : '--';
+
+    return Transaction(
+      title: formattedTitle,
+      amount: rawAmount.abs(),
+      date: formattedDate,
+      status: _formatStatus(rawStatus),
+      isIncoming: isIncoming,
+      statusKey: rawStatus.toLowerCase(),
+      channel: channel,
+      reference: reference,
+      icon: _iconForChannel(channel),
+      createdAt: createdAt,
+    );
+  }
+
+  bool get isDisplayable => statusKey == 'success' || statusKey == 'failed';
+
+  Color get statusColor {
+    switch (statusKey) {
+      case 'success':
+        return const Color(0xFF00CA44);
+      case 'failed':
+        return Colors.red;
+      default:
+        return Colors.orange;
+    }
+  }
+
+  TransactionReceiptData toReceiptData(DateFormat formatter) {
+    final amountPrefix = isIncoming ? '+' : '-';
+    final computedDate =
+        createdAt != null ? formatter.format(createdAt!) : date;
+    return TransactionReceiptData(
+      title: channel.isEmpty ? 'Wallet transaction' : _titleCase(channel),
+      amountDisplay: '$amountPrefix₦${amount.toStringAsFixed(2)}',
+      isCredit: isIncoming,
+      statusLabel: status,
+      statusColor: statusColor,
+      dateLabel: computedDate,
+      channel: channel,
+      reference: reference,
+      icon: icon,
+    );
+  }
+
+  static String _composeTitle(String channel, String reference) {
+    final base = channel.isEmpty ? 'Wallet transaction' : _titleCase(channel);
+    if (reference.isEmpty) return base;
+    final suffix = reference.length <= 8
+        ? reference
+        : reference.substring(reference.length - 8);
+    return '$base â€¢ $suffix';
+  }
+
+  static String _titleCase(String value) {
+    if (value.isEmpty) return value;
+    return value
+        .split(' ')
+        .where((word) => word.isNotEmpty)
+        .map((word) => word[0].toUpperCase() + word.substring(1).toLowerCase())
+        .join(' ');
+  }
+
+  static String _formatStatus(String status) {
+    switch (status.toLowerCase()) {
+      case 'success':
+        return 'Successful';
+      case 'failed':
+        return 'Failed';
+      default:
+        return status.isEmpty
+            ? 'Pending'
+            : status[0].toUpperCase() + status.substring(1).toLowerCase();
+    }
+  }
+
+  static IconData _iconForChannel(String channel) {
+    final value = channel.toLowerCase();
+    if (value.contains('airtime')) return Icons.phone;
+    if (value.contains('data')) return Icons.wifi;
+    if (value.contains('electric')) return Icons.electrical_services;
+    if (value.contains('tv')) return Icons.tv;
+    if (value.contains('education')) return Icons.school;
+    if (value.contains('wallet')) return Icons.account_balance_wallet;
+    return Icons.swap_horiz;
+  }
 }
+
+
+

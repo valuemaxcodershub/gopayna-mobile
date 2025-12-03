@@ -1,5 +1,7 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+
+import 'widgets/transaction_receipt.dart';
 
 class TransactionHistoryScreen extends StatefulWidget {
   const TransactionHistoryScreen({super.key});
@@ -206,7 +208,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
                 period == _selectedPeriod 
                     ? Icons.radio_button_checked 
                     : Icons.radio_button_unchecked,
-                color: const Color(0xFF00B82E),
+                color: const Color(0xFF00CA44),
               ),
               title: Text(period),
               onTap: () {
@@ -235,7 +237,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
         return Theme(
           data: Theme.of(context).copyWith(
             colorScheme: Theme.of(context).colorScheme.copyWith(
-              primary: const Color(0xFF00B82E),
+              primary: const Color(0xFF00CA44),
             ),
           ),
           child: child!,
@@ -333,7 +335,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
                 SizedBox(width: isTablet ? 16 : 12),
                 Icon(
                   Icons.history,
-                  color: const Color(0xFF00B82E),
+                  color: const Color(0xFF00CA44),
                   size: isTablet ? 28 : 24,
                 ),
                 SizedBox(width: isTablet ? 12 : 8),
@@ -355,10 +357,10 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
                       vertical: isTablet ? 10 : 8,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF00B82E).withValues(alpha: 0.1),
+                      color: const Color(0xFF00CA44).withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
-                        color: const Color(0xFF00B82E),
+                        color: const Color(0xFF00CA44),
                         width: 1,
                       ),
                     ),
@@ -368,7 +370,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
                         Text(
                           _selectedPeriod,
                           style: TextStyle(
-                            color: const Color(0xFF00B82E),
+                            color: const Color(0xFF00CA44),
                             fontSize: isTablet ? 14 : 12,
                             fontWeight: FontWeight.w600,
                           ),
@@ -376,7 +378,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
                         SizedBox(width: isTablet ? 8 : 4),
                         Icon(
                           Icons.keyboard_arrow_down,
-                          color: const Color(0xFF00B82E),
+                          color: const Color(0xFF00CA44),
                           size: isTablet ? 18 : 16,
                         ),
                       ],
@@ -504,15 +506,18 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
       child: GestureDetector(
         onTap: () {
           HapticFeedback.lightImpact();
-          _showTransactionDetails(transaction);
+          showTransactionReceipt(
+            context: context,
+            data: transaction.toReceiptData(),
+          );
         },
         child: Container(
           padding: EdgeInsets.all(isTablet ? 20 : 16),
           decoration: BoxDecoration(
-            color: const Color(0xFF00B82E).withValues(alpha: 0.05),
+            color: const Color(0xFF00CA44).withValues(alpha: 0.05),
             borderRadius: BorderRadius.circular(isTablet ? 16 : 12),
             border: Border.all(
-              color: const Color(0xFF00B82E).withValues(alpha: 0.1),
+              color: const Color(0xFF00CA44).withValues(alpha: 0.1),
               width: 1,
             ),
           ),
@@ -521,12 +526,12 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
               Container(
                 padding: EdgeInsets.all(isTablet ? 14 : 12),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF00B82E).withValues(alpha: 0.1),
+                  color: const Color(0xFF00CA44).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(isTablet ? 14 : 12),
                 ),
                 child: Icon(
                   transaction.icon,
-                  color: const Color(0xFF00B82E),
+                  color: const Color(0xFF00CA44),
                   size: isTablet ? 24 : 20,
                 ),
               ),
@@ -572,7 +577,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
                       vertical: isTablet ? 6 : 4,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF00B82E),
+                      color: const Color(0xFF00CA44),
                       borderRadius: BorderRadius.circular(isTablet ? 8 : 6),
                     ),
                     child: Text(
@@ -593,112 +598,6 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
     );
   }
 
-  void _showTransactionDetails(TransactionItem transaction) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (context) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(20),
-            topRight: Radius.circular(20),
-          ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                height: 4,
-                width: 40,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(height: 24),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF00B82E).withValues(alpha: 0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  transaction.icon,
-                  color: const Color(0xFF00B82E),
-                  size: 32,
-                ),
-              ),
-              const SizedBox(height: 20),
-              Text(
-                'Transaction Details',
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 24),
-              _buildDetailRow('Type', transaction.type),
-              _buildDetailRow('Amount', '₦${transaction.amount.toStringAsFixed(2)}'),
-              _buildDetailRow('Date', transaction.date),
-              _buildDetailRow('Status', transaction.status),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.pop(context),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF00B82E),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Text(
-                    'Close',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDetailRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey.shade600,
-            ),
-          ),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: Colors.black87,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 class TransactionItem {
@@ -717,4 +616,27 @@ class TransactionItem {
     required this.icon,
     this.isIncoming = false,
   });
+
+  TransactionReceiptData toReceiptData() {
+    final statusColor = status.toLowerCase() == 'successful'
+        ? const Color(0xFF00CA44)
+        : status.toLowerCase() == 'failed'
+            ? Colors.red
+            : Colors.orange;
+    final sign = isIncoming ? '+' : '-';
+    return TransactionReceiptData(
+      title: type,
+      amountDisplay: '$sign₦${amount.toStringAsFixed(2)}',
+      isCredit: isIncoming,
+      statusLabel: status,
+      statusColor: statusColor,
+      dateLabel: date,
+      channel: type,
+      reference: '--',
+      icon: icon,
+    );
+  }
 }
+
+
+

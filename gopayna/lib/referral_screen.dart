@@ -1,5 +1,10 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:share_plus/share_plus.dart';
+
+import 'api_service.dart';
 
 class ReferrerPage extends StatefulWidget {
   const ReferrerPage({super.key});
@@ -18,73 +23,33 @@ class _ReferrerPageState extends State<ReferrerPage>
   late Animation<Offset> _slideAnimation;
   late Animation<double> _scaleAnimation;
 
-  final String _referralCode = 'WFCZFF600';
+  String? _referralCode;
   bool _showHistory = false;
+  double? _referralBalance;
+  double? _walletBalance;
+  int _referralSuccessCount = 0;
+  bool _isProcessingWithdrawal = false;
+  bool _isSummaryLoading = true;
+  String? _summaryError;
+
+  ColorScheme get _colorScheme => Theme.of(context).colorScheme;
+  bool get _isDark => Theme.of(context).brightness == Brightness.dark;
+  Color get _onSurface => _colorScheme.onSurface;
+  Color get _mutedText => _colorScheme.onSurface.withValues(alpha: 0.7);
+  Color get _cardColor => _colorScheme.surface;
+  Color get _shadowColor => Colors.black.withValues(alpha: _isDark ? 0.5 : 0.08);
   
-  final List<ReferralEarning> _earnings = [
-    ReferralEarning(
-      referredUser: 'John Adebayo',
-      amount: 500.00,
-      date: 'Nov 18, 2025 - 03:45 PM',
-      status: 'Completed',
-      type: 'Registration Bonus',
-    ),
-    ReferralEarning(
-      referredUser: 'Mary Okonkwo',
-      amount: 250.00,
-      date: 'Nov 17, 2025 - 11:20 AM',
-      status: 'Completed',
-      type: 'Transaction Bonus',
-    ),
-    ReferralEarning(
-      referredUser: 'Ibrahim Hassan',
-      amount: 500.00,
-      date: 'Nov 15, 2025 - 07:30 PM',
-      status: 'Completed',
-      type: 'Registration Bonus',
-    ),
-    ReferralEarning(
-      referredUser: 'Grace Okoro',
-      amount: 150.00,
-      date: 'Nov 12, 2025 - 02:15 PM',
-      status: 'Completed',
-      type: 'Transaction Bonus',
-    ),
-    ReferralEarning(
-      referredUser: 'David Ogunbiyi',
-      amount: 500.00,
-      date: 'Nov 10, 2025 - 09:45 AM',
-      status: 'Pending',
-      type: 'Registration Bonus',
-    ),
-    ReferralEarning(
-      referredUser: 'Fatima Abdul',
-      amount: 300.00,
-      date: 'Nov 8, 2025 - 05:20 PM',
-      status: 'Completed',
-      type: 'Transaction Bonus',
-    ),
-    ReferralEarning(
-      referredUser: 'Chidi Okwu',
-      amount: 500.00,
-      date: 'Nov 5, 2025 - 01:10 PM',
-      status: 'Completed',
-      type: 'Registration Bonus',
-    ),
-    ReferralEarning(
-      referredUser: 'Aisha Mohammed',
-      amount: 200.00,
-      date: 'Nov 3, 2025 - 04:35 PM',
-      status: 'Completed',
-      type: 'Transaction Bonus',
-    ),
-  ];
+  List<ReferralEarning> _earnings = [];
+  bool _isHistoryLoading = false;
+  String? _historyError;
+  String? _authToken;
 
   @override
   void initState() {
     super.initState();
     _initializeAnimations();
     _startAnimations();
+    _loadReferralSummary();
   }
 
   void _initializeAnimations() {
@@ -125,6 +90,208 @@ class _ReferrerPageState extends State<ReferrerPage>
     _scaleController.forward();
   }
 
+  Future<String?> _getAuthToken() async {
+    if (_authToken != null && _authToken!.isNotEmpty) {
+      return _authToken;
+    }
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('jwt');
+    if (token != null && token.isNotEmpty) {
+      _authToken = token;
+    }
+    return _authToken;
+  }
+
+  Future<void> _loadReferralSummary() async {
+    setState(() {
+      _isSummaryLoading = true;
+      _summaryError = null;
+    });
+
+    try {
+      final token = await _getAuthToken();
+      if (token == null || token.isEmpty) {
+        if (!mounted) return;
+        setState(() {
+          _summaryError = 'Session expired. Please sign in again.';
+          _isSummaryLoading = false;
+        });
+        return;
+      }
+
+      final response = await fetchUserProfile(token);
+      if (!mounted) return;
+
+      if (response['error'] != null) {
+        setState(() {
+          _summaryError = response['error'].toString();
+          _isSummaryLoading = false;
+        });
+        return;
+      }
+
+      final user = response['user'] ?? response;
+      setState(() {
+        _referralCode = user['referralCode']?.toString();
+        _referralBalance =
+            double.tryParse(user['referralBonusWallet']?.toString() ?? '') ?? 0;
+        _walletBalance =
+            double.tryParse(user['walletBalance']?.toString() ?? '') ?? 0;
+        _referralSuccessCount =
+            int.tryParse(user['referralSuccessCount']?.toString() ?? '0') ?? 0;
+        _isSummaryLoading = false;
+      });
+
+      await _loadReferralHistory(token: token);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _summaryError = 'Unable to load referral summary.';
+        _isSummaryLoading = false;
+      });
+    }
+  }
+
+  double get _referralBalanceValue => _referralBalance ?? 0;
+  double get _walletBalanceValue => _walletBalance ?? 0;
+  bool get _canShareReferral =>
+      !_isSummaryLoading && (_referralCode?.trim().isNotEmpty ?? false);
+
+  Future<void> _loadReferralHistory({String? token, int? limitOverride}) async {
+    final authToken = token ?? await _getAuthToken();
+    if (authToken == null || authToken.isEmpty) {
+      return;
+    }
+
+    final limit = limitOverride ?? (_showHistory ? 50 : 6);
+
+    if (!mounted) return;
+    setState(() {
+      _isHistoryLoading = true;
+      _historyError = null;
+    });
+
+    try {
+      final response = await fetchReferralHistory(token: authToken, limit: limit);
+      if (!mounted) return;
+
+      if (response['error'] != null) {
+        setState(() {
+          _historyError = response['error'].toString();
+          _isHistoryLoading = false;
+        });
+        return;
+      }
+
+      final dynamic rawData = response['data'];
+      final List<dynamic> payload = rawData is List ? rawData : const [];
+      final parsed = payload
+          .whereType<Map<String, dynamic>>()
+          .map(ReferralEarning.fromApi)
+          .toList();
+
+      setState(() {
+        _earnings = parsed;
+        _isHistoryLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _historyError = 'Unable to load referral activity right now.';
+        _isHistoryLoading = false;
+      });
+    }
+  }
+
+  void _showSnack(String message, {Color? background}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: background ?? Theme.of(context).colorScheme.primary,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+  }
+
+  void _toggleHistoryView() {
+    setState(() {
+      _showHistory = !_showHistory;
+    });
+    _loadReferralHistory(limitOverride: _showHistory ? 50 : 6);
+  }
+
+  Future<void> _withdrawReferralEarnings() async {
+    if (_isProcessingWithdrawal) return;
+
+    final available = _referralBalanceValue;
+    if (available <= 0) {
+      _showSnack(
+        'No referral earnings available to withdraw yet.',
+        background: Theme.of(context).colorScheme.error,
+      );
+      return;
+    }
+
+    final token = await _getAuthToken();
+    if (!mounted) return;
+    if (token == null || token.isEmpty) {
+      _showSnack(
+        'Session expired. Please sign in again.',
+        background: Theme.of(context).colorScheme.error,
+      );
+      return;
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _isProcessingWithdrawal = true;
+    });
+
+    try {
+      final response = await transferReferralEarnings(token: token);
+      if (!mounted) return;
+
+      if (response['error'] != null) {
+        _showSnack(
+          response['error'].toString(),
+          background: Theme.of(context).colorScheme.error,
+        );
+      } else {
+        final data = response['data'] ?? response;
+        final newReferralBalance =
+            double.tryParse(data['referralBonusWallet']?.toString() ?? '') ?? _referralBalanceValue;
+        final newWalletBalance =
+            double.tryParse(data['walletBalance']?.toString() ?? '') ?? _walletBalanceValue;
+
+        setState(() {
+          _referralBalance = newReferralBalance;
+          _walletBalance = newWalletBalance;
+        });
+
+        await _loadReferralHistory(limitOverride: _showHistory ? 50 : 6);
+        if (!mounted) return;
+
+        _showSnack(
+          data['message']?.toString() ?? 'Referral earnings moved to wallet.',
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      _showSnack(
+        'Unable to withdraw referral earnings right now.',
+        background: Theme.of(context).colorScheme.error,
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isProcessingWithdrawal = false;
+        });
+      }
+    }
+  }
+
   @override
   void dispose() {
     _fadeController.dispose();
@@ -140,7 +307,7 @@ class _ReferrerPageState extends State<ReferrerPage>
     final statusBarHeight = MediaQuery.of(context).padding.top;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Column(
         children: [
           _buildCustomStatusBar(statusBarHeight),
@@ -156,7 +323,7 @@ class _ReferrerPageState extends State<ReferrerPage>
   Widget _buildCustomStatusBar(double statusBarHeight) {
     return Container(
       height: statusBarHeight,
-      color: const Color(0xFFF8F9FA),
+      color: Theme.of(context).scaffoldBackgroundColor,
     );
   }
 
@@ -169,12 +336,12 @@ class _ReferrerPageState extends State<ReferrerPage>
           vertical: isTablet ? 20 : 16,
         ),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: _colorScheme.surface,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
+              color: _shadowColor,
+              blurRadius: 12,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
@@ -185,12 +352,14 @@ class _ReferrerPageState extends State<ReferrerPage>
               child: Container(
                 padding: EdgeInsets.all(isTablet ? 12 : 8),
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
+                  color: _isDark
+                      ? _colorScheme.surfaceContainerHighest
+                      : _colorScheme.surface,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
                   Icons.arrow_back,
-                  color: Colors.black87,
+                  color: _colorScheme.onSurface,
                   size: isTablet ? 24 : 20,
                 ),
               ),
@@ -198,7 +367,7 @@ class _ReferrerPageState extends State<ReferrerPage>
             SizedBox(width: isTablet ? 16 : 12),
             Icon(
               Icons.group,
-              color: const Color(0xFF00B82E),
+              color: _colorScheme.primary,
               size: isTablet ? 28 : 24,
             ),
             SizedBox(width: isTablet ? 12 : 8),
@@ -208,25 +377,21 @@ class _ReferrerPageState extends State<ReferrerPage>
                 style: TextStyle(
                   fontSize: isTablet ? 24 : 20,
                   fontWeight: FontWeight.bold,
-                  color: Colors.black87,
+                  color: _colorScheme.onSurface,
                 ),
               ),
             ),
             GestureDetector(
-              onTap: () {
-                setState(() {
-                  _showHistory = !_showHistory;
-                });
-              },
+              onTap: _toggleHistoryView,
               child: Container(
                 padding: EdgeInsets.all(isTablet ? 12 : 8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF00B82E).withValues(alpha: 0.1),
+                  color: _colorScheme.primary.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
                   Icons.history,
-                  color: const Color(0xFF00B82E),
+                  color: _colorScheme.primary,
                   size: isTablet ? 24 : 20,
                 ),
               ),
@@ -255,6 +420,8 @@ class _ReferrerPageState extends State<ReferrerPage>
         child: Column(
           children: [
             SizedBox(height: isTablet ? 24 : 16),
+            _buildSummaryBanner(isTablet),
+            SizedBox(height: _summaryError != null || _isSummaryLoading ? 16 : 0),
             _buildEarningsCard(isTablet),
             SizedBox(height: isTablet ? 40 : 30),
             _buildTitleSection(isTablet),
@@ -271,6 +438,79 @@ class _ReferrerPageState extends State<ReferrerPage>
     );
   }
 
+  Widget _buildSummaryBanner(bool isTablet) {
+    if (_isSummaryLoading) {
+      return Container(
+        padding: EdgeInsets.symmetric(
+          horizontal: isTablet ? 20 : 16,
+          vertical: isTablet ? 14 : 12,
+        ),
+        decoration: BoxDecoration(
+          color: _colorScheme.primary.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(isTablet ? 16 : 12),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation<Color>(_colorScheme.primary),
+              ),
+            ),
+            SizedBox(width: isTablet ? 12 : 10),
+            Text(
+              'Fetching referral details...',
+              style: TextStyle(
+                color: _colorScheme.primary,
+                fontWeight: FontWeight.w600,
+                fontSize: isTablet ? 16 : 14,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_summaryError != null) {
+      return Container(
+        padding: EdgeInsets.symmetric(
+          horizontal: isTablet ? 20 : 16,
+          vertical: isTablet ? 14 : 12,
+        ),
+        decoration: BoxDecoration(
+          color: _colorScheme.errorContainer,
+          borderRadius: BorderRadius.circular(isTablet ? 16 : 12),
+          border: Border.all(color: _colorScheme.error.withValues(alpha: 0.4)),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.error_outline, color: _colorScheme.error),
+            SizedBox(width: isTablet ? 12 : 10),
+            Expanded(
+              child: Text(
+                _summaryError!,
+                style: TextStyle(
+                  color: _colorScheme.error,
+                  fontWeight: FontWeight.w600,
+                  fontSize: isTablet ? 15 : 13,
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: _loadReferralSummary,
+              child: Text('Retry', style: TextStyle(color: _colorScheme.error)),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return const SizedBox.shrink();
+  }
+
   Widget _buildHistoryView(bool isTablet) {
     return Container(
       margin: EdgeInsets.symmetric(
@@ -278,13 +518,13 @@ class _ReferrerPageState extends State<ReferrerPage>
         vertical: isTablet ? 16 : 12,
       ),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: _cardColor,
         borderRadius: BorderRadius.circular(isTablet ? 20 : 16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
+            color: _shadowColor,
+            blurRadius: 12,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
@@ -299,7 +539,7 @@ class _ReferrerPageState extends State<ReferrerPage>
                   style: TextStyle(
                     fontSize: isTablet ? 20 : 18,
                     fontWeight: FontWeight.bold,
-                    color: Colors.black87,
+                    color: _onSurface,
                   ),
                 ),
                 const Spacer(),
@@ -307,26 +547,68 @@ class _ReferrerPageState extends State<ReferrerPage>
                   '${_earnings.length} records',
                   style: TextStyle(
                     fontSize: isTablet ? 14 : 12,
-                    color: Colors.grey.shade600,
+                    color: _mutedText,
                   ),
                 ),
               ],
             ),
           ),
           Expanded(
-            child: ListView.builder(
-              padding: EdgeInsets.only(
-                left: isTablet ? 24 : 20,
-                right: isTablet ? 24 : 20,
-                bottom: isTablet ? 24 : 20,
-              ),
-              itemCount: _earnings.length,
-              itemBuilder: (context, index) {
-                return _buildEarningItemCard(_earnings[index], isTablet, index);
-              },
-            ),
+            child: _isHistoryLoading && _earnings.isEmpty
+                ? Center(
+                    child: SizedBox(
+                      width: isTablet ? 36 : 28,
+                      height: isTablet ? 36 : 28,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 3,
+                        valueColor:
+                            AlwaysStoppedAnimation<Color>(_colorScheme.primary),
+                      ),
+                    ),
+                  )
+                : (_historyError != null && _earnings.isEmpty)
+                    ? _buildHistoryMessage(
+                        _historyError!,
+                        isTablet,
+                        isError: true,
+                      )
+                    : _earnings.isEmpty
+                        ? _buildHistoryMessage(
+                            'No referral activity yet.',
+                            isTablet,
+                          )
+                        : ListView.builder(
+                            padding: EdgeInsets.only(
+                              left: isTablet ? 24 : 20,
+                              right: isTablet ? 24 : 20,
+                              bottom: isTablet ? 24 : 20,
+                            ),
+                            itemCount: _earnings.length,
+                            itemBuilder: (context, index) {
+                              return _buildEarningItemCard(
+                                  _earnings[index], isTablet, index);
+                            },
+                          ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildHistoryMessage(String message, bool isTablet,
+      {bool isError = false}) {
+    return Center(
+      child: Padding(
+        padding: EdgeInsets.all(isTablet ? 24 : 16),
+        child: Text(
+          message,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: isError ? _colorScheme.error : _mutedText,
+            fontSize: isTablet ? 16 : 14,
+            fontWeight: isError ? FontWeight.w600 : FontWeight.w500,
+          ),
+        ),
       ),
     );
   }
@@ -337,15 +619,15 @@ class _ReferrerPageState extends State<ReferrerPage>
       child: Container(
         padding: EdgeInsets.all(isTablet ? 24 : 20),
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFF00B82E), Color(0xFF00A525)],
+          gradient: LinearGradient(
+            colors: [_colorScheme.primary, _colorScheme.secondary],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
           borderRadius: BorderRadius.circular(isTablet ? 20 : 16),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF00B82E).withValues(alpha: 0.3),
+              color: _colorScheme.primary.withValues(alpha: 0.35),
               blurRadius: 20,
               offset: const Offset(0, 10),
             ),
@@ -359,7 +641,7 @@ class _ReferrerPageState extends State<ReferrerPage>
                 Text(
                   'Total Referral Earnings',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: _colorScheme.onPrimary,
                     fontSize: isTablet ? 16 : 14,
                     fontWeight: FontWeight.w500,
                   ),
@@ -367,16 +649,16 @@ class _ReferrerPageState extends State<ReferrerPage>
                 const Spacer(),
                 Icon(
                   Icons.trending_up,
-                  color: Colors.white,
+                  color: _colorScheme.onPrimary,
                   size: isTablet ? 24 : 20,
                 ),
               ],
             ),
             SizedBox(height: isTablet ? 16 : 12),
             Text(
-              '₦2,700.00',
+              '₦${_referralBalanceValue.toStringAsFixed(2)}',
               style: TextStyle(
-                color: Colors.white,
+                color: _colorScheme.onPrimary,
                 fontSize: isTablet ? 36 : 32,
                 fontWeight: FontWeight.bold,
               ),
@@ -386,18 +668,56 @@ class _ReferrerPageState extends State<ReferrerPage>
               children: [
                 Icon(
                   Icons.group,
-                  color: Colors.white.withValues(alpha: 0.8),
+                  color: _colorScheme.onPrimary.withValues(alpha: 0.85),
                   size: isTablet ? 16 : 14,
                 ),
                 SizedBox(width: isTablet ? 8 : 6),
                 Text(
-                  '7 successful referrals',
+                  '$_referralSuccessCount successful referrals',
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.8),
+                    color: _colorScheme.onPrimary.withValues(alpha: 0.85),
                     fontSize: isTablet ? 14 : 12,
                   ),
                 ),
               ],
+            ),
+            SizedBox(height: isTablet ? 12 : 10),
+            
+            SizedBox(height: isTablet ? 20 : 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: (_referralBalanceValue <= 0 || _isProcessingWithdrawal || _isSummaryLoading)
+                    ? null
+                    : _withdrawReferralEarnings,
+                icon: _isProcessingWithdrawal
+                    ? SizedBox(
+                        width: isTablet ? 22 : 18,
+                        height: isTablet ? 22 : 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(_colorScheme.primary),
+                        ),
+                      )
+                    : const Icon(Icons.account_balance_wallet_outlined),
+                label: Text(
+                  _referralBalanceValue <= 0
+                      ? 'No earnings to withdraw'
+                      : 'Withdraw earnings',
+                  style: TextStyle(
+                    fontSize: isTablet ? 16 : 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _colorScheme.onPrimary,
+                  foregroundColor: _colorScheme.primary,
+                  padding: EdgeInsets.symmetric(vertical: isTablet ? 16 : 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(isTablet ? 16 : 12),
+                  ),
+                ),
+              ),
             ),
           ],
         ),
@@ -406,24 +726,22 @@ class _ReferrerPageState extends State<ReferrerPage>
   }
 
   Widget _buildRecentEarningsSection(bool isTablet) {
-    final recentEarnings = [
-      {'name': 'John Adebayo', 'amount': '₦500', 'type': 'Registration'},
-      {'name': 'Mary Okonkwo', 'amount': '₦250', 'type': 'Transaction'},
-      {'name': 'Ibrahim Hassan', 'amount': '₦500', 'type': 'Registration'},
-    ];
+    final recentEarnings = _earnings.take(3).toList();
+    final showLoader = _isHistoryLoading && recentEarnings.isEmpty;
+    final showError = _historyError != null && recentEarnings.isEmpty;
 
     return FadeTransition(
       opacity: _fadeAnimation,
       child: Container(
         padding: EdgeInsets.all(isTablet ? 24 : 20),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: _cardColor,
           borderRadius: BorderRadius.circular(isTablet ? 20 : 16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 5),
+              color: _shadowColor,
+              blurRadius: 12,
+              offset: const Offset(0, 6),
             ),
           ],
         ),
@@ -437,29 +755,25 @@ class _ReferrerPageState extends State<ReferrerPage>
                   style: TextStyle(
                     fontSize: isTablet ? 20 : 18,
                     fontWeight: FontWeight.bold,
-                    color: Colors.black87,
+                    color: _onSurface,
                   ),
                 ),
                 const Spacer(),
                 GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _showHistory = !_showHistory;
-                    });
-                  },
+                  onTap: _toggleHistoryView,
                   child: Container(
                     padding: EdgeInsets.symmetric(
                       horizontal: isTablet ? 12 : 8,
                       vertical: isTablet ? 6 : 4,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF00B82E).withValues(alpha: 0.1),
+                      color: _colorScheme.primary.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
                       'See all',
                       style: TextStyle(
-                        color: const Color(0xFF00B82E),
+                        color: _colorScheme.primary,
                         fontSize: isTablet ? 14 : 12,
                         fontWeight: FontWeight.w600,
                       ),
@@ -469,68 +783,122 @@ class _ReferrerPageState extends State<ReferrerPage>
               ],
             ),
             SizedBox(height: isTablet ? 20 : 16),
-            ...recentEarnings.map((earning) => Container(
-              margin: EdgeInsets.only(bottom: isTablet ? 16 : 12),
-              padding: EdgeInsets.all(isTablet ? 16 : 12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF0F8F0),
-                borderRadius: BorderRadius.circular(isTablet ? 12 : 10),
-                border: Border.all(
-                  color: const Color(0xFF00B82E).withValues(alpha: 0.2),
-                  width: 1,
+            if (_isHistoryLoading && recentEarnings.isNotEmpty)
+              Padding(
+                padding: EdgeInsets.only(bottom: isTablet ? 16 : 12),
+                child: LinearProgressIndicator(
+                  minHeight: 3,
+                  backgroundColor: _colorScheme.primary.withValues(alpha: 0.1),
+                  valueColor: AlwaysStoppedAnimation<Color>(_colorScheme.primary),
                 ),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: EdgeInsets.all(isTablet ? 10 : 8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF00B82E).withValues(alpha: 0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      earning['type'] == 'Registration' 
-                          ? Icons.person_add 
-                          : Icons.monetization_on,
-                      color: const Color(0xFF00B82E),
-                      size: isTablet ? 20 : 16,
+              )
+            else if (showLoader)
+              Center(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: isTablet ? 24 : 16),
+                  child: SizedBox(
+                    width: isTablet ? 28 : 22,
+                    height: isTablet ? 28 : 22,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 3,
+                      valueColor: AlwaysStoppedAnimation<Color>(_colorScheme.primary),
                     ),
                   ),
-                  SizedBox(width: isTablet ? 16 : 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                ),
+              )
+            else if (showError)
+              Center(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: isTablet ? 24 : 16),
+                  child: Text(
+                    _historyError ?? 'Unable to load referral activity.',
+                    style: TextStyle(
+                      color: _colorScheme.error,
+                      fontSize: isTablet ? 16 : 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              )
+            else if (recentEarnings.isEmpty)
+              Center(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: isTablet ? 24 : 16),
+                  child: Text(
+                    'No referral activity yet.',
+                    style: TextStyle(
+                      color: _mutedText,
+                      fontSize: isTablet ? 16 : 14,
+                    ),
+                  ),
+                ),
+              )
+            else
+              ...recentEarnings.map((earning) => Container(
+                    margin: EdgeInsets.only(bottom: isTablet ? 16 : 12),
+                    padding: EdgeInsets.all(isTablet ? 16 : 12),
+                    decoration: BoxDecoration(
+                      color: _colorScheme.primary.withValues(alpha: 0.06),
+                      borderRadius: BorderRadius.circular(isTablet ? 12 : 10),
+                      border: Border.all(
+                        color: _colorScheme.primary.withValues(alpha: 0.2),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
                       children: [
-                        Text(
-                          earning['name']!,
-                          style: TextStyle(
-                            fontSize: isTablet ? 16 : 14,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.black87,
+                        Container(
+                          padding: EdgeInsets.all(isTablet ? 10 : 8),
+                          decoration: BoxDecoration(
+                            color: _colorScheme.primary.withValues(alpha: 0.12),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            earning.type
+                                    .toLowerCase()
+                                    .contains('withdraw')
+                                ? Icons.account_balance_wallet
+                                : Icons.card_giftcard,
+                            color: _colorScheme.primary,
+                            size: isTablet ? 20 : 16,
                           ),
                         ),
-                        SizedBox(height: isTablet ? 4 : 2),
+                        SizedBox(width: isTablet ? 16 : 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                earning.referredUser,
+                                style: TextStyle(
+                                  fontSize: isTablet ? 16 : 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: _onSurface,
+                                ),
+                              ),
+                              SizedBox(height: isTablet ? 4 : 2),
+                              Text(
+                                earning.type,
+                                style: TextStyle(
+                                  fontSize: isTablet ? 12 : 10,
+                                  color: _mutedText,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                         Text(
-                          '${earning['type']} Bonus',
+                          '₦${earning.amount.toStringAsFixed(2)}',
                           style: TextStyle(
-                            fontSize: isTablet ? 12 : 10,
-                            color: Colors.grey.shade600,
+                            fontSize: isTablet ? 16 : 14,
+                            fontWeight: FontWeight.bold,
+                            color: _colorScheme.primary,
                           ),
                         ),
                       ],
                     ),
-                  ),
-                  Text(
-                    earning['amount']!,
-                    style: TextStyle(
-                      fontSize: isTablet ? 16 : 14,
-                      fontWeight: FontWeight.bold,
-                      color: const Color(0xFF00B82E),
-                    ),
-                  ),
-                ],
-              ),
-            )),
+                  )),
           ],
         ),
       ),
@@ -542,23 +910,23 @@ class _ReferrerPageState extends State<ReferrerPage>
       scale: _scaleAnimation,
       child: Column(
         children: [
-          Text(
-            'Refer friends and earn ₦6\ninstantly',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: isTablet ? 28 : 24,
-              fontWeight: FontWeight.bold,
-              color: Colors.black87,
-              height: 1.3,
-            ),
-          ),
+          // Text(
+          //   'Refer friends and earn ₦6\ninstantly',
+          //   textAlign: TextAlign.center,
+          //   style: TextStyle(
+          //     fontSize: isTablet ? 28 : 24,
+          //     fontWeight: FontWeight.bold,
+          //     color: _onSurface,
+          //     height: 1.3,
+          //   ),
+          // ),
           SizedBox(height: isTablet ? 20 : 16),
           Text(
-            'Invite friends to Gopayna and earn ₦6 on each\nreferrals first transaction',
+            'Invite friends to Gopayna and earn ₦6 on every 3 friends you referred.',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: isTablet ? 18 : 16,
-              color: Colors.grey.shade600,
+              color: _mutedText,
               height: 1.5,
             ),
           ),
@@ -568,6 +936,8 @@ class _ReferrerPageState extends State<ReferrerPage>
   }
 
   Widget _buildReferralCodeSection(bool isTablet) {
+    final codeText = _referralCode?.toUpperCase() ?? '------';
+    final isDisabled = !_canShareReferral;
     return FadeTransition(
       opacity: _fadeAnimation,
       child: Container(
@@ -576,17 +946,17 @@ class _ReferrerPageState extends State<ReferrerPage>
           vertical: isTablet ? 20 : 16,
         ),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: _cardColor,
           borderRadius: BorderRadius.circular(isTablet ? 16 : 12),
           border: Border.all(
-            color: const Color(0xFF00B82E),
+            color: _colorScheme.primary,
             width: 2,
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 5),
+              color: _shadowColor,
+              blurRadius: 12,
+              offset: const Offset(0, 6),
             ),
           ],
         ),
@@ -594,26 +964,30 @@ class _ReferrerPageState extends State<ReferrerPage>
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
-              _referralCode,
+              codeText,
               style: TextStyle(
                 fontSize: isTablet ? 24 : 20,
                 fontWeight: FontWeight.bold,
-                color: const Color(0xFF00B82E),
+                color: _colorScheme.primary,
                 letterSpacing: 2,
               ),
             ),
             SizedBox(width: isTablet ? 16 : 12),
             GestureDetector(
-              onTap: _copyReferralCode,
+              onTap: isDisabled ? null : _copyReferralCode,
               child: Container(
                 padding: EdgeInsets.all(isTablet ? 12 : 8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF00B82E).withValues(alpha: 0.1),
+                  color: isDisabled
+                      ? _colorScheme.onSurface.withValues(alpha: 0.08)
+                      : _colorScheme.primary.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(isTablet ? 10 : 8),
                 ),
                 child: Icon(
                   Icons.copy,
-                  color: const Color(0xFF00B82E),
+                  color: isDisabled
+                      ? _colorScheme.onSurface.withValues(alpha: 0.4)
+                      : _colorScheme.primary,
                   size: isTablet ? 24 : 20,
                 ),
               ),
@@ -631,12 +1005,12 @@ class _ReferrerPageState extends State<ReferrerPage>
         width: double.infinity,
         height: isTablet ? 60 : 56,
         child: ElevatedButton(
-          onPressed: _shareReferralCode,
+          onPressed: _canShareReferral ? _shareReferralCode : null,
           style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF00B82E),
-            foregroundColor: Colors.white,
+            backgroundColor: _colorScheme.primary,
+            foregroundColor: _colorScheme.onPrimary,
             elevation: 8,
-            shadowColor: const Color(0xFF00B82E).withValues(alpha: 0.3),
+            shadowColor: _colorScheme.primary.withValues(alpha: 0.35),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(isTablet ? 16 : 12),
             ),
@@ -655,6 +1029,9 @@ class _ReferrerPageState extends State<ReferrerPage>
   }
 
   Widget _buildEarningItemCard(ReferralEarning earning, bool isTablet, int index) {
+    final isCompleted = earning.status == 'Completed';
+    final Color accentColor = isCompleted ? _colorScheme.primary : _colorScheme.tertiary;
+    final Color accentBg = accentColor.withValues(alpha: 0.12);
     return AnimatedContainer(
       duration: Duration(milliseconds: 300 + (index * 100)),
       curve: Curves.easeOutCubic,
@@ -662,14 +1039,10 @@ class _ReferrerPageState extends State<ReferrerPage>
       child: Container(
         padding: EdgeInsets.all(isTablet ? 20 : 16),
         decoration: BoxDecoration(
-          color: earning.status == 'Completed' 
-              ? const Color(0xFFF0F8F0) 
-              : Colors.orange.shade50,
+          color: accentColor.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(isTablet ? 16 : 12),
           border: Border.all(
-            color: earning.status == 'Completed'
-                ? const Color(0xFF00B82E).withValues(alpha: 0.2)
-                : Colors.orange.withValues(alpha: 0.3),
+            color: accentColor.withValues(alpha: 0.3),
             width: 1,
           ),
         ),
@@ -680,18 +1053,14 @@ class _ReferrerPageState extends State<ReferrerPage>
                 Container(
                   padding: EdgeInsets.all(isTablet ? 12 : 8),
                   decoration: BoxDecoration(
-                    color: earning.status == 'Completed'
-                        ? const Color(0xFF00B82E).withValues(alpha: 0.1)
-                        : Colors.orange.withValues(alpha: 0.1),
+                    color: accentBg,
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
-                    earning.type == 'Registration Bonus' 
-                        ? Icons.person_add 
-                        : Icons.monetization_on,
-                    color: earning.status == 'Completed'
-                        ? const Color(0xFF00B82E)
-                        : Colors.orange,
+                    earning.type.toLowerCase().contains('withdraw')
+                        ? Icons.account_balance_wallet
+                        : Icons.card_giftcard,
+                    color: accentColor,
                     size: isTablet ? 24 : 20,
                   ),
                 ),
@@ -705,7 +1074,7 @@ class _ReferrerPageState extends State<ReferrerPage>
                         style: TextStyle(
                           fontSize: isTablet ? 16 : 14,
                           fontWeight: FontWeight.bold,
-                          color: Colors.black87,
+                          color: _onSurface,
                         ),
                       ),
                       SizedBox(height: isTablet ? 4 : 2),
@@ -713,7 +1082,7 @@ class _ReferrerPageState extends State<ReferrerPage>
                         earning.type,
                         style: TextStyle(
                           fontSize: isTablet ? 12 : 10,
-                          color: Colors.grey.shade600,
+                          color: _mutedText,
                         ),
                       ),
                     ],
@@ -727,9 +1096,7 @@ class _ReferrerPageState extends State<ReferrerPage>
                       style: TextStyle(
                         fontSize: isTablet ? 18 : 16,
                         fontWeight: FontWeight.bold,
-                        color: earning.status == 'Completed'
-                            ? const Color(0xFF00B82E)
-                            : Colors.orange,
+                        color: accentColor,
                       ),
                     ),
                     SizedBox(height: isTablet ? 4 : 2),
@@ -739,15 +1106,13 @@ class _ReferrerPageState extends State<ReferrerPage>
                         vertical: isTablet ? 4 : 2,
                       ),
                       decoration: BoxDecoration(
-                        color: earning.status == 'Completed'
-                            ? const Color(0xFF00B82E)
-                            : Colors.orange,
+                        color: accentColor,
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
                         earning.status,
                         style: TextStyle(
-                          color: Colors.white,
+                          color: _colorScheme.onPrimary,
                           fontSize: isTablet ? 10 : 8,
                           fontWeight: FontWeight.w600,
                         ),
@@ -763,14 +1128,14 @@ class _ReferrerPageState extends State<ReferrerPage>
                 Icon(
                   Icons.access_time,
                   size: isTablet ? 16 : 14,
-                  color: Colors.grey.shade500,
+                  color: _mutedText,
                 ),
                 SizedBox(width: isTablet ? 8 : 4),
                 Text(
                   earning.date,
                   style: TextStyle(
                     fontSize: isTablet ? 12 : 10,
-                    color: Colors.grey.shade600,
+                    color: _mutedText,
                   ),
                 ),
               ],
@@ -782,65 +1147,41 @@ class _ReferrerPageState extends State<ReferrerPage>
   }
 
   void _copyReferralCode() {
-    Clipboard.setData(ClipboardData(text: _referralCode));
+    final code = _referralCode?.trim();
+    if (code == null || code.isEmpty) {
+      _showSnack(
+        'Referral code not available yet.',
+        background: _colorScheme.error,
+      );
+      return;
+    }
+    final normalizedCode = code.toUpperCase();
+    Clipboard.setData(ClipboardData(text: normalizedCode));
     HapticFeedback.lightImpact();
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.check_circle, color: Colors.white),
-            const SizedBox(width: 8),
-            Text('Referral code $_referralCode copied!'),
-          ],
-        ),
-        backgroundColor: const Color(0xFF00B82E),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    _showSnack('Referral code copied! Share it with your friends.');
   }
 
-  void _shareReferralCode() {
+  Future<void> _shareReferralCode() async {
+    final code = _referralCode?.trim();
+    if (code == null || code.isEmpty) {
+      _showSnack(
+        'Referral code not available yet.',
+        background: _colorScheme.error,
+      );
+      return;
+    }
+
+    final normalizedCode = code.toUpperCase();
+    final message =
+        'Join me on Gopayna and we both earn ₦6! Use my referral code: $normalizedCode when you register.';
+
     HapticFeedback.lightImpact();
-    
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        title: const Text('Share Referral Code'),
-        content: Text(
-          'Join me on Gopayna and we both earn ₦6! Use my referral code: $_referralCode\n\nDownload the app now and start earning!',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'Close',
-              style: TextStyle(color: Colors.grey.shade600),
-            ),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _copyReferralCode();
-            },
-            child: const Text(
-              'Copy & Share',
-              style: TextStyle(
-                color: Color(0xFF00B82E),
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
+    try {
+      await Share.share(message, subject: 'Join me on Gopayna');
+    } catch (_) {
+      Clipboard.setData(ClipboardData(text: message));
+      _showSnack('Share unavailable. Referral message copied.');
+    }
   }
 }
 
@@ -858,4 +1199,84 @@ class ReferralEarning {
     required this.status,
     required this.type,
   });
+
+  factory ReferralEarning.fromApi(Map<String, dynamic> json) {
+    final rawType = (json['type'] ?? 'referral_bonus').toString();
+    final description = (json['description'] ?? '').toString().trim();
+    Map<String, dynamic>? metadata;
+    if (json['metadata'] is Map) {
+      metadata = Map<String, dynamic>.from(json['metadata'] as Map);
+    }
+
+    Map<String, dynamic>? referredUserMeta;
+    if (metadata?['referredUser'] is Map) {
+      referredUserMeta =
+          Map<String, dynamic>.from(metadata!['referredUser'] as Map);
+    }
+
+    String? referredUserName;
+    if (referredUserMeta != null) {
+      final first = (referredUserMeta['firstName'] ?? '').toString().trim();
+      final last = (referredUserMeta['lastName'] ?? '').toString().trim();
+      final combined = [first, last].where((part) => part.isNotEmpty).join(' ');
+      referredUserName = combined.isNotEmpty
+          ? combined
+          : (referredUserMeta['email'] ?? referredUserMeta['phone'] ?? '')
+              .toString()
+              .trim();
+    }
+
+    final fallbackTitle = description.isNotEmpty
+        ? description
+        : rawType == 'withdrawal'
+            ? 'Referral Withdrawal'
+            : rawType == 'referral_progress'
+                ? 'Referral Signup'
+                : 'Referral Bonus';
+
+    final title = rawType == 'referral_progress' &&
+            (referredUserName != null && referredUserName.isNotEmpty)
+        ? '$referredUserName joined via your code'
+        : fallbackTitle;
+
+    return ReferralEarning(
+      referredUser: title,
+      amount: double.tryParse(json['amount']?.toString() ?? '') ?? 0,
+      date: _formatReferralActivityDate(json['createdAt'] ?? json['created_at']),
+      status: _formatReferralStatus(json['status']),
+      type: _deriveReferralType(rawType),
+    );
+  }
 }
+
+String _formatReferralActivityDate(dynamic raw) {
+  if (raw == null) {
+    return '--';
+  }
+  final parsed = DateTime.tryParse(raw.toString());
+  if (parsed == null) {
+    return '--';
+  }
+  return DateFormat('MMM d, yyyy - hh:mm a').format(parsed.toLocal());
+}
+
+String _formatReferralStatus(dynamic raw) {
+  final text = (raw ?? '').toString();
+  if (text.isEmpty) {
+    return 'Completed';
+  }
+  return text[0].toUpperCase() + text.substring(1);
+}
+
+String _deriveReferralType(String rawType) {
+  switch (rawType) {
+    case 'withdrawal':
+      return 'Referral Withdrawal';
+    case 'referral_progress':
+      return 'Referral Signup';
+    case 'referral_bonus':
+    default:
+      return 'Referral Bonus';
+  }
+}
+
