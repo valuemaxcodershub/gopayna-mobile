@@ -1,7 +1,5 @@
 ﻿import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:webview_flutter_platform_interface/webview_flutter_platform_interface.dart';
-import 'package:webview_flutter_web/webview_flutter_web.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'intro_screen.dart';
 import 'app_settings.dart';
@@ -10,9 +8,6 @@ import 'otp_verification.dart';
 import 'dashboard.dart';
 
 void main() {
-  if (kIsWeb) {
-    WebViewPlatform.instance = WebWebViewPlatform();
-  }
   runApp(const MyApp());
 }
 
@@ -202,7 +197,6 @@ class _GoPaynaHomePageState extends State<GoPaynaHomePage> with TickerProviderSt
             children: [
               const Spacer(flex: 2),
               
-              // Animated Logo and Text Section
               AnimatedBuilder(
                 animation: _logoController,
                 builder: (context, child) {

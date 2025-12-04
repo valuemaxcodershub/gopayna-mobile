@@ -25,7 +25,7 @@ Future<Map<String, dynamic>> sendVerificationOtp(String email) async {
   }
 }
 
-const String apiOrigin = 'http://localhost:5000';
+const String apiOrigin = 'https://api.gopayna.com';
 const String baseUrl = '$apiOrigin/api/auth';
 const String paystackBaseUrl = '$apiOrigin/api/paystack';
 
@@ -266,6 +266,10 @@ Future<double?> fetchWalletBalance(String token) async {
   }
 }
 
+Map<String, String> _jsonHeaders() => {
+      'Content-Type': 'application/json',
+    };
+
 Map<String, String> _authorizedJsonHeaders(String token) => {
       'Content-Type': 'application/json',
       'Authorization': 'Bearer $token',
@@ -492,6 +496,33 @@ Future<Map<String, dynamic>> setWithdrawalPin({
   }
 }
 
+Future<Map<String, dynamic>> fetchWithdrawalPinStatus({
+  required String token,
+}) async {
+  try {
+    final response = await http.get(
+      Uri.parse('$paystackBaseUrl/pin/status'),
+      headers: _authorizedJsonHeaders(token),
+    );
+    final body = response.body.isEmpty ? '{}' : response.body;
+    final decoded = jsonDecode(body);
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      final pinSet = decoded['pinSet'] == true || decoded['pin_set'] == true;
+      return {
+        'success': true,
+        'pinSet': pinSet,
+      };
+    }
+    return {
+      'error': decoded['error'] ?? _extractErrorMessage(body, response.statusCode),
+      'status': response.statusCode,
+    };
+  } catch (e) {
+    log('Fetch withdrawal pin status failed: $e', name: 'api_service');
+    return {'error': 'Unable to check withdrawal PIN status right now.'};
+  }
+}
+
 Future<Map<String, dynamic>> requestAccountDeactivation({
   required String token,
   String? reason,
@@ -575,3 +606,41 @@ Future<Map<String, dynamic>> transferReferralEarnings({
   }
 }
 
+Future<Map<String, dynamic>> submitContactForm({
+  required String name,
+  required String email,
+  required String message,
+  String? mobile,
+}) async {
+  try {
+    final body = {
+      'name': name,
+      'email': email,
+      'message': message,
+    };
+    if (mobile != null && mobile.isNotEmpty) {
+      body['mobile'] = mobile;
+    }
+
+    final response = await http.post(
+      Uri.parse('$baseUrl/contact'),
+      headers: _jsonHeaders(),
+      body: jsonEncode(body),
+    );
+    final responseBody = response.body.isEmpty ? '{}' : response.body;
+    final decoded = jsonDecode(responseBody);
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return {'success': true, 'data': decoded};
+    }
+    return {
+      'error': decoded['error'] ??
+          _extractErrorMessage(responseBody, response.statusCode),
+      'status': response.statusCode,
+    };
+  } catch (e) {
+    log('Contact form submission failed: $e', name: 'api_service');
+    return {
+      'error': 'Unable to send message. Please check your connection and try again.'
+    };
+  }
+}

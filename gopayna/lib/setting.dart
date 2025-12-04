@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -14,7 +14,9 @@ import 'app_settings.dart';
 import 'api_service.dart';
 
 class SettingScreen extends StatefulWidget {
-  const SettingScreen({super.key});
+  final bool launchWithdrawalPinSection;
+
+  const SettingScreen({super.key, this.launchWithdrawalPinSection = false});
 
   @override
   State<SettingScreen> createState() => _SettingScreenState();
@@ -34,18 +36,21 @@ class _SettingScreenState extends State<SettingScreen>
   bool _isDarkMode = false;
   bool _showWalletBalance = true;
   final TextEditingController _pinController = TextEditingController();
+  final TextEditingController _pinOtpController = TextEditingController();
   final TextEditingController _resetOtpController = TextEditingController();
   final TextEditingController _resetNewPasswordController =
       TextEditingController();
   final TextEditingController _resetConfirmPasswordController =
       TextEditingController();
-  bool _obscurePin = true;
   String? _userEmail;
   String? _userPhone;
   String? _userDisplayName;
   String? _userProfileImagePath;
   bool _profileSummaryLoading = false;
   bool _submittingDeactivation = false;
+  final ScrollController _contentScrollController = ScrollController();
+  final GlobalKey _withdrawalPinCardKey = GlobalKey();
+  bool _pendingPinDeeplink = false;
 
   @override
   void initState() {
@@ -57,6 +62,11 @@ class _SettingScreenState extends State<SettingScreen>
     _startAnimations();
     _loadStoredUserContact();
     _loadProfileSummary();
+    _pendingPinDeeplink = widget.launchWithdrawalPinSection;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _handlePendingPinDeeplink();
+    });
   }
 
   void _initializeAnimations() {
@@ -170,6 +180,27 @@ class _SettingScreenState extends State<SettingScreen>
     }
   }
 
+  Future<void> _handlePendingPinDeeplink() async {
+    if (!_pendingPinDeeplink) return;
+    _pendingPinDeeplink = false;
+    await _scrollToWithdrawalPinCard();
+    if (!mounted) return;
+    await Future.delayed(const Duration(milliseconds: 120));
+    if (mounted) {
+      _showWithdrawalPinModal();
+    }
+  }
+
+  Future<void> _scrollToWithdrawalPinCard() async {
+    final context = _withdrawalPinCardKey.currentContext;
+    if (context == null) return;
+    await Scrollable.ensureVisible(
+      context,
+      duration: const Duration(milliseconds: 450),
+      curve: Curves.easeInOut,
+    );
+  }
+
   String _composeDisplayName(
     String? firstName,
     String? lastName,
@@ -206,7 +237,22 @@ class _SettingScreenState extends State<SettingScreen>
     _resetNewPasswordController.dispose();
     _resetConfirmPasswordController.dispose();
     _pinController.dispose();
+    _pinOtpController.dispose();
+    _contentScrollController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant SettingScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.launchWithdrawalPinSection &&
+        !oldWidget.launchWithdrawalPinSection) {
+      _pendingPinDeeplink = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _handlePendingPinDeeplink();
+      });
+    }
   }
 
   @override
@@ -299,6 +345,7 @@ class _SettingScreenState extends State<SettingScreen>
     return SlideTransition(
       position: _slideAnimation,
       child: SingleChildScrollView(
+        controller: _contentScrollController,
         padding: EdgeInsets.symmetric(
           horizontal: isTablet ? 32 : 20,
         ),
@@ -323,7 +370,7 @@ class _SettingScreenState extends State<SettingScreen>
     final placeholderColor =
         isDark ? colorScheme.surfaceContainerLow : Colors.grey.shade200;
     final displayName = _userDisplayName ??
-        (_profileSummaryLoading ? 'Loading profileâ€¦' : 'Hello there');
+        (_profileSummaryLoading ? 'Loading profile…' : 'Hello there');
     return ScaleTransition(
       scale: _profileAnimation,
       child: Container(
@@ -553,6 +600,7 @@ class _SettingScreenState extends State<SettingScreen>
             7,
             colorScheme,
             isDark,
+            cardKey: _withdrawalPinCardKey,
           ),
           const SizedBox(height: 32),
           _buildSectionTitle('More', isTablet, colorScheme),
@@ -607,9 +655,11 @@ class _SettingScreenState extends State<SettingScreen>
     bool isTablet,
     int index,
     ColorScheme colorScheme,
-    bool isDark,
-  ) {
+    bool isDark, {
+    Key? cardKey,
+  }) {
     return AnimatedContainer(
+      key: cardKey,
       duration: Duration(milliseconds: 300 + (index * 100)),
       curve: Curves.easeOutCubic,
       margin: EdgeInsets.only(bottom: isTablet ? 12 : 8),
@@ -1248,10 +1298,123 @@ class _SettingScreenState extends State<SettingScreen>
     });
   }
 
-  void _showWithdrawalPinModal() {
+  void _showWithdrawalPinModal() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('jwt');
+    if (token == null || token.isEmpty) {
+      _showSnack('Please log in again to continue.', isError: true);
+      return;
+    }
+
+    if (!mounted) return;
+    final pinController = _pinController..text = '';
+    final otpController = _pinOtpController..text = '';
+    bool obscurePin = true;
+    bool isSendingOtp = false;
+    bool isSettingPin = false;
+    bool otpSent = false;
+    String? errorMessage;
+    String? successMessage;
+
+    Future<void> sendOtp(StateSetter setModalState) async {
+      errorMessage = null;
+      successMessage = null;
+      setModalState(() {
+        isSendingOtp = true;
+      });
+
+      final result = await sendWithdrawalPinOtpRequest(token);
+      
+      if (!context.mounted) return;
+      setModalState(() {
+        isSendingOtp = false;
+      });
+
+      if (result['error'] != null) {
+        setModalState(() {
+          errorMessage = result['error'].toString();
+        });
+        return;
+      }
+
+      setModalState(() {
+        otpSent = true;
+        successMessage = 'OTP sent to your email';
+      });
+
+      if (!mounted) return;
+      final messenger = ScaffoldMessenger.of(context);
+      final colorScheme = Theme.of(context).colorScheme;
+      messenger.showSnackBar(
+        SnackBar(
+          content: const Text('OTP sent to your email'),
+          backgroundColor: colorScheme.primary,
+        ),
+      );
+    }
+
+    Future<void> submitPin(StateSetter setModalState) async {
+      errorMessage = null;
+      successMessage = null;
+
+      final pin = pinController.text.trim();
+      final otp = otpController.text.trim();
+
+      if (pin.isEmpty || pin.length != 4) {
+        setModalState(() {
+          errorMessage = 'Please enter a 4-digit PIN';
+        });
+        return;
+      }
+
+      if (otp.isEmpty) {
+        setModalState(() {
+          errorMessage = 'Please enter the OTP sent to your email';
+        });
+        return;
+      }
+
+      setModalState(() {
+        isSettingPin = true;
+      });
+
+      final result = await setWithdrawalPin(
+        token: token,
+        pin: pin,
+        otp: otp,
+      );
+
+      if (!context.mounted) return;
+      setModalState(() {
+        isSettingPin = false;
+      });
+
+      if (result['error'] != null) {
+        setModalState(() {
+          errorMessage = result['error'].toString();
+        });
+        return;
+      }
+
+      if (!mounted) return;
+      final navigator = Navigator.of(context);
+      final messenger = ScaffoldMessenger.of(context);
+      final colorScheme = Theme.of(context).colorScheme;
+      navigator.pop();
+      messenger.showSnackBar(
+        SnackBar(
+          content: const Text('Withdrawal PIN set successfully'),
+          backgroundColor: colorScheme.primary,
+        ),
+      );
+      pinController.clear();
+      otpController.clear();
+    }
+
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -1281,154 +1444,279 @@ class _SettingScreenState extends State<SettingScreen>
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  height: 4,
-                  width: 40,
-                  decoration: BoxDecoration(
-                    color: colorScheme.outlineVariant
-                        .withValues(alpha: isDark ? 0.6 : 0.4),
-                    borderRadius: BorderRadius.circular(2),
+                Center(
+                  child: Container(
+                    height: 4,
+                    width: 40,
+                    decoration: BoxDecoration(
+                      color: colorScheme.outlineVariant
+                          .withValues(alpha: isDark ? 0.6 : 0.4),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 24),
-                Icon(
-                  Icons.lock_outline,
-                  size: 64,
-                  color: colorScheme.primary,
+                Center(
+                  child: Icon(
+                    Icons.lock_outline,
+                    size: 64,
+                    color: colorScheme.primary,
+                  ),
                 ),
                 const SizedBox(height: 16),
-                const Text(
-                  'Set/Reset Withdrawal PIN',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
+                const Center(
+                  child: Text(
+                    'Set/Reset Withdrawal PIN',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
                   ),
-                  textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
-                Text(
-                  'Create a secure 4-digit PIN for withdrawals and sensitive operations',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: theme.textTheme.bodySmall?.color?.withValues(
-                          alpha: 0.8,
-                        ) ??
-                        colorScheme.onSurface.withValues(alpha: 0.7),
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 32),
-                TextField(
-                  controller: _pinController,
-                  keyboardType: TextInputType.number,
-                  obscureText: _obscurePin,
-                  maxLength: 4,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 8,
-                  ),
-                  decoration: InputDecoration(
-                    hintText: '****',
-                    hintStyle: TextStyle(
-                      color: theme.inputDecorationTheme.hintStyle?.color ??
-                          Colors.grey.shade500,
-                      letterSpacing: 8,
+                Center(
+                  child: Text(
+                    'Create a secure 4-digit PIN for withdrawals and sensitive operations',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: theme.textTheme.bodySmall?.color?.withValues(
+                            alpha: 0.8,
+                          ) ??
+                          colorScheme.onSurface.withValues(alpha: 0.7),
                     ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: colorScheme.primary.withValues(alpha: 0.6),
-                      ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: colorScheme.primary,
-                        width: 2,
-                      ),
-                    ),
-                    counterText: '',
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscurePin ? Icons.visibility_off : Icons.visibility,
-                      ),
-                      color: colorScheme.onSurface.withValues(alpha: 0.6),
-                      onPressed: () {
-                        setModalState(() {
-                          _obscurePin = !_obscurePin;
-                        });
-                      },
-                    ),
+                    textAlign: TextAlign.center,
                   ),
                 ),
-                const SizedBox(height: 32),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextButton(
-                        onPressed: () {
-                          _pinController.clear();
-                          Navigator.pop(context);
-                        },
-                        child: const Text(
-                          'Cancel',
-                          style: TextStyle(fontSize: 16),
+                const SizedBox(height: 24),
+                if (!otpSent) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: colorScheme.primary.withValues(
+                        alpha: isDark ? 0.18 : 0.08,
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.info_outline,
+                          size: 20,
+                          color: colorScheme.onPrimaryContainer,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'First, request an OTP to verify your identity',
+                            style: TextStyle(
+                              color: colorScheme.onPrimaryContainer,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: isSendingOtp ? null : () => sendOtp(setModalState),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
                         ),
                       ),
+                      child: isSendingOtp
+                          ? const SizedBox(
+                              height: 18,
+                              width: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : Text(
+                              'Send OTP',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: colorScheme.onPrimary,
+                              ),
+                            ),
                     ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: ElevatedButton(
+                  ),
+                ] else ...[
+                  TextField(
+                    controller: otpController,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      labelText: 'Enter OTP',
+                      hintText: 'Enter the OTP sent to your email',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      prefixIcon: const Icon(Icons.verified_user),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: pinController,
+                    keyboardType: TextInputType.number,
+                    obscureText: obscurePin,
+                    maxLength: 4,
+                    decoration: InputDecoration(
+                      labelText: 'New 4-Digit PIN',
+                      hintText: '****',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      counterText: '',
+                      prefixIcon: const Icon(Icons.pin),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          obscurePin ? Icons.visibility_off : Icons.visibility,
+                        ),
                         onPressed: () {
-                          if (_pinController.text.length == 4) {
+                          setModalState(() {
+                            obscurePin = !obscurePin;
+                          });
+                        },
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextButton(
+                          onPressed: () {
+                            pinController.clear();
+                            otpController.clear();
                             Navigator.pop(context);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: const Text(
-                                  'Withdrawal PIN updated successfully',
-                                ),
-                                backgroundColor: colorScheme.primary,
-                              ),
-                            );
-                            _pinController.clear();
-                          } else {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: const Text(
-                                  'Please enter a 4-digit PIN',
-                                ),
-                                backgroundColor: colorScheme.error,
-                              ),
-                            );
-                          }
-                        },
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: const Text(
-                          'Set PIN',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
+                          },
+                          child: const Text(
+                            'Cancel',
+                            style: TextStyle(fontSize: 16),
                           ),
                         ),
                       ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: isSettingPin
+                              ? null
+                              : () => submitPin(setModalState),
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: isSettingPin
+                              ? const SizedBox(
+                                  height: 18,
+                                  width: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : Text(
+                                  'Save PIN',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: colorScheme.onPrimary,
+                                  ),
+                                ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+                if (errorMessage != null) ...[
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: colorScheme.errorContainer.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: colorScheme.error.withValues(alpha: 0.5),
+                      ),
                     ),
-                  ],
-                ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.error_outline,
+                          color: colorScheme.error,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            errorMessage!,
+                            style: TextStyle(
+                              color: colorScheme.error,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                if (successMessage != null) ...[
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF00CA44).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: const Color(0xFF00CA44).withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.check_circle_outline,
+                          color: Color(0xFF00CA44),
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            successMessage!,
+                            style: const TextStyle(
+                              color: Color(0xFF00CA44),
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 16),
               ],
             ),
           ),
         ),
       ),
-    );
+    ).whenComplete(() {
+      pinController.clear();
+      otpController.clear();
+    });
   }
 
   void _showSnack(String message, {bool isError = false}) {
@@ -1557,4 +1845,3 @@ class SettingsItem {
     this.onSwitchChanged,
   });
 }
-

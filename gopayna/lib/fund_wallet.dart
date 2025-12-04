@@ -201,13 +201,22 @@ class _FundWalletScreenState extends State<FundWalletScreen>
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            label,
-            style: TextStyle(fontSize: 14, color: muted),
+          Expanded(
+            flex: 2,
+            child: Text(
+              label,
+              style: TextStyle(fontSize: 14, color: muted),
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
-          Text(
-            value,
-            style: valueStyle ?? const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              value,
+              style: valueStyle ?? const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.end,
+            ),
           ),
         ],
       ),
@@ -300,13 +309,22 @@ class _FundWalletScreenState extends State<FundWalletScreen>
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      _formatCurrency(amount),
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                    Expanded(
+                      flex: 2,
+                      child: Text(
+                        _formatCurrency(amount),
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                    Text(
-                      _formatTransactionDate(createdAt),
-                      style: TextStyle(fontSize: 12, color: muted),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        _formatTransactionDate(createdAt),
+                        style: TextStyle(fontSize: 12, color: muted),
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.end,
+                      ),
                     ),
                   ],
                 ),

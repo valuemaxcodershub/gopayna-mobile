@@ -3,7 +3,7 @@ import 'dart:developer'; // Import for logging
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:uni_links/uni_links.dart';
+import 'package:app_links/app_links.dart';
 import 'login.dart';
 
 import 'api_service.dart';
@@ -143,17 +143,18 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
   }
 
   Future<void> _initializeDeepLinks() async {
-    if (kIsWeb) return; // uni_links not supported on web
-    await _handleReferralLink();
-    _linkSubscription = linkStream.listen(
+    if (kIsWeb) return; // app_links handles web differently
+    final appLinks = AppLinks();
+    await _handleReferralLink(appLinks);
+    _linkSubscription = appLinks.uriLinkStream.map((uri) => uri.toString()).listen(
       (link) => _applyReferralCodeFromLink(link),
       onError: (_) {},
     );
   }
 
-  Future<void> _handleReferralLink() async {
-    final initialLink = await getInitialLink();
-    _applyReferralCodeFromLink(initialLink);
+  Future<void> _handleReferralLink(AppLinks appLinks) async {
+    final initialLink = await appLinks.getInitialLink();
+    _applyReferralCodeFromLink(initialLink?.toString());
   }
 
   void _applyReferralCodeFromLink(String? link) {

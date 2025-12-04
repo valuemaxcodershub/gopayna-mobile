@@ -1,8 +1,10 @@
+import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api_service.dart';
+import 'setting.dart';
 import 'widgets/themed_screen_helpers.dart';
 import 'widgets/wallet_visibility_builder.dart';
 
@@ -22,15 +24,17 @@ class _WithdrawFundScreenState extends State<WithdrawFundScreen>
   final _accountNumberController = TextEditingController();
   final _amountController = TextEditingController();
   final _pinController = TextEditingController();
-  final _bankSearchController = TextEditingController();
 
   PaystackBank? _selectedBank;
   List<PaystackBank> _banks = [];
-  bool _isFetchingBanks = false;
   String? _banksError;
+  bool _pinSet = false;
+  bool _pinStatusLoading = false;
+  String? _pinStatusError;
 
   double _availableBalance = 0;
   bool _isLoading = false;
+  bool _balanceRefreshing = false;
   bool _verifyingAccount = false;
   bool _accountVerified = false;
   String? _accountName;
@@ -45,15 +49,21 @@ class _WithdrawFundScreenState extends State<WithdrawFundScreen>
     super.initState();
     _bootstrap();
     _accountNumberController.addListener(_invalidateAccountVerification);
+    _pinController.addListener(_handlePinChange);
   }
 
   @override
   void dispose() {
     _accountNumberController.dispose();
     _amountController.dispose();
+    _pinController.removeListener(_handlePinChange);
     _pinController.dispose();
-    _bankSearchController.dispose();
     super.dispose();
+  }
+
+  void _handlePinChange() {
+    if (!mounted) return;
+    setState(() {});
   }
 
   void _invalidateAccountVerification() {
@@ -85,6 +95,8 @@ class _WithdrawFundScreenState extends State<WithdrawFundScreen>
       _sessionError = null;
     });
     await _refreshWalletBalance(tokenOverride: storedToken);
+    _loadStaticBanks();
+    await _loadPinStatus(tokenOverride: storedToken);
     if (mounted) {
       setState(() => _bootstrapping = false);
     }
@@ -117,74 +129,97 @@ class _WithdrawFundScreenState extends State<WithdrawFundScreen>
   Future<void> _refreshWalletBalance({String? tokenOverride}) async {
     final token = tokenOverride ?? await _ensureToken();
     if (token == null) return;
+    if (mounted) {
+      setState(() => _balanceRefreshing = true);
+    }
     final balance = await fetchWalletBalance(token);
     if (!mounted) return;
     setState(() {
       if (balance != null) {
         _availableBalance = balance;
       }
+      _balanceRefreshing = false;
     });
   }
 
-  Future<void> _fetchBanks() async {
-    if (_isFetchingBanks || _banks.isNotEmpty) {
-      return;
-    }
-    final token = await _ensureToken();
+  Future<void> _loadPinStatus({String? tokenOverride}) async {
+    final token = tokenOverride ?? await _ensureToken();
     if (token == null) return;
-    setState(() {
-      _isFetchingBanks = true;
-      _banksError = null;
-    });
-    final response = await fetchPaystackBanks(token: token);
+    if (mounted) {
+      setState(() {
+        _pinStatusLoading = true;
+        _pinStatusError = null;
+      });
+    }
+    final response = await fetchWithdrawalPinStatus(token: token);
     if (!mounted) return;
     if (response['error'] != null) {
       setState(() {
-        _isFetchingBanks = false;
-        _banksError = response['error'].toString();
+        _pinStatusLoading = false;
+        _pinStatusError = response['error'].toString();
       });
-      _showSnack(response['error'].toString());
       return;
     }
-    final List<dynamic> payload = response['data'] as List<dynamic>? ?? [];
-    final banks = payload
-        .whereType<Map<String, dynamic>>()
-        .map(PaystackBank.fromApi)
-        .where((bank) => bank.isValid && bank.isNigerian)
-        .toList()
-      ..sort((a, b) => a.name.compareTo(b.name));
+    final pinSet = response['pinSet'] == true ||
+        response['pin_set'] == true ||
+        (response['data'] is Map && response['data']['pinSet'] == true);
     setState(() {
-      _banks = banks;
-      _isFetchingBanks = false;
+      _pinSet = pinSet;
+      _pinStatusLoading = false;
+      _pinStatusError = null;
     });
   }
 
-  Future<void> _openBankPicker() async {
-    await _fetchBanks();
+  Future<void> _openWithdrawalPinSettings() async {
     if (!mounted) return;
-    if (_banks.isEmpty) {
-      _showSnack(_banksError ?? 'Unable to load banks. Please try again.');
-      return;
-    }
-
-    _bankSearchController.clear();
-    final selected = await showModalBottomSheet<PaystackBank>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => BankPickerSheet(
-        banks: _banks,
-        searchController: _bankSearchController,
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const SettingScreen(
+          launchWithdrawalPinSection: true,
+        ),
       ),
     );
-
-    if (selected != null) {
-      setState(() {
-        _selectedBank = selected;
-      });
-      _invalidateAccountVerification();
+    if (mounted) {
+      await _loadPinStatus();
     }
   }
+
+  void _loadStaticBanks() {
+    if (_banks.isNotEmpty) return;
+    _banks = _nigerianBanks;
+    setState(() {});
+  }
+
+  static const List<PaystackBank> _nigerianBanks = [
+    PaystackBank(name: 'Access Bank', code: '044', country: 'Nigeria'),
+    PaystackBank(name: 'Citibank Nigeria', code: '023', country: 'Nigeria'),
+    PaystackBank(name: 'Ecobank Nigeria', code: '050', country: 'Nigeria'),
+    PaystackBank(name: 'Fidelity Bank', code: '070', country: 'Nigeria'),
+    PaystackBank(
+        name: 'First Bank of Nigeria', code: '011', country: 'Nigeria'),
+    PaystackBank(
+        name: 'First City Monument Bank', code: '214', country: 'Nigeria'),
+    PaystackBank(name: 'Guaranty Trust Bank', code: '058', country: 'Nigeria'),
+    PaystackBank(name: 'Heritage Bank', code: '030', country: 'Nigeria'),
+    PaystackBank(name: 'Keystone Bank', code: '082', country: 'Nigeria'),
+    PaystackBank(name: 'Polaris Bank', code: '076', country: 'Nigeria'),
+    PaystackBank(name: 'Providus Bank', code: '101', country: 'Nigeria'),
+    PaystackBank(name: 'Stanbic IBTC Bank', code: '221', country: 'Nigeria'),
+    PaystackBank(
+        name: 'Standard Chartered Bank', code: '068', country: 'Nigeria'),
+    PaystackBank(name: 'Sterling Bank', code: '232', country: 'Nigeria'),
+    PaystackBank(
+        name: 'Union Bank of Nigeria', code: '032', country: 'Nigeria'),
+    PaystackBank(
+        name: 'United Bank For Africa', code: '033', country: 'Nigeria'),
+    PaystackBank(name: 'Unity Bank', code: '215', country: 'Nigeria'),
+    PaystackBank(name: 'Wema Bank', code: '035', country: 'Nigeria'),
+    PaystackBank(name: 'Zenith Bank', code: '057', country: 'Nigeria'),
+    PaystackBank(name: 'Kuda Bank', code: '50211', country: 'Nigeria'),
+    PaystackBank(name: 'Opay', code: '999992', country: 'Nigeria'),
+    PaystackBank(name: 'PalmPay', code: '999991', country: 'Nigeria'),
+    PaystackBank(name: 'Moniepoint', code: '50515', country: 'Nigeria'),
+  ];
 
   Future<void> _verifyAccount() async {
     FocusScope.of(context).unfocus();
@@ -239,6 +274,24 @@ class _WithdrawFundScreenState extends State<WithdrawFundScreen>
     _showSnack('Account verified successfully.', isError: false);
   }
 
+  String? _validateAmount(double? amount) {
+    if (amount == null || amount.isNaN) {
+      return 'Please enter the amount you wish to withdraw.';
+    }
+    if (amount <= 0) {
+      return 'Please enter the amount you wish to withdraw.';
+    }
+    if (amount < 1000) {
+      return 'Minimum withdrawal amount is ₦1,000.';
+    }
+    if (amount > _availableBalance) {
+      return 'Insufficient balance.';
+    }
+    return null;
+  }
+
+  bool get _pinInputComplete => _pinController.text.trim().length == 4;
+
   void _withdrawFunds() {
     FocusScope.of(context).unfocus();
     if (_isLoading) return;
@@ -247,12 +300,21 @@ class _WithdrawFundScreenState extends State<WithdrawFundScreen>
       _showSnack('Please verify the beneficiary account before withdrawing.');
       return;
     }
-    final amount = double.tryParse(_amountController.text.trim()) ?? 0;
-    if (amount <= 0) {
-      _showSnack('Enter the amount you wish to withdraw.');
+    final amountValue = double.tryParse(_amountController.text.trim());
+    final amountError = _validateAmount(amountValue);
+    if (amountError != null) {
+      _showSnack(amountError);
       return;
     }
+    final amount = amountValue!;
     final pin = _pinController.text.trim();
+    if (!_pinSet) {
+      _showSnack('Set your 4-digit withdrawal PIN before making withdrawals.');
+      _promptSetPin(
+        'Your account needs a withdrawal PIN. Request an OTP from the security section to create one.',
+      );
+      return;
+    }
     if (pin.length != 4) {
       _showSnack('Enter your 4-digit transaction PIN.');
       return;
@@ -309,8 +371,19 @@ class _WithdrawFundScreenState extends State<WithdrawFundScreen>
 
     _amountController.clear();
     _pinController.clear();
+    final transaction = data['transaction'] as Map<String, dynamic>?;
+    final txStatus = transaction?['status']?.toString().toLowerCase();
+    final normalizedMessage = message.toLowerCase();
+    final isPending = txStatus == 'pending' ||
+        normalizedMessage.contains('processing') ||
+        normalizedMessage.contains('notified') ||
+        normalizedMessage.contains('being processed');
 
-    await _showSuccessDialog(amount, message: message);
+    if (isPending) {
+      await _showPendingDialog(amount, message: message);
+    } else {
+      await _showSuccessDialog(amount, message: message);
+    }
   }
 
   void _promptSetPin(String message) {
@@ -416,6 +489,69 @@ class _WithdrawFundScreenState extends State<WithdrawFundScreen>
     );
   }
 
+  Future<void> _showPendingDialog(double amount, {required String message}) {
+    final cs = colorScheme;
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Icon(Icons.hourglass_top, color: cs.primary),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Withdrawal Processing',
+                style: Theme.of(context).textTheme.titleMedium,
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              message,
+              style: TextStyle(color: cs.onSurface, fontSize: 14),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Amount: ₦${amount.toStringAsFixed(2)}',
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: const [
+                Expanded(
+                  child: Text(
+                    'We will notify you once Paystack confirms this transfer.',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                ),
+                SizedBox(width: 12),
+                SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ],
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Got it'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showSnack(String message, {bool isError = true}) {
     final messenger = ScaffoldMessenger.of(context);
     messenger.hideCurrentSnackBar();
@@ -468,48 +604,242 @@ class _WithdrawFundScreenState extends State<WithdrawFundScreen>
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           _buildBalanceHeader(muted),
-                          const SizedBox(height: 24),
+                          const SizedBox(height: 16),
+                          if (_pinStatusLoading ||
+                              !_pinSet ||
+                              _pinStatusError != null) ...[
+                            _buildPinStatusBanner(cs, muted),
+                            const SizedBox(height: 16),
+                          ],
+                          const SizedBox(height: 8),
+                          _buildSectionHeader(
+                            'Beneficiary Details',
+                            muted,
+                            icon: Icons.account_balance,
+                            subtitle:
+                                'Enter a valid 10-digit account and select a bank, then tap verify.',
+                          ),
+                          const SizedBox(height: 12),
                           _buildAccountNumberField(card, shadow),
                           const SizedBox(height: 16),
                           _buildBankField(card, shadow),
                           const SizedBox(height: 12),
                           _buildVerifyButton(),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Banks update in real-time from Paystack (Nigeria).',
-                            style: TextStyle(fontSize: 12, color: muted),
-                          ),
-                          const SizedBox(height: 16),
+                          _buildVerificationStatusText(muted),
+                          const SizedBox(height: 24),
                           if (_accountVerified) ...[
                             _buildAccountSummaryCard(cs, muted),
                             const SizedBox(height: 24),
-                            _buildAmountCard(cs),
+                            _buildSectionHeader(
+                              'Withdrawal Details',
+                              muted,
+                              icon: Icons.payments,
+                              subtitle:
+                                  'Enter the amount to withdraw and confirm with your PIN.',
+                            ),
                             const SizedBox(height: 12),
-                            _buildAmountHint(muted),
+                            _buildAmountCard(cs),
                             const SizedBox(height: 20),
                             _buildPinField(card, shadow),
-                            const SizedBox(height: 32),
+                            const SizedBox(height: 24),
                             _buildSubmitButton(),
-                            const SizedBox(height: 20),
-                            Center(
-                              child: TextButton(
-                                onPressed: () => _promptSetPin(
-                                  'Request an OTP to set your PIN before withdrawing.',
-                                ),
-                                child: const Text(
-                                  'Yet to set your transaction pin? Click here',
-                                  style: TextStyle(
-                                    color: _brandGreen,
-                                    decoration: TextDecoration.underline,
-                                  ),
-                                ),
-                              ),
-                            ),
                           ],
                         ],
                       ),
                     ),
                   ),
+      ),
+    );
+  }
+
+  Widget _buildPinStatusBanner(ColorScheme cs, Color muted) {
+    if (_pinStatusLoading) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          children: [
+            const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Checking your withdrawal PIN status…',
+                style: TextStyle(fontSize: 13, color: muted),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_pinStatusError != null) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: cs.error.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: cs.error.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.error_outline, color: cs.error),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _pinStatusError!,
+                    style:
+                        TextStyle(color: cs.error, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Retry to confirm whether your withdrawal PIN is already set.',
+                    style: TextStyle(color: cs.onSurface, fontSize: 13),
+                  ),
+                ],
+              ),
+            ),
+            TextButton(
+              onPressed: _loadPinStatus,
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_pinSet) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.orange.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: const [
+              Icon(Icons.lock_outline, color: Colors.orange),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Set your withdrawal PIN',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'You need a 4-digit PIN (protected by OTP) before you can send funds to a bank account.',
+            style: TextStyle(fontSize: 13, color: cs.onSurface),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 12,
+            runSpacing: 8,
+            children: [
+              ElevatedButton.icon(
+                onPressed: _openWithdrawalPinSettings,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _brandGreen,
+                  foregroundColor: Colors.white,
+                ),
+                icon: const Icon(Icons.settings),
+                label: const Text('Set/Reset Withdrawal PIN'),
+              ),
+              OutlinedButton(
+                onPressed: _loadPinStatus,
+                child: const Text('I have set my PIN'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(String title, Color muted,
+      {String? subtitle, IconData icon = Icons.checklist}) {
+    final cs = colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(icon, color: _brandGreen, size: 18),
+            const SizedBox(width: 8),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: cs.onSurface,
+              ),
+            ),
+          ],
+        ),
+        if (subtitle != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            subtitle,
+            style: TextStyle(fontSize: 13, color: muted),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildVerificationStatusText(Color muted) {
+    if (!_verifyingAccount && !_accountVerified) {
+      return const SizedBox.shrink();
+    }
+
+    IconData icon;
+    Color color;
+    String text;
+
+    if (_verifyingAccount) {
+      icon = Icons.hourglass_top;
+      color = Colors.orange;
+      text = 'Verifying account with Paystack…';
+    } else {
+      icon = Icons.verified;
+      color = _brandGreen;
+      text = 'Account verified successfully. You can proceed.';
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 16),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(fontSize: 12, color: color),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -533,8 +863,15 @@ class _WithdrawFundScreenState extends State<WithdrawFundScreen>
               ),
             ),
             IconButton(
-              onPressed: _refreshWalletBalance,
-              icon: const Icon(Icons.refresh, size: 20),
+              onPressed:
+                  _balanceRefreshing ? null : () => _refreshWalletBalance(),
+              icon: _balanceRefreshing
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.refresh, size: 20),
               color: _brandGreen,
               tooltip: 'Refresh balance',
             ),
@@ -625,77 +962,96 @@ class _WithdrawFundScreenState extends State<WithdrawFundScreen>
   }
 
   Widget _buildBankField(Color card, Color shadow) {
-    final bankName = _selectedBank?.name ?? 'Tap to select bank';
-    final cs = Theme.of(context).colorScheme;
-    final labelColor = cs.onSurface.withValues(alpha: 0.6);
-    final valueColor = _selectedBank == null
-        ? cs.onSurface.withValues(alpha: 0.6)
-        : cs.onSurface;
-    return Container(
-      decoration: BoxDecoration(
-        color: card,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: shadow,
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        DropdownSearch<PaystackBank>(
+          items: _banks,
+          selectedItem: _selectedBank,
+          enabled: !_accountVerified,
+          itemAsString: (bank) => bank.name,
+          validator: (_) {
+            if (_accountVerified || _selectedBank != null) {
+              return null;
+            }
+            return 'Please select your bank';
+          },
+          onChanged: (bank) {
+            if (bank == null) return;
+            setState(() {
+              _selectedBank = bank;
+            });
+            _invalidateAccountVerification();
+          },
+          dropdownButtonProps: const DropdownButtonProps(
+            icon: Icon(Icons.keyboard_arrow_down_rounded),
           ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: _isFetchingBanks ? null : _openBankPicker,
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Row(
-              children: [
-                const Icon(Icons.account_balance, color: _brandGreen),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Bank',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: labelColor,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        bankName,
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: valueColor,
-                        ),
-                      ),
-                    ],
-                  ),
+          popupProps: PopupProps.menu(
+            showSearchBox: true,
+            itemBuilder: (context, bank, isSelected) => ListTile(
+              title: Text(bank.name),
+              subtitle: bank.longCode == null ? null : Text(bank.longCode!),
+              trailing: isSelected ? const Icon(Icons.check) : null,
+            ),
+            searchFieldProps: TextFieldProps(
+              decoration: InputDecoration(
+                hintText: 'Search bank...',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                if (_isFetchingBanks)
-                  const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                else
-                  Icon(Icons.chevron_right,
-                      color: cs.onSurface.withValues(alpha: 0.5)),
-              ],
+              ),
+            ),
+            emptyBuilder: (context, _) => const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text('No banks found.'),
+            ),
+          ),
+          dropdownBuilder: (context, bank) {
+            final label = bank?.name ?? 'Select Bank';
+            return Text(
+              label,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface,
+                fontWeight: FontWeight.w600,
+              ),
+            );
+          },
+          dropdownDecoratorProps: DropDownDecoratorProps(
+            dropdownSearchDecoration: InputDecoration(
+              labelText: 'Select Bank',
+              prefixIcon: const Icon(Icons.account_balance, color: _brandGreen),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              filled: true,
+              fillColor: card,
             ),
           ),
         ),
-      ),
+        if (_banksError != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    _banksError!,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
     );
   }
 
   Widget _buildVerifyButton() {
     final canVerify = !_verifyingAccount &&
+        !_accountVerified &&
         _selectedBank != null &&
         _accountNumberController.text.trim().length == 10;
     return SizedBox(
@@ -789,119 +1145,43 @@ class _WithdrawFundScreenState extends State<WithdrawFundScreen>
   }
 
   Widget _buildAmountCard(ColorScheme cs) {
-    final surface = Theme.of(context).cardColor;
-    final shadow = Colors.black.withValues(
-        alpha: Theme.of(context).brightness == Brightness.dark ? 0.25 : 0.05);
-    return Container(
-      decoration: BoxDecoration(
-        color: surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _brandGreen.withValues(alpha: 0.4), width: 2),
-        boxShadow: [
-          BoxShadow(
-            color: shadow,
-            blurRadius: 10,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            decoration: const BoxDecoration(
-              color: _brandGreen,
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(14),
-                topRight: Radius.circular(14),
-              ),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.money, color: Colors.white, size: 20),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    '₦${_amountController.text.isEmpty ? '0' : _amountController.text}',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    _accountVerified ? Icons.check : Icons.info,
-                    color: _brandGreen,
-                    size: 16,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: TextFormField(
-              controller: _amountController,
-              keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              decoration: const InputDecoration(
-                labelText: 'Amount to Withdraw (Min: ₦1,000)',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.all(Radius.circular(12)),
-                  borderSide: BorderSide.none,
-                ),
-                filled: true,
-                fillColor: Colors.transparent,
-                contentPadding: EdgeInsets.all(16),
-              ),
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: cs.onSurface,
-              ),
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter amount to withdraw';
-                }
-                final amount = double.tryParse(value);
-                if (amount == null || amount < 1000) {
-                  return 'Minimum withdrawal amount is ₦1,000';
-                }
-                if (amount > _availableBalance) {
-                  return 'Insufficient balance';
-                }
-                return null;
-              },
-              onChanged: (_) => setState(() {}),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAmountHint(Color muted) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      child: WalletVisibilityBuilder(
-        builder: (_, showBalance) {
-          final balanceText = showBalance
-              ? '₦${_availableBalance.toStringAsFixed(2)}'
-              : '*************';
-          return Text(
-            'Minimum withdrawal amount is ₦1,000 | Available: $balanceText',
-            style: TextStyle(fontSize: 12, color: muted),
+    final amountText = _amountController.text.trim();
+    final amountValue = double.tryParse(amountText);
+    final validation = amountText.isEmpty ? null : _validateAmount(amountValue);
+    final isValid = validation == null;
+    final suffixIcon = amountText.isEmpty
+        ? null
+        : Icon(
+            isValid ? Icons.check_circle : Icons.error,
+            color: isValid ? Colors.green : cs.error,
           );
-        },
-      ),
+
+    return WalletVisibilityBuilder(
+      builder: (_, showBalance) {
+        final helperText =
+            'Minimum withdrawal amount is ₦1,000 | Available: ${showBalance ? '₦${_availableBalance.toStringAsFixed(2)}' : '*************'}';
+        return TextFormField(
+          controller: _amountController,
+          keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          decoration: InputDecoration(
+            labelText: 'Amount to Withdraw (Min: ₦1,000)',
+            prefixIcon: const Icon(Icons.money, color: _brandGreen),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+            helperText: helperText,
+            suffixIcon: suffixIcon,
+            filled: true,
+            fillColor: Theme.of(context).cardColor,
+          ),
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            color: cs.onSurface,
+          ),
+          validator: (value) => _validateAmount(double.tryParse(value ?? '')),
+          onChanged: (_) => setState(() {}),
+        );
+      },
     );
   }
 
@@ -947,38 +1227,61 @@ class _WithdrawFundScreenState extends State<WithdrawFundScreen>
           }
           return null;
         },
+        onChanged: (_) => setState(() {}),
       ),
     );
   }
 
   Widget _buildSubmitButton() {
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton(
-        onPressed: _isLoading ? null : _withdrawFunds,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: _brandGreen,
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          elevation: 8,
-          shadowColor: _brandGreen.withValues(alpha: 0.3),
+    final canSubmit =
+        !_isLoading && _accountVerified && _pinSet && _pinInputComplete;
+    final child = _isLoading
+        ? const SizedBox(
+            height: 20,
+            width: 20,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+            ),
+          )
+        : const Text(
+            'Confirm & Withdraw',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+          );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        ElevatedButton(
+          onPressed: canSubmit ? _withdrawFunds : null,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: _brandGreen,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            elevation: canSubmit ? 8 : 0,
+            shadowColor: _brandGreen.withValues(alpha: 0.3),
+          ),
+          child: child,
         ),
-        child: _isLoading
-            ? const SizedBox(
-                height: 20,
-                width: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+        if (!_pinSet)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: GestureDetector(
+              onTap: _openWithdrawalPinSettings,
+              child: Text(
+                'Set/Reset your withdrawal PIN to enable this action.',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.orange.shade700,
+                  fontWeight: FontWeight.w600,
+                  decoration: TextDecoration.underline,
                 ),
-              )
-            : const Text(
-                'Confirm & Withdraw',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
               ),
-      ),
+            ),
+          ),
+      ],
     );
   }
 }
