@@ -1208,7 +1208,10 @@ class _SettingScreenState extends State<SettingScreen>
                                   color: Colors.white,
                                 ),
                               )
-                            : const Text('Send OTP'),
+                            : const Text(
+                                'Send OTP',
+                                style: TextStyle(color: Colors.white),
+                              ),
                       ),
                     ],
                   ),
@@ -1262,6 +1265,7 @@ class _SettingScreenState extends State<SettingScreen>
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
+                            alignment: Alignment.center,
                           ),
                           child: isResetting
                               ? const SizedBox(
@@ -1277,7 +1281,9 @@ class _SettingScreenState extends State<SettingScreen>
                                   style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w600,
+                                    color: Colors.white,
                                   ),
+                                  textAlign: TextAlign.center,
                                 ),
                         ),
                       ),

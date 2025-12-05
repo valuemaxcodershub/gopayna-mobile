@@ -9,12 +9,12 @@ import 'referral_screen.dart';
 import 'all_transactions_history.dart';
 import 'support.dart';
 import 'fund_wallet.dart';
-import 'withdraw_fund.dart';
+// import 'withdraw_fund.dart'; // TODO: Re-enable when withdrawal feature is ready
 import 'buy_airtime.dart';
 import 'buy_data.dart';
 import 'buy_electricity.dart';
 import 'buy_tv_subscription.dart';
-import 'buy_education_pin.dart';
+import 'buy_exam_pin.dart';
 import 'notification.dart';
 import 'dart:developer';
 import 'api_service.dart';
@@ -32,6 +32,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     with TickerProviderStateMixin {
   String? _userName;
   double? _walletBalance;
+  String? _userProfileImageUrl;
   late final AppSettings _appSettings;
 
   late AnimationController _fadeController;
@@ -48,7 +49,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   int _selectedTab = 0;
   bool _transactionsLoading = false;
   String? _transactionsError;
-  final DateFormat _transactionDateFormat = DateFormat('MMM d, yyyy â€¢ h:mma');
+  final DateFormat _transactionDateFormat = DateFormat('MMM d, yyyy • h:mma');
   List<Transaction> _transactions = [];
   DateTime? _lastActivity;
 
@@ -187,12 +188,40 @@ class _DashboardScreenState extends State<DashboardScreen>
         _userName = name;
         _walletBalance = walletBalance ?? _walletBalance;
       });
+      
+      // Fetch profile to get profile image
+      await _loadProfileImage(token);
     } catch (e) {
       log('Failed to load user info: $e', name: '_DashboardScreenState');
       setState(() {
         _userName = null; // Reset user name on error
       });
     }
+  }
+
+  Future<void> _loadProfileImage(String token) async {
+    try {
+      final result = await fetchUserProfile(token);
+      if (!mounted) return;
+      if (result['error'] != null) {
+        log('Profile fetch error: ${result['error']}', name: '_DashboardScreenState');
+        return;
+      }
+      final user = result['user'] as Map<String, dynamic>?;
+      if (user == null) return;
+      final imageUrl = user['profileImageUrl']?.toString();
+      setState(() {
+        _userProfileImageUrl = _resolveProfileImageUrl(imageUrl);
+      });
+    } catch (e) {
+      log('Failed to load profile image: $e', name: '_DashboardScreenState');
+    }
+  }
+
+  String? _resolveProfileImageUrl(String? relativePath) {
+    if (relativePath == null || relativePath.isEmpty) return null;
+    if (relativePath.startsWith('http')) return relativePath;
+    return '$apiOrigin$relativePath';
   }
 
   String _deriveDisplayName(Map<dynamic, dynamic> data) {
@@ -348,11 +377,25 @@ class _DashboardScreenState extends State<DashboardScreen>
                     ),
                     color: colorScheme.onPrimary.withValues(alpha: 0.18),
                   ),
-                  child: Icon(
-                    Icons.person,
-                    color: colorScheme.onPrimary,
-                    size: 22,
-                  ),
+                  child: _userProfileImageUrl != null
+                      ? ClipOval(
+                          child: Image.network(
+                            _userProfileImageUrl!,
+                            width: 40,
+                            height: 40,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) => Icon(
+                              Icons.person,
+                              color: colorScheme.onPrimary,
+                              size: 22,
+                            ),
+                          ),
+                        )
+                      : Icon(
+                          Icons.person,
+                          color: colorScheme.onPrimary,
+                          size: 22,
+                        ),
                 ),
               ),
               const SizedBox(width: 12),
@@ -372,22 +415,28 @@ class _DashboardScreenState extends State<DashboardScreen>
             ],
           ),
           actions: [
-            IconButton(
-              icon: Icon(Icons.notifications, color: colorScheme.onPrimary),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const NotificationScreen(),
-                  ),
-                );
-              },
-              tooltip: 'Notifications',
+            Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child: IconButton(
+                icon: Icon(Icons.notifications_outlined, color: colorScheme.onPrimary),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const NotificationScreen(),
+                    ),
+                  );
+                },
+                tooltip: 'Notifications',
+              ),
             ),
-            IconButton(
-              icon: Icon(Icons.logout, color: colorScheme.onPrimary),
-              onPressed: _logout,
-              tooltip: 'Logout',
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: IconButton(
+                icon: Icon(Icons.logout, color: colorScheme.onPrimary),
+                onPressed: _logout,
+                tooltip: 'Logout',
+              ),
             ),
           ],
           systemOverlayStyle: SystemUiOverlayStyle.light,
@@ -474,7 +523,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                   ),
                 ),
                 SizedBox(width: isTablet ? 12 : 8),
-                Flexible(
+                Expanded(
                   child: GestureDetector(
                     onTap: () {
                       Navigator.push(
@@ -487,6 +536,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                     },
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.end,
                       children: [
                         Flexible(
                           child: Text(
@@ -503,7 +553,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                         Icon(
                           Icons.arrow_forward_ios,
                           color: colorScheme.onPrimary,
-                          size: isTablet ? 14 : 12,
+                          size: isTablet ? 14 : 10,
                         ),
                       ],
                     ),
@@ -612,7 +662,7 @@ class _DashboardScreenState extends State<DashboardScreen>
           color: const Color(0xFF00CA44)),
       ServiceItem(
           icon: Icons.money,
-          title: 'Withdraw Fund',
+          title: 'Betting',
           color: const Color(0xFF00CA44)),
     ];
 
@@ -650,13 +700,22 @@ class _DashboardScreenState extends State<DashboardScreen>
         child: GestureDetector(
           onTap: () {
             HapticFeedback.lightImpact();
-            if (service.title == 'Withdraw Fund') {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const WithdrawFundScreen(),
+            if (service.title == 'Betting') {
+              // Withdrawal functionality temporarily disabled
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: const Text('Betting feature coming soon!'),
+                  backgroundColor: colorScheme.primary,
+                  behavior: SnackBarBehavior.floating,
                 ),
               );
+              // TODO: Re-enable when ready
+              // Navigator.push(
+              //   context,
+              //   MaterialPageRoute(
+              //     builder: (context) => const WithdrawFundScreen(),
+              //   ),
+              // );
             } else if (service.title == 'Airtime') {
               Navigator.push(
                 context,
@@ -772,15 +831,17 @@ class _DashboardScreenState extends State<DashboardScreen>
               padding: EdgeInsets.all(isTablet ? 24 : 20),
               child: Row(
                 children: [
-                  Text(
-                    'Recent Transactions',
-                    style: TextStyle(
-                      fontSize: isTablet ? 20 : 18,
-                      fontWeight: FontWeight.bold,
-                      color: colorScheme.onSurface,
+                  Expanded(
+                    child: Text(
+                      'Recent Transactions',
+                      style: TextStyle(
+                        fontSize: isTablet ? 20 : 18,
+                        fontWeight: FontWeight.bold,
+                        color: colorScheme.onSurface,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  const Spacer(),
                   IconButton(
                     onPressed: _transactionsLoading
                         ? null
@@ -793,7 +854,10 @@ class _DashboardScreenState extends State<DashboardScreen>
                       size: isTablet ? 22 : 20,
                     ),
                     tooltip: 'Refresh transactions',
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
                   ),
+                  const SizedBox(width: 8),
                   GestureDetector(
                     onTap: () {
                       Navigator.push(
@@ -1201,7 +1265,7 @@ class Transaction {
     final suffix = reference.length <= 8
         ? reference
         : reference.substring(reference.length - 8);
-    return '$base â€¢ $suffix';
+    return '$base • $suffix';
   }
 
   static String _titleCase(String value) {

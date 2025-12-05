@@ -1,6 +1,8 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+import 'api_service.dart' as api;
 import 'widgets/wallet_visibility_builder.dart';
 import 'widgets/themed_screen_helpers.dart';
 
@@ -32,11 +34,12 @@ class BuyTVSubscriptionScreen extends StatefulWidget {
   const BuyTVSubscriptionScreen({super.key});
 
   @override
-  State<BuyTVSubscriptionScreen> createState() => _BuyTVSubscriptionScreenState();
+  State<BuyTVSubscriptionScreen> createState() =>
+      _BuyTVSubscriptionScreenState();
 }
 
 class _BuyTVSubscriptionScreenState extends State<BuyTVSubscriptionScreen>
-  with ThemedScreenHelpers {
+    with ThemedScreenHelpers {
   final _formKey = GlobalKey<FormState>();
   final _smartCardController = TextEditingController();
   final _phoneController = TextEditingController();
@@ -44,93 +47,190 @@ class _BuyTVSubscriptionScreenState extends State<BuyTVSubscriptionScreen>
   String _selectedProvider = 'dstv';
   String _selectedPackage = '';
   bool _isLoading = false;
-  final double _walletBalance = 4700.00;
+  double _walletBalance = 0.0;
+  String? _token;
+  List<TVTransaction> _recentTransactions = [];
 
+  // NelloByte supported providers: dstv, gotv, startimes
   final List<Map<String, dynamic>> _providers = [
     {
       'id': 'dstv',
       'name': 'DStv',
       'color': const Color(0xFF0066CC),
-      'icon': Icons.tv,
+      'logo': 'assets/dstv_logo.png',
       'textColor': Colors.white,
     },
     {
       'id': 'gotv',
       'name': 'GOtv',
-      'color': const Color(0xFFFF6600),
-      'icon': Icons.tv,
+      'color': const Color(0xFF00A651),
+      'logo': 'assets/gotv_logo.png',
       'textColor': Colors.white,
     },
     {
       'id': 'startimes',
       'name': 'StarTimes',
-      'color': const Color(0xFF800080),
-      'icon': Icons.tv,
-      'textColor': Colors.white,
-    },
-    {
-      'id': 'showmax',
-      'name': 'Showmax',
-      'color': const Color(0xFFDC143C),
-      'icon': Icons.tv,
+      'color': const Color(0xFFE4002B),
+      'logo': 'assets/startimes_logo.png',
       'textColor': Colors.white,
     },
   ];
 
+  // NelloByte package codes from documentation
+  // DStv: 77=DSTV Padi, 78=DSTV Yanga, 79=DSTV Confam, 63=DSTV Compact, 66=DSTV CompactPlus, 67=DSTV Premium
+  // GOtv: 64=GOtv Smallie, 61=GOtv Jinja, 62=GOtv Jolli, 65=GOtv Max, 90=GOtv Supa
+  // StarTimes: 6=Nova, 7=Basic, 8=Smart, 9=Classic, 10=Super
   final Map<String, List<Map<String, dynamic>>> _packages = {
     'dstv': [
-      {'bundle': 'DStv Padi', 'price': 2500, 'duration': '30 Days'},
-      {'bundle': 'DStv Yanga', 'price': 3500, 'duration': '30 Days'},
-      {'bundle': 'DStv Confam', 'price': 5500, 'duration': '30 Days'},
-      {'bundle': 'DStv Compact', 'price': 10500, 'duration': '30 Days'},
-      {'bundle': 'DStv Compact Plus', 'price': 16600, 'duration': '30 Days'},
-      {'bundle': 'DStv Premium', 'price': 24500, 'duration': '30 Days'},
+      {
+        'bundle': 'DStv Padi',
+        'code': '77',
+        'price': 2500,
+        'duration': '30 Days'
+      },
+      {
+        'bundle': 'DStv Yanga',
+        'code': '78',
+        'price': 3500,
+        'duration': '30 Days'
+      },
+      {
+        'bundle': 'DStv Confam',
+        'code': '79',
+        'price': 5500,
+        'duration': '30 Days'
+      },
+      {
+        'bundle': 'DStv Compact',
+        'code': '63',
+        'price': 10500,
+        'duration': '30 Days'
+      },
+      {
+        'bundle': 'DStv Compact Plus',
+        'code': '66',
+        'price': 16600,
+        'duration': '30 Days'
+      },
+      {
+        'bundle': 'DStv Premium',
+        'code': '67',
+        'price': 24500,
+        'duration': '30 Days'
+      },
     ],
     'gotv': [
-      {'bundle': 'GOtv Smallie', 'price': 1300, 'duration': '30 Days'},
-      {'bundle': 'GOtv Jinja', 'price': 2700, 'duration': '30 Days'},
-      {'bundle': 'GOtv Jolli', 'price': 3950, 'duration': '30 Days'},
-      {'bundle': 'GOtv Max', 'price': 5700, 'duration': '30 Days'},
-      {'bundle': 'GOtv Supa', 'price': 7400, 'duration': '30 Days'},
+      {
+        'bundle': 'GOtv Smallie',
+        'code': '64',
+        'price': 1300,
+        'duration': '30 Days'
+      },
+      {
+        'bundle': 'GOtv Jinja',
+        'code': '61',
+        'price': 2700,
+        'duration': '30 Days'
+      },
+      {
+        'bundle': 'GOtv Jolli',
+        'code': '62',
+        'price': 3950,
+        'duration': '30 Days'
+      },
+      {
+        'bundle': 'GOtv Max',
+        'code': '65',
+        'price': 5700,
+        'duration': '30 Days'
+      },
+      {
+        'bundle': 'GOtv Supa',
+        'code': '90',
+        'price': 7400,
+        'duration': '30 Days'
+      },
     ],
     'startimes': [
-      {'bundle': 'Nova Bouquet', 'price': 1300, 'duration': '30 Days'},
-      {'bundle': 'Basic Bouquet', 'price': 2200, 'duration': '30 Days'},
-      {'bundle': 'Smart Bouquet', 'price': 2900, 'duration': '30 Days'},
-      {'bundle': 'Classic Bouquet', 'price': 3500, 'duration': '30 Days'},
-      {'bundle': 'Super Bouquet', 'price': 5200, 'duration': '30 Days'},
-    ],
-    'showmax': [
-      {'bundle': 'Showmax Mobile', 'price': 1450, 'duration': '30 Days'},
-      {'bundle': 'Showmax Standard', 'price': 2900, 'duration': '30 Days'},
-      {'bundle': 'Showmax Pro', 'price': 3200, 'duration': '30 Days'},
+      {
+        'bundle': 'Nova Bouquet',
+        'code': '6',
+        'price': 1300,
+        'duration': '30 Days'
+      },
+      {
+        'bundle': 'Basic Bouquet',
+        'code': '7',
+        'price': 2200,
+        'duration': '30 Days'
+      },
+      {
+        'bundle': 'Smart Bouquet',
+        'code': '8',
+        'price': 2900,
+        'duration': '30 Days'
+      },
+      {
+        'bundle': 'Classic Bouquet',
+        'code': '9',
+        'price': 3500,
+        'duration': '30 Days'
+      },
+      {
+        'bundle': 'Super Bouquet',
+        'code': '10',
+        'price': 5200,
+        'duration': '30 Days'
+      },
     ],
   };
 
-  final List<TVTransaction> _recentTransactions = [
-    TVTransaction(
-      id: 'TV001',
-      provider: 'DStv',
-      smartCardNumber: '1234567890',
-      customerName: 'JOHN DOE',
-      package: 'DStv Compact',
-      amount: 10500,
-      date: DateTime.now().subtract(const Duration(hours: 2)),
-      status: 'Successful',
-      providerColor: const Color(0xFF0066CC),
-    ),
-    TVTransaction(
-      id: 'TV002',
-      provider: 'GOtv',
-      smartCardNumber: '0987654321',
-      customerName: 'JANE SMITH',
-      package: 'GOtv Jolli',
-      amount: 3950,
-      date: DateTime.now().subtract(const Duration(days: 1)),
-      status: 'Successful',
-      providerColor: const Color(0xFFFF6600),
-    ),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadWalletData();
+    _loadRecentTransactions();
+  }
+
+  Future<void> _loadRecentTransactions() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('jwt');
+    if (token == null) return;
+
+    final result = await api.fetchVTUHistory(token, type: 'tv', limit: 5);
+    if (mounted && result['success'] == true) {
+      final data = result['data'] as List? ?? [];
+      setState(() {
+        _recentTransactions = data.map((tx) {
+          final details = tx['details'] as Map<String, dynamic>? ?? {};
+          return TVTransaction(
+            id: tx['reference']?.toString() ?? '',
+            provider: details['provider']?.toString().toUpperCase() ?? 'Unknown',
+            smartCardNumber: details['smartCardNumber']?.toString() ?? '',
+            customerName: details['customerName']?.toString() ?? '',
+            package: tx['description']?.toString() ?? '',
+            amount: (tx['amount'] as num?)?.toDouble() ?? 0,
+            date: DateTime.tryParse(tx['createdAt']?.toString() ?? '') ?? DateTime.now(),
+            status: tx['status'] == 'success' ? 'Successful' : 'Failed',
+            providerColor: const Color(0xFF0066CC),
+          );
+        }).toList();
+      });
+    }
+  }
+
+  Future<void> _loadWalletData() async {
+    final prefs = await SharedPreferences.getInstance();
+    _token = prefs.getString('jwt');
+    if (_token != null) {
+      final balance = await api.fetchWalletBalance(_token!);
+      if (mounted && balance != null) {
+        setState(() {
+          _walletBalance = balance;
+        });
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -158,9 +258,10 @@ class _BuyTVSubscriptionScreenState extends State<BuyTVSubscriptionScreen>
   void _showConfirmationDialog() {
     final isTablet = MediaQuery.of(context).size.width > 600;
     final selectedPackage = _packages[_selectedProvider]!.firstWhere(
-      (package) => '${package['bundle']} - ${package['duration']}' == _selectedPackage,
+      (package) =>
+          '${package['bundle']} - ${package['duration']}' == _selectedPackage,
     );
-    
+
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -200,17 +301,23 @@ class _BuyTVSubscriptionScreenState extends State<BuyTVSubscriptionScreen>
                 ),
                 child: Column(
                   children: [
-                    _buildConfirmationRow('Provider', _selectedProviderData['name']),
+                    _buildConfirmationRow(
+                        'Provider', _selectedProviderData['name']),
                     const SizedBox(height: 8),
-                    _buildConfirmationRow('Smart Card', _smartCardController.text),
+                    _buildConfirmationRow(
+                        'Smart Card', _smartCardController.text),
                     const SizedBox(height: 8),
-                    _buildConfirmationRow('Phone Number', _phoneController.text),
+                    _buildConfirmationRow(
+                        'Phone Number', _phoneController.text),
                     const SizedBox(height: 8),
-                    _buildConfirmationRow('Package', selectedPackage['bundle'] ?? ''),
+                    _buildConfirmationRow(
+                        'Package', selectedPackage['bundle'] ?? ''),
                     const SizedBox(height: 8),
-                    _buildConfirmationRow('Duration', selectedPackage['duration'] ?? ''),
+                    _buildConfirmationRow(
+                        'Duration', selectedPackage['duration'] ?? ''),
                     const SizedBox(height: 8),
-                    _buildConfirmationRow('Amount', '₦${selectedPackage['price']}'),
+                    _buildConfirmationRow(
+                        'Amount', '₦${selectedPackage['price']}'),
                   ],
                 ),
               ),
@@ -276,25 +383,120 @@ class _BuyTVSubscriptionScreenState extends State<BuyTVSubscriptionScreen>
   }
 
   void _processPurchase() async {
+    if (_token == null) {
+      _showErrorDialog('Session expired. Please login again.');
+      return;
+    }
+
+    // Get the selected package details
+    Map<String, dynamic>? selectedPackage;
+    try {
+      selectedPackage = _packages[_selectedProvider]!.firstWhere(
+        (package) =>
+            '${package['bundle']} - ${package['duration']}' == _selectedPackage,
+      );
+    } catch (e) {
+      _showErrorDialog('Please select a valid package.');
+      return;
+    }
+
+    final amount = (selectedPackage['price'] as num?)?.toDouble() ?? 0;
+
+    if (amount > _walletBalance) {
+      _showErrorDialog('Insufficient wallet balance.');
+      return;
+    }
+
     setState(() {
       _isLoading = true;
     });
 
-    await Future.delayed(const Duration(seconds: 2));
+    // Use the package code from the selected package
+    // NelloByte expects numeric package codes (e.g., 77 for DStv Padi)
+    final packageCode = selectedPackage['code']?.toString() ?? '';
+
+    final result = await api.buyTVSubscription(
+      _token!,
+      provider:
+          _selectedProvider, // Send provider ID directly (dstv, gotv, startimes)
+      smartCardNumber: _smartCardController.text,
+      packageCode: packageCode,
+      amount: amount,
+      phone: _phoneController.text,
+    );
 
     setState(() {
       _isLoading = false;
     });
 
-    if (mounted) {
+    if (!mounted) return;
+
+    if (result['success'] == true) {
+      _loadWalletData();
       _showSuccessDialog();
+    } else {
+      _showErrorDialog(
+          result['error'] ?? 'Transaction failed. Please try again.');
     }
   }
 
+  void _showErrorDialog(String message) {
+    final isTablet = MediaQuery.of(context).size.width > 600;
+    final cs = colorScheme;
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(isTablet ? 20 : 16),
+          ),
+          title: Row(
+            children: [
+              Icon(Icons.error_outline,
+                  color: Colors.red, size: isTablet ? 32 : 24),
+              SizedBox(width: isTablet ? 12 : 8),
+              Text(
+                'Error',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: isTablet ? 22 : 18,
+                  color: cs.onSurface,
+                ),
+              ),
+            ],
+          ),
+          content: Text(
+            message,
+            style: TextStyle(
+              fontSize: isTablet ? 16 : 14,
+              color: cs.onSurface,
+            ),
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: cs.primary,
+                foregroundColor: cs.onPrimary,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   void _showSuccessDialog() {
-    final selectedProviderData = _providers.firstWhere((p) => p['id'] == _selectedProvider);
+    final selectedProviderData =
+        _providers.firstWhere((p) => p['id'] == _selectedProvider);
     final selectedPackage = _packages[_selectedProvider]!.firstWhere(
-      (package) => '${package['bundle']} - ${package['duration']}' == _selectedPackage,
+      (package) =>
+          '${package['bundle']} - ${package['duration']}' == _selectedPackage,
     );
 
     showDialog(
@@ -389,7 +591,7 @@ class _BuyTVSubscriptionScreenState extends State<BuyTVSubscriptionScreen>
   String _formatDate(DateTime date) {
     final now = DateTime.now();
     final difference = now.difference(date);
-    
+
     if (difference.inDays == 0) {
       if (difference.inHours == 0) {
         return '${difference.inMinutes} min ago';
@@ -411,7 +613,7 @@ class _BuyTVSubscriptionScreenState extends State<BuyTVSubscriptionScreen>
     final borderColor = this.borderColor;
     final mutedTextColor = this.mutedTextColor;
     final shadowColor = this.shadowColor;
-    
+
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
@@ -539,16 +741,19 @@ class _BuyTVSubscriptionScreenState extends State<BuyTVSubscriptionScreen>
                       child: GridView.builder(
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          crossAxisSpacing: 12,
-                          mainAxisSpacing: 12,
-                          childAspectRatio: 3.5,
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 4,
+                          crossAxisSpacing: 10,
+                          mainAxisSpacing: 10,
+                          childAspectRatio: 1.1,
                         ),
                         itemCount: _providers.length,
                         itemBuilder: (context, index) {
                           final provider = _providers[index];
-                          final isSelected = _selectedProvider == provider['id'];
+                          final isSelected =
+                              _selectedProvider == provider['id'];
+                          final hasLogo = provider['logo'] != null;
                           return GestureDetector(
                             onTap: () {
                               setState(() {
@@ -559,12 +764,12 @@ class _BuyTVSubscriptionScreenState extends State<BuyTVSubscriptionScreen>
                             },
                             child: AnimatedContainer(
                               duration: const Duration(milliseconds: 200),
-                              padding: const EdgeInsets.all(12),
+                              padding: const EdgeInsets.all(6),
                               decoration: BoxDecoration(
                                 color: isSelected
-                                    ? provider['color'].withValues(alpha: 0.12)
+                                    ? provider['color'].withValues(alpha: 0.15)
                                     : cardColor,
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(10),
                                 border: Border.all(
                                   color: isSelected
                                       ? provider['color']
@@ -572,24 +777,63 @@ class _BuyTVSubscriptionScreenState extends State<BuyTVSubscriptionScreen>
                                   width: isSelected ? 2 : 1,
                                 ),
                               ),
-                              child: Row(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(
-                                    provider['icon'],
-                                    color: provider['color'],
-                                    size: 16,
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(6),
+                                    child: hasLogo
+                                        ? Image.asset(
+                                            provider['logo'],
+                                            width: 28,
+                                            height: 28,
+                                            fit: BoxFit.contain,
+                                            errorBuilder: (_, __, ___) =>
+                                                Container(
+                                              width: 28,
+                                              height: 28,
+                                              decoration: BoxDecoration(
+                                                color: provider['color'],
+                                                borderRadius:
+                                                    BorderRadius.circular(6),
+                                              ),
+                                              child: Icon(
+                                                Icons.live_tv_outlined,
+                                                color: Colors.white,
+                                                size: 16,
+                                              ),
+                                            ),
+                                          )
+                                        : Container(
+                                            width: 28,
+                                            height: 28,
+                                            decoration: BoxDecoration(
+                                              color: provider['color'],
+                                              borderRadius:
+                                                  BorderRadius.circular(6),
+                                            ),
+                                            child: Icon(
+                                              provider['icon'] ??
+                                                  Icons.live_tv_outlined,
+                                              color: Colors.white,
+                                              size: 16,
+                                            ),
+                                          ),
                                   ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      provider['name'],
-                                      style: TextStyle(
-                                        color: provider['color'],
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    provider['name'],
+                                    style: TextStyle(
+                                      color: isSelected
+                                          ? provider['color']
+                                          : colorScheme.onSurface,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
                                     ),
+                                    textAlign: TextAlign.center,
+                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 1,
                                   ),
                                 ],
                               ),
@@ -644,7 +888,8 @@ class _BuyTVSubscriptionScreenState extends State<BuyTVSubscriptionScreen>
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: const BorderRadius.all(Radius.circular(16)),
-                      borderSide: BorderSide(color: colorScheme.primary, width: 1.5),
+                      borderSide:
+                          BorderSide(color: colorScheme.primary, width: 1.5),
                     ),
                   ),
                   style: TextStyle(
@@ -705,7 +950,8 @@ class _BuyTVSubscriptionScreenState extends State<BuyTVSubscriptionScreen>
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: const BorderRadius.all(Radius.circular(16)),
-                      borderSide: BorderSide(color: colorScheme.primary, width: 1.5),
+                      borderSide:
+                          BorderSide(color: colorScheme.primary, width: 1.5),
                     ),
                   ),
                   style: TextStyle(
@@ -762,18 +1008,20 @@ class _BuyTVSubscriptionScreenState extends State<BuyTVSubscriptionScreen>
                       child: GridView.builder(
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: 1,
                           crossAxisSpacing: 6,
                           mainAxisSpacing: 6,
-                          childAspectRatio: 4.0,
+                          childAspectRatio: 4.5,
                         ),
                         itemCount: _packages[_selectedProvider]!.length,
                         itemBuilder: (context, index) {
                           final package = _packages[_selectedProvider]![index];
-                          final packageId = '${package['bundle']} - ${package['duration']}';
+                          final packageId =
+                              '${package['bundle']} - ${package['duration']}';
                           final isSelected = _selectedPackage == packageId;
-                          
+
                           return GestureDetector(
                             onTap: () {
                               setState(() {
@@ -783,13 +1031,15 @@ class _BuyTVSubscriptionScreenState extends State<BuyTVSubscriptionScreen>
                             },
                             child: AnimatedContainer(
                               duration: const Duration(milliseconds: 200),
-                              margin: const EdgeInsets.all(3),
-                              padding: const EdgeInsets.all(12),
+                              margin: const EdgeInsets.symmetric(vertical: 2),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 10),
                               decoration: BoxDecoration(
                                 color: isSelected
-                                    ? colorScheme.primary.withValues(alpha: 0.12)
+                                    ? colorScheme.primary
+                                        .withValues(alpha: 0.12)
                                     : cardColor,
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(10),
                                 border: Border.all(
                                   color: isSelected
                                       ? colorScheme.primary
@@ -801,22 +1051,27 @@ class _BuyTVSubscriptionScreenState extends State<BuyTVSubscriptionScreen>
                                 children: [
                                   Expanded(
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      mainAxisSize: MainAxisSize.min,
                                       children: [
                                         Text(
                                           package['bundle'],
                                           style: TextStyle(
                                             fontWeight: FontWeight.bold,
                                             fontSize: 14,
-                                            color: colorScheme.onSurface,
+                                            color: isSelected
+                                                ? colorScheme.primary
+                                                : colorScheme.onSurface,
                                           ),
                                         ),
                                         const SizedBox(height: 2),
                                         Text(
                                           package['duration'],
                                           style: TextStyle(
-                                            fontSize: 12,
+                                            fontSize: 11,
                                             color: mutedTextColor,
                                           ),
                                         ),
@@ -828,16 +1083,19 @@ class _BuyTVSubscriptionScreenState extends State<BuyTVSubscriptionScreen>
                                     style: TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 14,
-                                      color: colorScheme.onSurface,
+                                      color: isSelected
+                                          ? colorScheme.primary
+                                          : colorScheme.onSurface,
                                     ),
                                   ),
-                                  const SizedBox(width: 8),
-                                  if (isSelected)
+                                  if (isSelected) ...[
+                                    const SizedBox(width: 8),
                                     Icon(
                                       Icons.check_circle,
                                       color: colorScheme.primary,
-                                      size: 16,
+                                      size: 18,
                                     ),
+                                  ],
                                 ],
                               ),
                             ),
@@ -873,7 +1131,8 @@ class _BuyTVSubscriptionScreenState extends State<BuyTVSubscriptionScreen>
                           width: isTablet ? 28 : 20,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(colorScheme.onPrimary),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                                colorScheme.onPrimary),
                           ),
                         )
                       : Text(
@@ -932,7 +1191,8 @@ class _BuyTVSubscriptionScreenState extends State<BuyTVSubscriptionScreen>
                             TextButton(
                               onPressed: () {},
                               style: TextButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(horizontal: 8),
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 8),
                                 minimumSize: Size.zero,
                                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                               ),
@@ -969,10 +1229,12 @@ class _BuyTVSubscriptionScreenState extends State<BuyTVSubscriptionScreen>
                                   width: 40,
                                   height: 40,
                                   decoration: BoxDecoration(
-                                    color: transaction.providerColor.withValues(alpha: 0.1),
+                                    color: transaction.providerColor
+                                        .withValues(alpha: 0.1),
                                     borderRadius: BorderRadius.circular(8),
                                     border: Border.all(
-                                      color: transaction.providerColor.withValues(alpha: 0.3),
+                                      color: transaction.providerColor
+                                          .withValues(alpha: 0.3),
                                       width: 1,
                                     ),
                                   ),
@@ -985,7 +1247,8 @@ class _BuyTVSubscriptionScreenState extends State<BuyTVSubscriptionScreen>
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         transaction.package,
@@ -1032,18 +1295,20 @@ class _BuyTVSubscriptionScreenState extends State<BuyTVSubscriptionScreen>
                                         vertical: 2,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: (transaction.status == 'Successful'
-                                                ? colorScheme.primary
-                                                : colorScheme.error)
-                                            .withValues(alpha: 0.15),
+                                        color:
+                                            (transaction.status == 'Successful'
+                                                    ? colorScheme.primary
+                                                    : colorScheme.error)
+                                                .withValues(alpha: 0.15),
                                         borderRadius: BorderRadius.circular(4),
                                       ),
                                       child: Text(
                                         transaction.status,
                                         style: TextStyle(
-                                          color: transaction.status == 'Successful'
-                                              ? colorScheme.primary
-                                              : colorScheme.error,
+                                          color:
+                                              transaction.status == 'Successful'
+                                                  ? colorScheme.primary
+                                                  : colorScheme.error,
                                           fontSize: 10,
                                           fontWeight: FontWeight.w500,
                                         ),
@@ -1067,4 +1332,3 @@ class _BuyTVSubscriptionScreenState extends State<BuyTVSubscriptionScreen>
     );
   }
 }
-

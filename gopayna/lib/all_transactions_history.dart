@@ -35,7 +35,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
   bool _loading = false;
   String? _error;
   DateTimeRange? _customRange;
-  final DateFormat _dateFormatter = DateFormat('MMM d, yyyy â€¢ h:mma');
+  final DateFormat _dateFormatter = DateFormat('MMM d, yyyy • h:mma');
   List<WalletTransactionItem> _transactions = [];
 
   @override
@@ -609,6 +609,9 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
     final isIncoming = transaction.isIncoming;
     final statusColor = transaction.statusColor;
     const brandColor = Color(0xFF00CA44);
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return AnimatedContainer(
       duration: Duration(milliseconds: 400 + (index * 100) + (sectionIndex * 200)),
       curve: Curves.easeOutCubic,
@@ -624,7 +627,9 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
         child: Container(
           padding: EdgeInsets.all(isTablet ? 20 : 16),
           decoration: BoxDecoration(
-            color: brandColor.withValues(alpha: isIncoming ? 0.08 : 0.05),
+            color: isDark 
+                ? brandColor.withValues(alpha: isIncoming ? 0.12 : 0.06)
+                : brandColor.withValues(alpha: isIncoming ? 0.08 : 0.04),
             borderRadius: BorderRadius.circular(isTablet ? 16 : 12),
             border: Border.all(
                   color: brandColor.withValues(alpha: isIncoming ? 0.3 : 0.1),
@@ -636,7 +641,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
               Container(
                 padding: EdgeInsets.all(isTablet ? 14 : 12),
                 decoration: BoxDecoration(
-                  color: brandColor.withValues(alpha: 0.1),
+                  color: brandColor.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(isTablet ? 14 : 12),
                 ),
                 child: Icon(
@@ -645,7 +650,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
                   size: isTablet ? 24 : 20,
                 ),
               ),
-              SizedBox(width: isTablet ? 16 : 12),
+              SizedBox(width: isTablet ? 16 : 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -653,50 +658,56 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
                     Text(
                       transaction.title,
                       style: TextStyle(
-                        fontSize: isTablet ? 18 : 16,
+                        fontSize: isTablet ? 17 : 15,
                         fontWeight: FontWeight.w600,
-                        color: Colors.black87,
+                        color: cs.onSurface,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    SizedBox(height: isTablet ? 6 : 4),
+                    SizedBox(height: isTablet ? 6 : 5),
                     Text(
                       transaction.dateLabel,
                       style: TextStyle(
-                        fontSize: isTablet ? 14 : 12,
-                        color: Colors.grey.shade600,
+                        fontSize: isTablet ? 13 : 11,
+                        color: cs.onSurface.withValues(alpha: 0.6),
                       ),
                     ),
                   ],
                 ),
               ),
+              SizedBox(width: isTablet ? 12 : 10),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       if (isIncoming)
-                        Icon(
-                          Icons.add_circle,
-                          color: brandColor,
-                          size: isTablet ? 16 : 14,
+                        Padding(
+                          padding: const EdgeInsets.only(right: 4),
+                          child: Icon(
+                            Icons.add_circle,
+                            color: brandColor,
+                            size: isTablet ? 16 : 14,
+                          ),
                         ),
-                      if (isIncoming) SizedBox(width: 4),
                       Text(
                         '${isIncoming ? '+' : '-'}₦${transaction.amount.toStringAsFixed(2)}',
                         style: TextStyle(
-                          fontSize: isTablet ? 18 : 16,
+                          fontSize: isTablet ? 17 : 15,
                           fontWeight: FontWeight.bold,
-                          color: isIncoming ? brandColor : Colors.black87,
+                          color: isIncoming ? brandColor : cs.onSurface,
                         ),
                       ),
                     ],
                   ),
-                  SizedBox(height: isTablet ? 6 : 4),
+                  SizedBox(height: isTablet ? 8 : 6),
                   Container(
                     padding: EdgeInsets.symmetric(
-                      horizontal: isTablet ? 12 : 8,
-                      vertical: isTablet ? 6 : 4,
+                      horizontal: isTablet ? 12 : 10,
+                      vertical: isTablet ? 5 : 4,
                     ),
                     decoration: BoxDecoration(
                       color: statusColor,
@@ -705,7 +716,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
                     child: Text(
                       transaction.statusLabel,
                       style: TextStyle(
-                        fontSize: isTablet ? 12 : 10,
+                        fontSize: isTablet ? 11 : 9,
                         fontWeight: FontWeight.w600,
                         color: Colors.white,
                       ),

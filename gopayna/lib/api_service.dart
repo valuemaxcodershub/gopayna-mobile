@@ -41,7 +41,7 @@ Future<Map<String, dynamic>> registerUser(String firstName, String lastName,
         'phone': phone,
         'email': email,
         'password': password,
-        'referralCode': referralCode, // Include referral code in the request
+        'referralCode': referralCode, 
       }),
     );
 
@@ -642,5 +642,479 @@ Future<Map<String, dynamic>> submitContactForm({
     return {
       'error': 'Unable to send message. Please check your connection and try again.'
     };
+  }
+}
+
+// ===========================
+// NelloByte VTU API Methods
+// ===========================
+
+const String vtuBaseUrl = '$apiOrigin/api/clubkonnect';
+
+/// Check VTU API status
+Future<Map<String, dynamic>> checkVtuStatus() async {
+  try {
+    final response = await http.get(
+      Uri.parse('$vtuBaseUrl/status'),
+    );
+    final responseBody = response.body.isEmpty ? '{}' : response.body;
+    final decoded = jsonDecode(responseBody);
+    return {'success': true, 'data': decoded};
+  } catch (e) {
+    log('Check VTU status failed: $e', name: 'api_service');
+    return {'error': 'Unable to check VTU status.'};
+  }
+}
+
+/// Fetch available airtime networks with discounts
+Future<Map<String, dynamic>> fetchAirtimeNetworks(String token) async {
+  try {
+    final response = await http.get(
+      Uri.parse('$vtuBaseUrl/airtime-networks'),
+      headers: _authorizedJsonHeaders(token),
+    );
+    final responseBody = response.body.isEmpty ? '{}' : response.body;
+    final decoded = jsonDecode(responseBody);
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return {'success': true, 'data': decoded};
+    }
+    return {
+      'error': decoded['error'] ?? _extractErrorMessage(responseBody, response.statusCode),
+      'status': response.statusCode,
+    };
+  } catch (e) {
+    log('Fetch airtime networks failed: $e', name: 'api_service');
+    return {'error': 'Unable to fetch airtime networks. Please try again.'};
+  }
+}
+
+/// Fetch available data plans for a network
+Future<Map<String, dynamic>> fetchDataPlans(String token, String network) async {
+  try {
+    final response = await http.get(
+      Uri.parse('$vtuBaseUrl/data-plans?network=$network'),
+      headers: _authorizedJsonHeaders(token),
+    );
+    final responseBody = response.body.isEmpty ? '{}' : response.body;
+    final decoded = jsonDecode(responseBody);
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return {'success': true, 'data': decoded};
+    }
+    return {
+      'error': decoded['error'] ?? _extractErrorMessage(responseBody, response.statusCode),
+      'status': response.statusCode,
+    };
+  } catch (e) {
+    log('Fetch data plans failed: $e', name: 'api_service');
+    return {'error': 'Unable to fetch data plans. Please try again.'};
+  }
+}
+
+/// Fetch available TV subscription packages
+Future<Map<String, dynamic>> fetchTVPackages(String token, String provider) async {
+  try {
+    final response = await http.get(
+      Uri.parse('$vtuBaseUrl/tv-packages?provider=$provider'),
+      headers: _authorizedJsonHeaders(token),
+    );
+    final responseBody = response.body.isEmpty ? '{}' : response.body;
+    final decoded = jsonDecode(responseBody);
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return {'success': true, 'data': decoded};
+    }
+    return {
+      'error': decoded['error'] ?? _extractErrorMessage(responseBody, response.statusCode),
+      'status': response.statusCode,
+    };
+  } catch (e) {
+    log('Fetch TV packages failed: $e', name: 'api_service');
+    return {'error': 'Unable to fetch TV packages. Please try again.'};
+  }
+}
+
+/// Fetch available electricity distribution companies (discos)
+Future<Map<String, dynamic>> fetchDiscos(String token) async {
+  try {
+    final response = await http.get(
+      Uri.parse('$vtuBaseUrl/discos'),
+      headers: _authorizedJsonHeaders(token),
+    );
+    final responseBody = response.body.isEmpty ? '{}' : response.body;
+    final decoded = jsonDecode(responseBody);
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return {'success': true, 'data': decoded};
+    }
+    return {
+      'error': decoded['error'] ?? _extractErrorMessage(responseBody, response.statusCode),
+      'status': response.statusCode,
+    };
+  } catch (e) {
+    log('Fetch discos failed: $e', name: 'api_service');
+    return {'error': 'Unable to fetch electricity providers. Please try again.'};
+  }
+}
+
+/// Fetch available exam bodies for education pins (WAEC, JAMB)
+Future<Map<String, dynamic>> fetchExamBodies(String token) async {
+  try {
+    final response = await http.get(
+      Uri.parse('$vtuBaseUrl/exam-bodies'),
+      headers: _authorizedJsonHeaders(token),
+    );
+    final responseBody = response.body.isEmpty ? '{}' : response.body;
+    final decoded = jsonDecode(responseBody);
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return {'success': true, 'data': decoded};
+    }
+    return {
+      'error': decoded['error'] ?? _extractErrorMessage(responseBody, response.statusCode),
+      'status': response.statusCode,
+    };
+  } catch (e) {
+    log('Fetch exam bodies failed: $e', name: 'api_service');
+    return {'error': 'Unable to fetch exam bodies. Please try again.'};
+  }
+}
+
+/// Verify meter number
+Future<Map<String, dynamic>> verifyMeter(String token, String disco, String meterNumber) async {
+  try {
+    final response = await http.get(
+      Uri.parse('$vtuBaseUrl/verify-meter?disco=$disco&meterNumber=$meterNumber'),
+      headers: _authorizedJsonHeaders(token),
+    );
+    final responseBody = response.body.isEmpty ? '{}' : response.body;
+    final decoded = jsonDecode(responseBody);
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return {'success': true, 'data': decoded};
+    }
+    return {
+      'error': decoded['error'] ?? _extractErrorMessage(responseBody, response.statusCode),
+      'status': response.statusCode,
+    };
+  } catch (e) {
+    log('Verify meter failed: $e', name: 'api_service');
+    return {'error': 'Unable to verify meter. Please try again.'};
+  }
+}
+
+/// Verify smart card number
+Future<Map<String, dynamic>> verifySmartCard(String token, String provider, String smartCardNumber) async {
+  try {
+    final response = await http.get(
+      Uri.parse('$vtuBaseUrl/verify-smartcard?provider=$provider&smartCardNumber=$smartCardNumber'),
+      headers: _authorizedJsonHeaders(token),
+    );
+    final responseBody = response.body.isEmpty ? '{}' : response.body;
+    final decoded = jsonDecode(responseBody);
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return {'success': true, 'data': decoded};
+    }
+    return {
+      'error': decoded['error'] ?? _extractErrorMessage(responseBody, response.statusCode),
+      'status': response.statusCode,
+    };
+  } catch (e) {
+    log('Verify smart card failed: $e', name: 'api_service');
+    return {'error': 'Unable to verify smart card. Please try again.'};
+  }
+}
+
+/// Verify JAMB profile ID
+Future<Map<String, dynamic>> verifyJambProfile(String token, String profileId) async {
+  try {
+    final response = await http.get(
+      Uri.parse('$vtuBaseUrl/verify-jamb?profileId=$profileId'),
+      headers: _authorizedJsonHeaders(token),
+    );
+    final responseBody = response.body.isEmpty ? '{}' : response.body;
+    final decoded = jsonDecode(responseBody);
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return {'success': true, 'data': decoded};
+    }
+    return {
+      'error': decoded['error'] ?? _extractErrorMessage(responseBody, response.statusCode),
+      'status': response.statusCode,
+    };
+  } catch (e) {
+    log('Verify JAMB profile failed: $e', name: 'api_service');
+    return {'error': 'Unable to verify JAMB profile. Please try again.'};
+  }
+}
+
+/// Buy airtime
+/// Network codes: mtn, glo, airtel, 9mobile
+/// BonusType: 01 = MTN Awuf (400%), 02 = MTN Garabasa (1000%)
+Future<Map<String, dynamic>> buyAirtime(
+  String token, {
+  required String network,
+  required String phone,
+  required double amount,
+  String? bonusType,
+}) async {
+  try {
+    final body = {
+      'network': network,
+      'phone': phone,
+      'amount': amount,
+    };
+    if (bonusType != null) {
+      body['bonusType'] = bonusType;
+    }
+    
+    final response = await http.post(
+      Uri.parse('$vtuBaseUrl/buy/airtime'),
+      headers: _authorizedJsonHeaders(token),
+      body: jsonEncode(body),
+    );
+    final responseBody = response.body.isEmpty ? '{}' : response.body;
+    final decoded = jsonDecode(responseBody);
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return {'success': true, 'data': decoded};
+    }
+    return {
+      'error': decoded['error'] ?? _extractErrorMessage(responseBody, response.statusCode),
+      'status': response.statusCode,
+    };
+  } catch (e) {
+    log('Buy airtime failed: $e', name: 'api_service');
+    return {'error': 'Unable to purchase airtime. Please try again.'};
+  }
+}
+
+/// Buy data bundle
+/// Network codes: mtn, glo, airtel, 9mobile
+/// planId: The data plan code from fetchDataPlans()
+Future<Map<String, dynamic>> buyData(
+  String token, {
+  required String network,
+  required String phone,
+  required String planId,
+  required double amount,
+}) async {
+  try {
+    final response = await http.post(
+      Uri.parse('$vtuBaseUrl/buy/data'),
+      headers: _authorizedJsonHeaders(token),
+      body: jsonEncode({
+        'network': network,
+        'phone': phone,
+        'planId': planId,
+        'amount': amount,
+      }),
+    );
+    final responseBody = response.body.isEmpty ? '{}' : response.body;
+    final decoded = jsonDecode(responseBody);
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return {'success': true, 'data': decoded};
+    }
+    return {
+      'error': decoded['error'] ?? _extractErrorMessage(responseBody, response.statusCode),
+      'status': response.statusCode,
+    };
+  } catch (e) {
+    log('Buy data failed: $e', name: 'api_service');
+    return {'error': 'Unable to purchase data. Please try again.'};
+  }
+}
+
+/// Buy electricity (prepaid/postpaid meter recharge)
+/// disco: Electricity company code (01-12)
+/// meterType: 01 = Prepaid, 02 = Postpaid
+Future<Map<String, dynamic>> buyElectricity(
+  String token, {
+  required String disco,
+  required String meterType,
+  required String meterNumber,
+  required double amount,
+  String? phone,
+}) async {
+  try {
+    final response = await http.post(
+      Uri.parse('$vtuBaseUrl/buy/electricity'),
+      headers: _authorizedJsonHeaders(token),
+      body: jsonEncode({
+        'disco': disco,
+        'meterType': meterType,
+        'meterNumber': meterNumber,
+        'amount': amount,
+        'phone': phone ?? '',
+      }),
+    );
+    final responseBody = response.body.isEmpty ? '{}' : response.body;
+    final decoded = jsonDecode(responseBody);
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return {'success': true, 'data': decoded};
+    }
+    return {
+      'error': decoded['error'] ?? _extractErrorMessage(responseBody, response.statusCode),
+      'status': response.statusCode,
+    };
+  } catch (e) {
+    log('Buy electricity failed: $e', name: 'api_service');
+    return {'error': 'Unable to purchase electricity. Please try again.'};
+  }
+}
+
+/// Buy TV subscription (DStv, GOtv, Startimes)
+/// provider: dstv, gotv, startimes
+/// packageCode: The package code from fetchTVPackages()
+Future<Map<String, dynamic>> buyTVSubscription(
+  String token, {
+  required String provider,
+  required String smartCardNumber,
+  required String packageCode,
+  required double amount,
+  String? phone,
+}) async {
+  try {
+    final response = await http.post(
+      Uri.parse('$vtuBaseUrl/buy/tv'),
+      headers: _authorizedJsonHeaders(token),
+      body: jsonEncode({
+        'provider': provider,
+        'smartCardNumber': smartCardNumber,
+        'packageCode': packageCode,
+        'amount': amount,
+        'phone': phone ?? '',
+      }),
+    );
+    final responseBody = response.body.isEmpty ? '{}' : response.body;
+    final decoded = jsonDecode(responseBody);
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return {'success': true, 'data': decoded};
+    }
+    return {
+      'error': decoded['error'] ?? _extractErrorMessage(responseBody, response.statusCode),
+      'status': response.statusCode,
+    };
+  } catch (e) {
+    log('Buy TV subscription failed: $e', name: 'api_service');
+    return {'error': 'Unable to purchase TV subscription. Please try again.'};
+  }
+}
+
+/// Buy education pin (WAEC, JAMB)
+/// examType: waec or jamb
+/// examCode: The exam code (e.g., waec, waec-registration, utme, de)
+Future<Map<String, dynamic>> buyEducationPin(
+  String token, {
+  required String examType,
+  required String examCode,
+  required String phone,
+  required double amount,
+  String? profileId, // For JAMB
+}) async {
+  try {
+    final body = {
+      'examType': examType,
+      'examCode': examCode,
+      'phone': phone,
+      'amount': amount,
+    };
+    if (profileId != null && profileId.isNotEmpty) {
+      body['profileId'] = profileId;
+    }
+    
+    final response = await http.post(
+      Uri.parse('$vtuBaseUrl/buy/education'),
+      headers: _authorizedJsonHeaders(token),
+      body: jsonEncode(body),
+    );
+    final responseBody = response.body.isEmpty ? '{}' : response.body;
+    final decoded = jsonDecode(responseBody);
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return {'success': true, 'data': decoded};
+    }
+    return {
+      'error': decoded['error'] ?? _extractErrorMessage(responseBody, response.statusCode),
+      'status': response.statusCode,
+    };
+  } catch (e) {
+    log('Buy education pin failed: $e', name: 'api_service');
+    return {'error': 'Unable to purchase education pin. Please try again.'};
+  }
+}
+
+/// Query transaction status
+Future<Map<String, dynamic>> queryTransaction(String token, {String? orderId, String? requestId}) async {
+  try {
+    final queryParams = <String, String>{};
+    if (orderId != null) queryParams['orderId'] = orderId;
+    if (requestId != null) queryParams['requestId'] = requestId;
+    
+    final uri = Uri.parse('$vtuBaseUrl/query').replace(queryParameters: queryParams);
+    final response = await http.get(
+      uri,
+      headers: _authorizedJsonHeaders(token),
+    );
+    final responseBody = response.body.isEmpty ? '{}' : response.body;
+    final decoded = jsonDecode(responseBody);
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return {'success': true, 'data': decoded};
+    }
+    return {
+      'error': decoded['error'] ?? _extractErrorMessage(responseBody, response.statusCode),
+      'status': response.statusCode,
+    };
+  } catch (e) {
+    log('Query transaction failed: $e', name: 'api_service');
+    return {'error': 'Unable to query transaction. Please try again.'};
+  }
+}
+
+/// Cancel transaction (only ORDER_RECEIVED or ORDER_ONHOLD can be cancelled)
+Future<Map<String, dynamic>> cancelTransaction(String token, String orderId) async {
+  try {
+    final response = await http.post(
+      Uri.parse('$vtuBaseUrl/cancel'),
+      headers: _authorizedJsonHeaders(token),
+      body: jsonEncode({'orderId': orderId}),
+    );
+    final responseBody = response.body.isEmpty ? '{}' : response.body;
+    final decoded = jsonDecode(responseBody);
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return {'success': true, 'data': decoded};
+    }
+    return {
+      'error': decoded['error'] ?? _extractErrorMessage(responseBody, response.statusCode),
+      'status': response.statusCode,
+    };
+  } catch (e) {
+    log('Cancel transaction failed: $e', name: 'api_service');
+    return {'error': 'Unable to cancel transaction. Please try again.'};
+  }
+}
+
+/// Fetch VTU transaction history
+/// type: Optional filter - 'airtime', 'data', 'electricity', 'tv', 'education'
+Future<Map<String, dynamic>> fetchVTUHistory(
+  String token, {
+  String? type,
+  int limit = 20,
+}) async {
+  try {
+    final queryParams = <String, String>{
+      'limit': limit.toString(),
+    };
+    if (type != null) queryParams['type'] = type;
+    
+    final uri = Uri.parse('$vtuBaseUrl/history').replace(queryParameters: queryParams);
+    final response = await http.get(
+      uri,
+      headers: _authorizedJsonHeaders(token),
+    );
+    final responseBody = response.body.isEmpty ? '{}' : response.body;
+    final decoded = jsonDecode(responseBody);
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return {'success': true, 'data': decoded['data'] ?? []};
+    }
+    return {
+      'error': decoded['error'] ?? _extractErrorMessage(responseBody, response.statusCode),
+      'status': response.statusCode,
+    };
+  } catch (e) {
+    log('Fetch VTU history failed: $e', name: 'api_service');
+    return {'error': 'Unable to fetch transaction history. Please try again.'};
   }
 }

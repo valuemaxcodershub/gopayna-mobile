@@ -43,7 +43,7 @@ class _FundWalletScreenState extends State<FundWalletScreen>
     {'amount': 40000, 'label': '₦40,000'},
   ];
   final NumberFormat _currencyFormat = NumberFormat.currency(locale: 'en_NG', symbol: '₦');
-  final DateFormat _transactionDateFormat = DateFormat('MMM d, yyyy â€¢ h:mma');
+  final DateFormat _transactionDateFormat = DateFormat('MMM d, yyyy • h:mma');
   List<Map<String, dynamic>> _recentTransactions = [];
   bool _transactionsLoading = false;
   String? _transactionsError;
@@ -146,6 +146,7 @@ class _FundWalletScreenState extends State<FundWalletScreen>
       return;
     }
 
+    // Send base amount - backend calculates fee and sends total to Paystack
     await _startPaystackPayment(amount: amount);
   }
 
@@ -182,11 +183,23 @@ class _FundWalletScreenState extends State<FundWalletScreen>
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancel'),
+              child: Text(
+                'Cancel',
+                style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
+              ),
             ),
             ElevatedButton(
               onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Continue to Paystack'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _brandGreen,
+                foregroundColor: Colors.white,
+                alignment: Alignment.center,
+              ),
+              child: const Text(
+                'Continue to Paystack',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white),
+              ),
             ),
           ],
         );
@@ -996,8 +1009,15 @@ class _PaystackWebViewPageState extends State<PaystackWebViewPage> {
                       setState(() => _externalCheckoutLaunched = true);
                     }
                   },
-                  icon: const Icon(Icons.open_in_new),
-                  label: const Text('Open Paystack Checkout'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF2E7D32),
+                    foregroundColor: Colors.white,
+                  ),
+                  icon: const Icon(Icons.open_in_new, color: Colors.white),
+                  label: const Text(
+                    'Open Paystack Checkout',
+                    style: TextStyle(color: Colors.white),
+                  ),
                 ),
                 const SizedBox(height: 32),
                 ElevatedButton(
@@ -1008,7 +1028,14 @@ class _PaystackWebViewPageState extends State<PaystackWebViewPage> {
                       'reference': widget.reference,
                     });
                   },
-                  child: const Text('I have completed payment'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF2E7D32),
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text(
+                    'I have completed payment',
+                    style: TextStyle(color: Colors.white),
+                  ),
                 ),
                 const SizedBox(height: 12),
                 TextButton(

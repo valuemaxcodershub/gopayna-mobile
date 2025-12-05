@@ -1,5 +1,6 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'api_service.dart';
 
 class SupportScreen extends StatefulWidget {
@@ -237,6 +238,8 @@ class _SupportScreenState extends State<SupportScreen>
               _buildMessageField(isTablet),
               SizedBox(height: isTablet ? 40 : 32),
               _buildSendButton(isTablet),
+              SizedBox(height: isTablet ? 24 : 20),
+              _buildWhatsAppButton(isTablet),
               SizedBox(height: isTablet ? 40 : 32),
             ],
           ),
@@ -460,6 +463,103 @@ class _SupportScreenState extends State<SupportScreen>
         ),
       ),
     );
+  }
+
+  Widget _buildWhatsAppButton(bool isTablet) {
+    return ScaleTransition(
+      scale: _scaleAnimation,
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(child: Divider(color: _mutedText.withValues(alpha: 0.3))),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Text(
+                  'OR',
+                  style: TextStyle(
+                    color: _mutedText,
+                    fontSize: isTablet ? 14 : 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              Expanded(child: Divider(color: _mutedText.withValues(alpha: 0.3))),
+            ],
+          ),
+          SizedBox(height: isTablet ? 20 : 16),
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            width: double.infinity,
+            height: isTablet ? 60 : 56,
+            child: ElevatedButton.icon(
+              onPressed: _openWhatsAppChat,
+              icon: Image.asset(
+                'assets/whatsapp.png',
+                width: isTablet ? 28 : 24,
+                height: isTablet ? 28 : 24,
+                errorBuilder: (context, error, stackTrace) => Icon(
+                  Icons.chat,
+                  size: isTablet ? 28 : 24,
+                  color: Colors.white,
+                ),
+              ),
+              label: Text(
+                'Chat on WhatsApp',
+                style: TextStyle(
+                  fontSize: isTablet ? 18 : 16,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF25D366),
+                foregroundColor: Colors.white,
+                elevation: 8,
+                shadowColor: const Color(0xFF25D366).withValues(alpha: 0.3),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(isTablet ? 16 : 12),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openWhatsAppChat() async {
+    HapticFeedback.lightImpact();
+    
+    // GoPayna support WhatsApp number (include country code without +)
+    const String supportNumber = '2348080624171';
+    const String message = 'Hello GoPayna Support, I need assistance with...';
+    
+    final Uri whatsappUri = Uri.parse(
+      'https://wa.me/$supportNumber?text=${Uri.encodeComponent(message)}',
+    );
+    
+    try {
+      if (await canLaunchUrl(whatsappUri)) {
+        await launchUrl(whatsappUri, mode: LaunchMode.externalApplication);
+      } else {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Could not open WhatsApp. Please make sure it is installed.'),
+            backgroundColor: _colorScheme.error,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Failed to open WhatsApp'),
+          backgroundColor: _colorScheme.error,
+        ),
+      );
+    }
   }
 
   void _handleSend() async {

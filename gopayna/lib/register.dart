@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:app_links/app_links.dart';
 import 'login.dart';
+import 'legal.dart';
 
 import 'api_service.dart';
 import 'otp_verification.dart';
@@ -41,6 +42,7 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _isLoading = false;
+  bool _acceptedTerms = false;
   StreamSubscription<String?>? _linkSubscription;
 
   @override
@@ -311,6 +313,72 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
                             controller: _referralCodeController,
                             keyboardType: TextInputType.text,
                           ),
+                          const SizedBox(height: 16),
+                          // Terms and Conditions checkbox
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: Checkbox(
+                                  value: _acceptedTerms,
+                                  onChanged: (value) {
+                                    setState(() {
+                                      _acceptedTerms = value ?? false;
+                                    });
+                                  },
+                                  activeColor: _brandColor,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: GestureDetector(
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => const LegalScreen(showLogout: false),
+                                      ),
+                                    );
+                                  },
+                                  child: RichText(
+                                    text: TextSpan(
+                                      text: 'I agree to the ',
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.black87,
+                                      ),
+                                      children: [
+                                        TextSpan(
+                                          text: 'Terms and Conditions',
+                                          style: TextStyle(
+                                            color: _brandColor,
+                                            fontWeight: FontWeight.w600,
+                                            decoration: TextDecoration.underline,
+                                          ),
+                                        ),
+                                        const TextSpan(
+                                          text: ' and ',
+                                        ),
+                                        TextSpan(
+                                          text: 'Privacy Policy',
+                                          style: TextStyle(
+                                            color: _brandColor,
+                                            fontWeight: FontWeight.w600,
+                                            decoration: TextDecoration.underline,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                           const SizedBox(height: 20),
                           ScaleTransition(
                             scale: _buttonScale,
@@ -326,6 +394,15 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
                                 ),
                                 child: ElevatedButton(
                                   onPressed: _isLoading ? null : () async {
+                                    if (!_acceptedTerms) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Please accept the Terms and Conditions to continue'),
+                                          backgroundColor: Colors.red,
+                                        ),
+                                      );
+                                      return;
+                                    }
                                     if (_formKey.currentState!.validate()) {
                                       HapticFeedback.lightImpact();
                                       setState(() => _isLoading = true);

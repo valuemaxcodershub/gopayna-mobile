@@ -1,6 +1,8 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+import 'api_service.dart' as api;
 import 'widgets/wallet_visibility_builder.dart';
 import 'widgets/themed_screen_helpers.dart';
 
@@ -30,78 +32,181 @@ class BuyAirtimeScreen extends StatefulWidget {
 }
 
 class _BuyAirtimeScreenState extends State<BuyAirtimeScreen>
-  with ThemedScreenHelpers {
+    with ThemedScreenHelpers {
   final _formKey = GlobalKey<FormState>();
-  final _phoneController = TextEditingController(text: '08051237666');
+  final _phoneController = TextEditingController();
   final _amountController = TextEditingController();
 
-  String _selectedNetwork = 'glo';
+  String _selectedNetwork = 'mtn';
   bool _isLoading = false;
   bool _showNetworkList = false;
-  final double _walletBalance = 50000.00;
+  double _walletBalance = 0.0;
+  String? _token;
+  List<AirtimeTransaction> _recentTransactions = [];
+
+  // Nigerian mobile number prefixes for auto-detection
+  static const Map<String, List<String>> _networkPrefixes = {
+    'mtn': [
+      '0803',
+      '0806',
+      '0703',
+      '0706',
+      '0813',
+      '0816',
+      '0810',
+      '0814',
+      '0903',
+      '0906',
+      '0913',
+      '0916'
+    ],
+    'glo': ['0805', '0807', '0705', '0815', '0811', '0905', '0915'],
+    'airtel': [
+      '0802',
+      '0808',
+      '0708',
+      '0812',
+      '0701',
+      '0901',
+      '0902',
+      '0907',
+      '0912'
+    ],
+    '9mobile': ['0809', '0818', '0817', '0909', '0908'],
+  };
 
   final List<Map<String, dynamic>> _networks = [
     {
       'id': 'mtn',
       'name': 'MTN',
       'color': const Color(0xFFFFCC00),
-      'icon': Icons.sim_card,
+      'logo': 'assets/mtn_logo.png',
       'textColor': Colors.black,
     },
     {
       'id': 'airtel',
       'name': 'Airtel',
       'color': const Color(0xFFE60026),
-      'icon': Icons.sim_card,
+      'logo': 'assets/airtel_logo.png',
       'textColor': Colors.white,
     },
     {
       'id': 'glo',
       'name': 'GLO',
       'color': const Color(0xFF00CA44),
-      'icon': Icons.sim_card,
+      'logo': 'assets/glo_logo.png',
       'textColor': Colors.white,
     },
     {
       'id': '9mobile',
       'name': '9Mobile',
-      'color': const Color(0xFF00CA44),
-      'icon': Icons.sim_card,
+      'color': const Color(0xFF006B3F),
+      'logo': 'assets/9mobile_logo.png',
       'textColor': Colors.white,
     },
   ];
 
-  final List<String> _quickAmounts = ['100', '200', '500', '1000', '2000', '5000'];
-
-  final List<AirtimeTransaction> _recentTransactions = [
-    AirtimeTransaction(
-      network: 'MTN',
-      phoneNumber: '08012345678',
-      amount: '1000',
-      date: DateTime.now().subtract(const Duration(hours: 2)),
-      isSuccessful: true,
-      networkColor: const Color(0xFFFFCC00),
-    ),
-    AirtimeTransaction(
-      network: 'GLO',
-      phoneNumber: '08051237666',
-      amount: '500',
-      date: DateTime.now().subtract(const Duration(days: 1)),
-      isSuccessful: true,
-      networkColor: const Color(0xFF00CA44),
-    ),
-    AirtimeTransaction(
-      network: 'Airtel',
-      phoneNumber: '08098765432',
-      amount: '200',
-      date: DateTime.now().subtract(const Duration(days: 2)),
-      isSuccessful: false,
-      networkColor: const Color(0xFFE60026),
-    ),
+  final List<String> _quickAmounts = [
+    '100',
+    '200',
+    '500',
+    '1000',
+    '2000',
+    '5000'
   ];
+
+  // Network colors for transaction display
+  Color _getNetworkColor(String network) {
+    switch (network.toLowerCase()) {
+      case 'mtn':
+        return const Color(0xFFFFCC00);
+      case 'glo':
+        return const Color(0xFF00CA44);
+      case 'airtel':
+        return const Color(0xFFE60026);
+      case '9mobile':
+        return const Color(0xFF006B3F);
+      default:
+        return Colors.grey;
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _phoneController.addListener(_onPhoneNumberChanged);
+    _loadWalletData();
+    _loadRecentTransactions();
+  }
+
+  /// Detect network from phone number prefix
+  String? _detectNetworkFromPhone(String phone) {
+    if (phone.length < 4) return null;
+    final prefix = phone.substring(0, 4);
+    for (final entry in _networkPrefixes.entries) {
+      if (entry.value.contains(prefix)) {
+        return entry.key;
+      }
+    }
+    return null;
+  }
+
+  /// Called when phone number changes - auto-detect network
+  void _onPhoneNumberChanged() {
+    final phone = _phoneController.text.trim();
+    if (phone.length >= 4) {
+      final detectedNetwork = _detectNetworkFromPhone(phone);
+      if (detectedNetwork != null && detectedNetwork != _selectedNetwork) {
+        setState(() {
+          _selectedNetwork = detectedNetwork;
+        });
+        HapticFeedback.selectionClick();
+      }
+    }
+  }
+
+  Future<void> _loadRecentTransactions() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('jwt');
+    if (token == null) return;
+
+    final result = await api.fetchVTUHistory(token, type: 'airtime', limit: 5);
+    if (mounted && result['success'] == true) {
+      final data = result['data'] as List? ?? [];
+      setState(() {
+        _recentTransactions = data.map((tx) {
+          final details = tx['details'] as Map<String, dynamic>? ?? {};
+          return AirtimeTransaction(
+            network: details['network']?.toString().toUpperCase() ?? 'Unknown',
+            phoneNumber: details['phone']?.toString() ?? '',
+            amount: tx['amount']?.toString() ?? '0',
+            date: DateTime.tryParse(tx['createdAt']?.toString() ?? '') ??
+                DateTime.now(),
+            isSuccessful: tx['status'] == 'success',
+            networkColor:
+                _getNetworkColor(details['network']?.toString() ?? ''),
+          );
+        }).toList();
+      });
+    }
+  }
+
+  Future<void> _loadWalletData() async {
+    final prefs = await SharedPreferences.getInstance();
+    _token = prefs.getString('jwt');
+    if (_token != null) {
+      final balance = await api.fetchWalletBalance(_token!);
+      if (mounted && balance != null) {
+        setState(() {
+          _walletBalance = balance;
+        });
+      }
+    }
+  }
 
   @override
   void dispose() {
+    _phoneController.removeListener(_onPhoneNumberChanged);
     _phoneController.dispose();
     _amountController.dispose();
     super.dispose();
@@ -125,7 +230,7 @@ class _BuyAirtimeScreenState extends State<BuyAirtimeScreen>
     final cs = colorScheme;
     final card = cardColor;
     final muted = mutedTextColor;
-    
+
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -161,11 +266,14 @@ class _BuyAirtimeScreenState extends State<BuyAirtimeScreen>
                 ),
                 child: Column(
                   children: [
-                    _buildConfirmationRow('Network', _selectedNetworkData['name']),
+                    _buildConfirmationRow(
+                        'Network', _selectedNetworkData['name']),
                     const SizedBox(height: 8),
-                    _buildConfirmationRow('Phone Number', _phoneController.text),
+                    _buildConfirmationRow(
+                        'Phone Number', _phoneController.text),
                     const SizedBox(height: 8),
-                    _buildConfirmationRow('Amount', '₦${_amountController.text}'),
+                    _buildConfirmationRow(
+                        'Amount', '₦${_amountController.text}'),
                   ],
                 ),
               ),
@@ -231,26 +339,117 @@ class _BuyAirtimeScreenState extends State<BuyAirtimeScreen>
   }
 
   void _processPurchase() async {
+    if (_token == null) {
+      _showErrorDialog('Session expired. Please login again.');
+      return;
+    }
+
+    final amount = double.tryParse(_amountController.text) ?? 0;
+    if (amount <= 0) {
+      _showErrorDialog('Please enter a valid amount.');
+      return;
+    }
+
+    if (amount > _walletBalance) {
+      _showErrorDialog('Insufficient wallet balance.');
+      return;
+    }
+
     setState(() {
       _isLoading = true;
     });
 
-    await Future.delayed(const Duration(seconds: 2));
+    // Send network name (mtn, glo, airtel, 9mobile) not the code
+    final result = await api.buyAirtime(
+      _token!,
+      network: _selectedNetwork, // Send network name directly
+      phone: _phoneController.text,
+      amount: amount,
+    );
 
     setState(() {
       _isLoading = false;
     });
 
-    if (mounted) {
+    if (!mounted) return;
+
+    if (result['success'] == true) {
+      // Refresh wallet balance after successful purchase
+      _loadWalletData();
+      _loadRecentTransactions();
       _showSuccessDialog();
+    } else {
+      // Reload wallet data in case of refund
+      if (result['refunded'] == true) {
+        _loadWalletData();
+      }
+      String errorMessage =
+          result['error'] ?? 'Transaction failed. Please try again.';
+      // Add refund notice if applicable
+      if (result['refunded'] == true) {
+        errorMessage += '\n\nYour wallet has been refunded.';
+      }
+      _showErrorDialog(errorMessage);
     }
+  }
+
+  void _showErrorDialog(String message) {
+    final isTablet = MediaQuery.of(context).size.width > 600;
+    final cs = colorScheme;
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(isTablet ? 20 : 16),
+          ),
+          title: Row(
+            children: [
+              Icon(Icons.error_outline,
+                  color: Colors.red, size: isTablet ? 32 : 24),
+              SizedBox(width: isTablet ? 12 : 8),
+              Text(
+                'Error',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: isTablet ? 22 : 18,
+                  color: cs.onSurface,
+                ),
+              ),
+            ],
+          ),
+          content: Text(
+            message,
+            style: TextStyle(
+              fontSize: isTablet ? 16 : 14,
+              color: cs.onSurface,
+            ),
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: cs.primary,
+                foregroundColor: cs.onPrimary,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   void _showSuccessDialog() {
     final isTablet = MediaQuery.of(context).size.width > 600;
-    final selectedNetworkData = _networks.firstWhere((n) => n['id'] == _selectedNetwork);
+    final selectedNetworkData =
+        _networks.firstWhere((n) => n['id'] == _selectedNetwork);
     final cs = colorScheme;
-    
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -315,7 +514,8 @@ class _BuyAirtimeScreenState extends State<BuyAirtimeScreen>
                     style: ElevatedButton.styleFrom(
                       backgroundColor: cs.onPrimary,
                       foregroundColor: cs.primary,
-                      padding: EdgeInsets.symmetric(vertical: isTablet ? 16 : 12),
+                      padding:
+                          EdgeInsets.symmetric(vertical: isTablet ? 16 : 12),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(isTablet ? 16 : 12),
                       ),
@@ -344,7 +544,7 @@ class _BuyAirtimeScreenState extends State<BuyAirtimeScreen>
   String _formatDate(DateTime date) {
     final now = DateTime.now();
     final difference = now.difference(date);
-    
+
     if (difference.inDays == 0) {
       if (difference.inHours == 0) {
         return '${difference.inMinutes} min ago';
@@ -366,7 +566,7 @@ class _BuyAirtimeScreenState extends State<BuyAirtimeScreen>
     final border = borderColor;
     final shadow = shadowColor;
     final surfaceVariant = cs.surfaceContainerHighest;
-    
+
     return Scaffold(
       backgroundColor: cs.surface,
       appBar: AppBar(
@@ -459,12 +659,22 @@ class _BuyAirtimeScreenState extends State<BuyAirtimeScreen>
                               height: isTablet ? 56 : 40,
                               decoration: BoxDecoration(
                                 color: _selectedNetworkData['color'],
-                                borderRadius: BorderRadius.circular(isTablet ? 12 : 8),
+                                borderRadius:
+                                    BorderRadius.circular(isTablet ? 12 : 8),
                               ),
-                              child: Icon(
-                                _selectedNetworkData['icon'],
-                                color: _selectedNetworkData['textColor'],
-                                size: isTablet ? 28 : 20,
+                              child: ClipRRect(
+                                borderRadius:
+                                    BorderRadius.circular(isTablet ? 12 : 8),
+                                child: Image.asset(
+                                  _selectedNetworkData['logo'],
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) =>
+                                      Icon(
+                                    Icons.sim_card,
+                                    color: _selectedNetworkData['textColor'],
+                                    size: isTablet ? 28 : 20,
+                                  ),
+                                ),
                               ),
                             ),
                             SizedBox(width: isTablet ? 16 : 12),
@@ -478,7 +688,7 @@ class _BuyAirtimeScreenState extends State<BuyAirtimeScreen>
                             ),
                             const Spacer(),
                             Icon(
-                              _showNetworkList 
+                              _showNetworkList
                                   ? Icons.keyboard_arrow_up
                                   : Icons.keyboard_arrow_down,
                               color: muted,
@@ -533,10 +743,19 @@ class _BuyAirtimeScreenState extends State<BuyAirtimeScreen>
                                         color: network['color'],
                                         borderRadius: BorderRadius.circular(6),
                                       ),
-                                      child: Icon(
-                                        network['icon'],
-                                        color: network['textColor'],
-                                        size: 16,
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(6),
+                                        child: Image.asset(
+                                          network['logo'],
+                                          fit: BoxFit.cover,
+                                          errorBuilder:
+                                              (context, error, stackTrace) =>
+                                                  Icon(
+                                            Icons.sim_card,
+                                            color: network['textColor'],
+                                            size: 16,
+                                          ),
+                                        ),
                                       ),
                                     ),
                                     const SizedBox(width: 12),
@@ -684,7 +903,7 @@ class _BuyAirtimeScreenState extends State<BuyAirtimeScreen>
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            _amountController.text.isEmpty 
+                            _amountController.text.isEmpty
                                 ? 'Select Amount'
                                 : '₦${_amountController.text}',
                             style: TextStyle(
@@ -718,12 +937,15 @@ class _BuyAirtimeScreenState extends State<BuyAirtimeScreen>
                           TextFormField(
                             controller: _amountController,
                             keyboardType: TextInputType.number,
-                            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly
+                            ],
                             decoration: InputDecoration(
                               labelText: 'Enter Amount',
                               labelStyle: TextStyle(color: muted),
                               border: const OutlineInputBorder(
-                                borderRadius: BorderRadius.all(Radius.circular(12)),
+                                borderRadius:
+                                    BorderRadius.all(Radius.circular(12)),
                                 borderSide: BorderSide.none,
                               ),
                               filled: true,
@@ -734,15 +956,18 @@ class _BuyAirtimeScreenState extends State<BuyAirtimeScreen>
                               ),
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(color: cs.primary, width: 2),
+                                borderSide:
+                                    BorderSide(color: cs.primary, width: 2),
                               ),
                               errorBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(color: cs.error, width: 2),
+                                borderSide:
+                                    BorderSide(color: cs.error, width: 2),
                               ),
                               focusedErrorBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(color: cs.error, width: 2),
+                                borderSide:
+                                    BorderSide(color: cs.error, width: 2),
                               ),
                               contentPadding: const EdgeInsets.all(16),
                             ),
@@ -779,7 +1004,8 @@ class _BuyAirtimeScreenState extends State<BuyAirtimeScreen>
                             spacing: 8,
                             runSpacing: 8,
                             children: _quickAmounts.map((amount) {
-                              final isSelected = _amountController.text == amount;
+                              final isSelected =
+                                  _amountController.text == amount;
                               return GestureDetector(
                                 onTap: () => _selectQuickAmount(amount),
                                 child: AnimatedContainer(
@@ -794,9 +1020,7 @@ class _BuyAirtimeScreenState extends State<BuyAirtimeScreen>
                                         : surfaceVariant,
                                     borderRadius: BorderRadius.circular(20),
                                     border: Border.all(
-                                      color: isSelected
-                                          ? cs.primary
-                                          : border,
+                                      color: isSelected ? cs.primary : border,
                                       width: 1,
                                     ),
                                   ),
@@ -844,7 +1068,8 @@ class _BuyAirtimeScreenState extends State<BuyAirtimeScreen>
                           width: isTablet ? 28 : 20,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(cs.onPrimary),
+                            valueColor:
+                                AlwaysStoppedAnimation<Color>(cs.onPrimary),
                           ),
                         )
                       : Text(
@@ -900,7 +1125,8 @@ class _BuyAirtimeScreenState extends State<BuyAirtimeScreen>
                             TextButton(
                               onPressed: () {},
                               style: TextButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(horizontal: 8),
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 8),
                                 minimumSize: Size.zero,
                                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                               ),
@@ -937,10 +1163,12 @@ class _BuyAirtimeScreenState extends State<BuyAirtimeScreen>
                                   width: 40,
                                   height: 40,
                                   decoration: BoxDecoration(
-                                    color: transaction.networkColor.withValues(alpha: 0.1),
+                                    color: transaction.networkColor
+                                        .withValues(alpha: 0.1),
                                     borderRadius: BorderRadius.circular(8),
                                     border: Border.all(
-                                      color: transaction.networkColor.withValues(alpha: 0.3),
+                                      color: transaction.networkColor
+                                          .withValues(alpha: 0.3),
                                       width: 1,
                                     ),
                                   ),
@@ -953,7 +1181,8 @@ class _BuyAirtimeScreenState extends State<BuyAirtimeScreen>
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Row(
                                         children: [
@@ -994,12 +1223,17 @@ class _BuyAirtimeScreenState extends State<BuyAirtimeScreen>
                                             ),
                                             decoration: BoxDecoration(
                                               color: transaction.isSuccessful
-                                                  ? cs.primary.withValues(alpha: 0.1)
-                                                  : cs.error.withValues(alpha: 0.1),
-                                              borderRadius: BorderRadius.circular(12),
+                                                  ? cs.primary
+                                                      .withValues(alpha: 0.1)
+                                                  : cs.error
+                                                      .withValues(alpha: 0.1),
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
                                             ),
                                             child: Text(
-                                              transaction.isSuccessful ? 'Success' : 'Failed',
+                                              transaction.isSuccessful
+                                                  ? 'Success'
+                                                  : 'Failed',
                                               style: TextStyle(
                                                 fontSize: 10,
                                                 fontWeight: FontWeight.w500,
@@ -1032,7 +1266,6 @@ class _BuyAirtimeScreenState extends State<BuyAirtimeScreen>
                 ),
                 const SizedBox(height: 20),
               ],
-
             ],
           ),
         ),
@@ -1040,6 +1273,3 @@ class _BuyAirtimeScreenState extends State<BuyAirtimeScreen>
     );
   }
 }
-
-
-

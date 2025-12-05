@@ -1,6 +1,8 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+import 'api_service.dart' as api;
 import 'widgets/wallet_visibility_builder.dart';
 import 'widgets/themed_screen_helpers.dart';
 
@@ -40,67 +42,79 @@ class _BuyElectricityScreenState extends State<BuyElectricityScreen>
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _meterNumberController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _amountController = TextEditingController();
 
   String _selectedProvider = 'eko';
   String _selectedPackage = '';
+  final String _selectedMeterType = 'prepaid';
   bool _isLoading = false;
-  final double _walletBalance = 4700.00;
+  double _walletBalance = 0.0;
+  String? _token;
+  List<ElectricityTransaction> _recentTransactions = [];
 
   final List<Map<String, dynamic>> _providers = [
     {
       'id': 'eko',
       'name': 'Eko Electricity (EKEDC)',
+      'shortName': 'EKEDC',
       'color': const Color(0xFF0066CC),
-      'icon': Icons.electric_bolt,
+      'icon': Icons.bolt_outlined,
       'textColor': Colors.white,
     },
     {
       'id': 'ikeja',
       'name': 'Ikeja Electric (IE)',
+      'shortName': 'IE',
       'color': const Color(0xFFFF6600),
-      'icon': Icons.electric_bolt,
+      'icon': Icons.bolt_outlined,
       'textColor': Colors.white,
     },
     {
       'id': 'abuja',
       'name': 'Abuja Electricity (AEDC)',
+      'shortName': 'AEDC',
       'color': const Color(0xFF800080),
-      'icon': Icons.electric_bolt,
+      'icon': Icons.bolt_outlined,
       'textColor': Colors.white,
     },
     {
       'id': 'kano',
       'name': 'Kano Electricity (KEDCO)',
+      'shortName': 'KEDCO',
       'color': const Color(0xFF00CA44),
-      'icon': Icons.electric_bolt,
+      'icon': Icons.bolt_outlined,
       'textColor': Colors.white,
     },
     {
       'id': 'portharcourt',
       'name': 'Port Harcourt Electric (PHED)',
+      'shortName': 'PHED',
       'color': const Color(0xFFDC143C),
-      'icon': Icons.electric_bolt,
+      'icon': Icons.bolt_outlined,
       'textColor': Colors.white,
     },
     {
       'id': 'jos',
       'name': 'Jos Electricity (JED)',
+      'shortName': 'JED',
       'color': const Color(0xFF4B0082),
-      'icon': Icons.electric_bolt,
+      'icon': Icons.bolt_outlined,
       'textColor': Colors.white,
     },
     {
       'id': 'kaduna',
       'name': 'Kaduna Electric (KAEDCO)',
+      'shortName': 'KAEDCO',
       'color': const Color(0xFF228B22),
-      'icon': Icons.electric_bolt,
+      'icon': Icons.bolt_outlined,
       'textColor': Colors.white,
     },
     {
       'id': 'ibadan',
       'name': 'Ibadan Electricity (IBEDC)',
+      'shortName': 'IBEDC',
       'color': const Color(0xFFFF4500),
-      'icon': Icons.electric_bolt,
+      'icon': Icons.bolt_outlined,
       'textColor': Colors.white,
     },
   ];
@@ -172,35 +186,92 @@ class _BuyElectricityScreenState extends State<BuyElectricityScreen>
     ],
   };
 
-  final List<ElectricityTransaction> _recentTransactions = [
-    ElectricityTransaction(
-      id: 'ELE001',
-      provider: 'Eko Electricity',
-      meterNumber: '12345678901',
-      customerName: 'JOHN DOE',
-      package: '₦2,000',
-      amount: 2000,
-      date: DateTime.now().subtract(const Duration(hours: 2)),
-      status: 'Successful',
-      providerColor: const Color(0xFF0066CC),
-    ),
-    ElectricityTransaction(
-      id: 'ELE002',
-      provider: 'Ikeja Electric',
-      meterNumber: '98765432109',
-      customerName: 'JANE SMITH',
-      package: '₦5,000',
-      amount: 5000,
-      date: DateTime.now().subtract(const Duration(days: 1)),
-      status: 'Successful',
-      providerColor: const Color(0xFFFF6600),
-    ),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadWalletData();
+    _loadRecentTransactions();
+  }
+
+  Future<void> _loadRecentTransactions() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('jwt');
+    if (token == null) return;
+
+    final result =
+        await api.fetchVTUHistory(token, type: 'electricity', limit: 5);
+    if (mounted && result['success'] == true) {
+      final data = result['data'] as List? ?? [];
+      setState(() {
+        _recentTransactions = data.map((tx) {
+          final details = tx['details'] as Map<String, dynamic>? ?? {};
+          return ElectricityTransaction(
+            id: tx['reference']?.toString() ?? '',
+            provider: details['disco']?.toString() ?? 'Unknown',
+            meterNumber: details['meterNumber']?.toString() ?? '',
+            customerName: details['customerName']?.toString() ?? '',
+            package: '₦${tx['amount']}',
+            amount: (tx['amount'] as num?)?.toDouble() ?? 0,
+            date: DateTime.tryParse(tx['createdAt']?.toString() ?? '') ??
+                DateTime.now(),
+            status: tx['status'] == 'success' ? 'Successful' : 'Failed',
+            providerColor: const Color(0xFF0066CC),
+          );
+        }).toList();
+      });
+    }
+  }
+
+  Future<void> _loadWalletData() async {
+    final prefs = await SharedPreferences.getInstance();
+    _token = prefs.getString('jwt');
+    if (_token != null) {
+      final balance = await api.fetchWalletBalance(_token!);
+      if (mounted && balance != null) {
+        setState(() {
+          _walletBalance = balance;
+        });
+      }
+    }
+  }
+
+  // Map provider IDs to NelloByte disco codes
+  String _getDiscoCode(String providerId) {
+    switch (providerId) {
+      case 'eko':
+        return '01'; // Eko Electric - EKEDC
+      case 'ikeja':
+        return '02'; // Ikeja Electric - IKEDC
+      case 'abuja':
+        return '03'; // Abuja Electric - AEDC
+      case 'kano':
+        return '04'; // Kano Electric - KEDC
+      case 'portharcourt':
+        return '05'; // Port Harcourt Electric - PHEDC
+      case 'jos':
+        return '06'; // Jos Electric - JEDC
+      case 'ibadan':
+        return '07'; // Ibadan Electric - IBEDC
+      case 'kaduna':
+        return '08'; // Kaduna Electric - KAEDC
+      case 'enugu':
+        return '09'; // Enugu Electric - EEDC
+      case 'benin':
+        return '10'; // Benin Electric - BEDC
+      case 'yola':
+        return '11'; // Yola Electric - YEDC
+      case 'aba':
+        return '12'; // Aba Electric - APLE
+      default:
+        return '01';
+    }
+  }
 
   @override
   void dispose() {
     _meterNumberController.dispose();
     _phoneController.dispose();
+    _amountController.dispose();
     super.dispose();
   }
 
@@ -222,7 +293,8 @@ class _BuyElectricityScreenState extends State<BuyElectricityScreen>
   void _showConfirmationDialog() {
     final isTablet = MediaQuery.of(context).size.width > 600;
     final selectedPackage = _packages[_selectedProvider]!.firstWhere(
-      (package) => '${package['bundle']} - ${package['type']}' == _selectedPackage,
+      (package) =>
+          '${package['bundle']} - ${package['type']}' == _selectedPackage,
     );
     final cs = colorScheme;
     final card = cardColor;
@@ -265,17 +337,23 @@ class _BuyElectricityScreenState extends State<BuyElectricityScreen>
                 ),
                 child: Column(
                   children: [
-                    _buildConfirmationRow('Provider', _selectedProviderData['name']),
+                    _buildConfirmationRow(
+                        'Provider', _selectedProviderData['name']),
                     const SizedBox(height: 8),
-                    _buildConfirmationRow('Meter Number', _meterNumberController.text),
+                    _buildConfirmationRow(
+                        'Meter Number', _meterNumberController.text),
                     const SizedBox(height: 8),
-                    _buildConfirmationRow('Phone Number', _phoneController.text),
+                    _buildConfirmationRow(
+                        'Phone Number', _phoneController.text),
                     const SizedBox(height: 8),
-                    _buildConfirmationRow('Package', selectedPackage['bundle'] ?? ''),
+                    _buildConfirmationRow(
+                        'Package', selectedPackage['bundle'] ?? ''),
                     const SizedBox(height: 8),
-                    _buildConfirmationRow('Type', selectedPackage['type'] ?? ''),
+                    _buildConfirmationRow(
+                        'Type', selectedPackage['type'] ?? ''),
                     const SizedBox(height: 8),
-                    _buildConfirmationRow('Amount', '₦${selectedPackage['price']}'),
+                    _buildConfirmationRow(
+                        'Amount', '₦${selectedPackage['price']}'),
                   ],
                 ),
               ),
@@ -339,27 +417,219 @@ class _BuyElectricityScreenState extends State<BuyElectricityScreen>
   }
 
   void _processPurchase() async {
+    if (_token == null) {
+      _showErrorDialog('Session expired. Please login again.');
+      return;
+    }
+
+    // Get the selected package details
+    Map<String, dynamic>? selectedPackage;
+    try {
+      selectedPackage = _packages[_selectedProvider]!.firstWhere(
+        (package) =>
+            '${package['bundle']} - ${package['type']}' == _selectedPackage,
+      );
+    } catch (e) {
+      _showErrorDialog('Please select a valid package.');
+      return;
+    }
+
+    final amount = (selectedPackage['price'] as num?)?.toDouble() ?? 0;
+
+    if (amount > _walletBalance) {
+      _showErrorDialog('Insufficient wallet balance.');
+      return;
+    }
+
     setState(() {
       _isLoading = true;
     });
 
-    await Future.delayed(const Duration(seconds: 2));
+    // Convert provider ID to NelloByte disco code
+    final discoCode = _getDiscoCode(_selectedProvider);
+    // Meter type: 01=Prepaid, 02=Postpaid
+    final meterTypeCode = _selectedMeterType == 'prepaid' ? '01' : '02';
 
-    if (!mounted) {
-      return;
-    }
+    final result = await api.buyElectricity(
+      _token!,
+      disco: discoCode,
+      meterType: meterTypeCode,
+      meterNumber: _meterNumberController.text,
+      amount: amount,
+      phone: _phoneController.text,
+    );
+
+    if (!mounted) return;
 
     setState(() {
       _isLoading = false;
     });
 
-    _showSuccessDialog();
+    if (result['success'] == true) {
+      _loadWalletData();
+      // Show token if returned
+      final data = result['data']?['data'];
+      if (data != null && data['token'] != null) {
+        _showSuccessDialogWithToken(data['token']);
+      } else {
+        _showSuccessDialog();
+      }
+    } else {
+      _showErrorDialog(
+          result['error'] ?? 'Transaction failed. Please try again.');
+    }
+  }
+
+  void _showSuccessDialogWithToken(String token) {
+    final isTablet = MediaQuery.of(context).size.width > 600;
+    final cs = colorScheme;
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(isTablet ? 20 : 16),
+          ),
+          title: Row(
+            children: [
+              Icon(Icons.check_circle,
+                  color: Colors.green, size: isTablet ? 32 : 24),
+              SizedBox(width: isTablet ? 12 : 8),
+              Text(
+                'Success',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: isTablet ? 22 : 18,
+                  color: cs.onSurface,
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Electricity purchase successful!',
+                style: TextStyle(
+                    fontSize: isTablet ? 16 : 14, color: cs.onSurface),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.green.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border:
+                      Border.all(color: Colors.green.withValues(alpha: 0.3)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Your Token:',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: cs.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    SelectableText(
+                      token,
+                      style: TextStyle(
+                        fontSize: isTablet ? 18 : 16,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'monospace',
+                        color: Colors.green.shade700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Clipboard.setData(ClipboardData(text: token));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Token copied to clipboard')),
+                );
+              },
+              child: const Text('Copy Token'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: cs.primary,
+                foregroundColor: cs.onPrimary,
+              ),
+              child: const Text('Done'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showErrorDialog(String message) {
+    final isTablet = MediaQuery.of(context).size.width > 600;
+    final cs = colorScheme;
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(isTablet ? 20 : 16),
+          ),
+          title: Row(
+            children: [
+              Icon(Icons.error_outline,
+                  color: Colors.red, size: isTablet ? 32 : 24),
+              SizedBox(width: isTablet ? 12 : 8),
+              Text(
+                'Error',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: isTablet ? 22 : 18,
+                  color: cs.onSurface,
+                ),
+              ),
+            ],
+          ),
+          content: Text(
+            message,
+            style: TextStyle(
+              fontSize: isTablet ? 16 : 14,
+              color: cs.onSurface,
+            ),
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: cs.primary,
+                foregroundColor: cs.onPrimary,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   void _showSuccessDialog() {
-    final selectedProviderData = _providers.firstWhere((p) => p['id'] == _selectedProvider);
+    final selectedProviderData =
+        _providers.firstWhere((p) => p['id'] == _selectedProvider);
     final selectedPackage = _packages[_selectedProvider]!.firstWhere(
-      (package) => '${package['bundle']} - ${package['type']}' == _selectedPackage,
+      (package) =>
+          '${package['bundle']} - ${package['type']}' == _selectedPackage,
     );
 
     final cs = colorScheme;
@@ -601,15 +871,16 @@ class _BuyElectricityScreenState extends State<BuyElectricityScreen>
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
                         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: isTablet ? 3 : 2,
-                          crossAxisSpacing: isTablet ? 16 : 12,
-                          mainAxisSpacing: isTablet ? 16 : 12,
-                          childAspectRatio: isTablet ? 3.2 : 3.5,
+                          crossAxisCount: isTablet ? 4 : 4,
+                          crossAxisSpacing: isTablet ? 12 : 8,
+                          mainAxisSpacing: isTablet ? 12 : 8,
+                          childAspectRatio: isTablet ? 1.0 : 0.85,
                         ),
                         itemCount: _providers.length,
                         itemBuilder: (context, index) {
                           final provider = _providers[index];
-                          final isSelected = _selectedProvider == provider['id'];
+                          final isSelected =
+                              _selectedProvider == provider['id'];
                           return GestureDetector(
                             onTap: () {
                               setState(() {
@@ -620,35 +891,48 @@ class _BuyElectricityScreenState extends State<BuyElectricityScreen>
                             },
                             child: AnimatedContainer(
                               duration: const Duration(milliseconds: 200),
-                              padding: EdgeInsets.all(isTablet ? 16 : 12),
+                              padding: EdgeInsets.all(isTablet ? 10 : 6),
                               decoration: BoxDecoration(
                                 color: isSelected
-                                  ? provider['color'].withValues(alpha: 0.1)
+                                    ? provider['color'].withValues(alpha: 0.15)
                                     : surfaceVariant,
-                                borderRadius: BorderRadius.circular(isTablet ? 12 : 8),
+                                borderRadius:
+                                    BorderRadius.circular(isTablet ? 12 : 10),
                                 border: Border.all(
-                                  color: isSelected ? provider['color'] : border,
+                                  color:
+                                      isSelected ? provider['color'] : border,
                                   width: isSelected ? 2 : 1,
                                 ),
                               ),
-                              child: Row(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Icon(
-                                    provider['icon'],
-                                    color: provider['color'],
-                                    size: isTablet ? 20 : 16,
-                                  ),
-                                  SizedBox(width: isTablet ? 12 : 8),
-                                  Expanded(
-                                    child: Text(
-                                      provider['name'].split(' ')[0],
-                                      style: TextStyle(
-                                        color: provider['color'],
-                                        fontSize: isTablet ? 14 : 12,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
+                                  Container(
+                                    width: isTablet ? 36 : 30,
+                                    height: isTablet ? 36 : 30,
+                                    decoration: BoxDecoration(
+                                      color: provider['color'],
+                                      borderRadius: BorderRadius.circular(6),
                                     ),
+                                    child: Icon(
+                                      provider['icon'],
+                                      color: Colors.white,
+                                      size: isTablet ? 20 : 16,
+                                    ),
+                                  ),
+                                  SizedBox(height: isTablet ? 8 : 4),
+                                  Text(
+                                    provider['shortName'] ??
+                                        provider['name'].split(' ')[0],
+                                    style: TextStyle(
+                                      color: isSelected
+                                          ? provider['color']
+                                          : cs.onSurface,
+                                      fontSize: isTablet ? 11 : 9,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ],
                               ),
@@ -693,17 +977,20 @@ class _BuyElectricityScreenState extends State<BuyElectricityScreen>
                       size: isTablet ? 28 : 24,
                     ),
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.all(Radius.circular(isTablet ? 20 : 16)),
+                      borderRadius:
+                          BorderRadius.all(Radius.circular(isTablet ? 20 : 16)),
                       borderSide: BorderSide.none,
                     ),
                     filled: true,
                     fillColor: card,
                     enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.all(Radius.circular(isTablet ? 20 : 16)),
+                      borderRadius:
+                          BorderRadius.all(Radius.circular(isTablet ? 20 : 16)),
                       borderSide: BorderSide(color: border),
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.all(Radius.circular(isTablet ? 20 : 16)),
+                      borderRadius:
+                          BorderRadius.all(Radius.circular(isTablet ? 20 : 16)),
                       borderSide: BorderSide(color: cs.primary, width: 2),
                     ),
                     contentPadding: EdgeInsets.all(isTablet ? 28 : 20),
@@ -827,7 +1114,8 @@ class _BuyElectricityScreenState extends State<BuyElectricityScreen>
                         itemCount: _packages[_selectedProvider]!.length,
                         itemBuilder: (context, index) {
                           final package = _packages[_selectedProvider]![index];
-                          final packageId = '${package['bundle']} - ${package['type']}';
+                          final packageId =
+                              '${package['bundle']} - ${package['type']}';
                           final isSelected = _selectedPackage == packageId;
 
                           return GestureDetector(
@@ -843,9 +1131,10 @@ class _BuyElectricityScreenState extends State<BuyElectricityScreen>
                               padding: EdgeInsets.all(isTablet ? 10 : 6),
                               decoration: BoxDecoration(
                                 color: isSelected
-                                  ? cs.primary.withValues(alpha: 0.08)
+                                    ? cs.primary.withValues(alpha: 0.08)
                                     : surfaceVariant,
-                                borderRadius: BorderRadius.circular(isTablet ? 12 : 8),
+                                borderRadius:
+                                    BorderRadius.circular(isTablet ? 12 : 8),
                                 border: Border.all(
                                   color: isSelected ? cs.primary : border,
                                   width: isSelected ? 2 : 1,
@@ -855,14 +1144,17 @@ class _BuyElectricityScreenState extends State<BuyElectricityScreen>
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
                                     children: [
                                       Text(
                                         package['bundle'],
                                         style: TextStyle(
                                           fontWeight: FontWeight.bold,
                                           fontSize: 11,
-                                          color: isSelected ? cs.primary : cs.onSurface,
+                                          color: isSelected
+                                              ? cs.primary
+                                              : cs.onSurface,
                                         ),
                                         overflow: TextOverflow.ellipsis,
                                       ),
@@ -918,7 +1210,8 @@ class _BuyElectricityScreenState extends State<BuyElectricityScreen>
                           width: isTablet ? 28 : 20,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(cs.onPrimary),
+                            valueColor:
+                                AlwaysStoppedAnimation<Color>(cs.onPrimary),
                           ),
                         )
                       : Text(
@@ -974,7 +1267,8 @@ class _BuyElectricityScreenState extends State<BuyElectricityScreen>
                             TextButton(
                               onPressed: () {},
                               style: TextButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(horizontal: 8),
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 8),
                                 minimumSize: Size.zero,
                                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                               ),
@@ -1011,10 +1305,12 @@ class _BuyElectricityScreenState extends State<BuyElectricityScreen>
                                   width: 40,
                                   height: 40,
                                   decoration: BoxDecoration(
-                                    color: transaction.providerColor.withValues(alpha: 0.12),
+                                    color: transaction.providerColor
+                                        .withValues(alpha: 0.12),
                                     borderRadius: BorderRadius.circular(8),
                                     border: Border.all(
-                                      color: transaction.providerColor.withValues(alpha: 0.3),
+                                      color: transaction.providerColor
+                                          .withValues(alpha: 0.3),
                                       width: 1,
                                     ),
                                   ),
@@ -1027,7 +1323,8 @@ class _BuyElectricityScreenState extends State<BuyElectricityScreen>
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         transaction.provider,
@@ -1074,17 +1371,21 @@ class _BuyElectricityScreenState extends State<BuyElectricityScreen>
                                         vertical: 2,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: transaction.status == 'Successful'
-                                          ? const Color(0xFF00CA44).withValues(alpha: 0.15)
-                                          : Colors.red.withValues(alpha: 0.15),
+                                        color:
+                                            transaction.status == 'Successful'
+                                                ? const Color(0xFF00CA44)
+                                                    .withValues(alpha: 0.15)
+                                                : Colors.red
+                                                    .withValues(alpha: 0.15),
                                         borderRadius: BorderRadius.circular(4),
                                       ),
                                       child: Text(
                                         transaction.status,
                                         style: TextStyle(
-                                            color: transaction.status == 'Successful'
-                                              ? const Color(0xFF00CA44)
-                                              : Colors.red.shade700,
+                                          color:
+                                              transaction.status == 'Successful'
+                                                  ? const Color(0xFF00CA44)
+                                                  : Colors.red.shade700,
                                           fontSize: 10,
                                           fontWeight: FontWeight.w500,
                                         ),
@@ -1108,7 +1409,3 @@ class _BuyElectricityScreenState extends State<BuyElectricityScreen>
     );
   }
 }
-
-
-
-

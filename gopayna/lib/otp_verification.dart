@@ -223,38 +223,59 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
               style: TextStyle(fontSize: 16, color: _canRegenerate ? Colors.red : Colors.black54),
             ),
             const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(otpLength, (idx) => Container(
-                width: 44,
-                height: 56,
-                margin: const EdgeInsets.symmetric(horizontal: 6),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(color: brandColor.withAlpha(20), blurRadius: 8, offset: const Offset(0, 2)),
-                  ],
-                  border: Border.all(color: brandColor.withAlpha(128), width: 1.5),
-                ),
-                child: TextField(
-                  controller: _controllers[idx],
-                  focusNode: _focusNodes[idx],
-                  keyboardType: TextInputType.number,
-                  textAlign: TextAlign.center,
-                  maxLengthEnforcement: MaxLengthEnforcement.none,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  textInputAction:
-                      idx == otpLength - 1 ? TextInputAction.done : TextInputAction.next,
-                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, letterSpacing: 2),
-                  decoration: const InputDecoration(
-                    counterText: '',
-                    border: InputBorder.none,
-                  ),
-                  onChanged: (val) => _onOtpChanged(idx, val),
-                  onTap: () => _controllers[idx].selection = TextSelection(baseOffset: 0, extentOffset: _controllers[idx].text.length),
-                ),
-              )),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                // Calculate responsive box size based on available width
+                final availableWidth = constraints.maxWidth;
+                // Each box has 3px margin on left and right = 6px total per box
+                // 6 boxes = 36px total margin
+                final totalMargin = 6.0 * otpLength;
+                // Calculate box width that will actually fit
+                final calculatedBoxWidth = (availableWidth - totalMargin) / otpLength;
+                // Use calculated width directly (no clamp) to ensure it fits
+                final boxWidth = calculatedBoxWidth > 44.0 ? 44.0 : calculatedBoxWidth;
+                final boxHeight = boxWidth * 1.27;
+                final fontSize = boxWidth * 0.5;
+                
+                return Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  children: List.generate(otpLength, (idx) => Container(
+                    width: boxWidth,
+                    height: boxHeight,
+                    margin: const EdgeInsets.symmetric(horizontal: 3),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(8),
+                      boxShadow: [
+                        BoxShadow(color: brandColor.withAlpha(20), blurRadius: 8, offset: const Offset(0, 2)),
+                      ],
+                      border: Border.all(color: brandColor.withAlpha(128), width: 1.5),
+                    ),
+                    child: Center(
+                      child: TextField(
+                        controller: _controllers[idx],
+                        focusNode: _focusNodes[idx],
+                        keyboardType: TextInputType.number,
+                        textAlign: TextAlign.center,
+                        maxLengthEnforcement: MaxLengthEnforcement.none,
+                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                        textInputAction:
+                            idx == otpLength - 1 ? TextInputAction.done : TextInputAction.next,
+                        style: TextStyle(fontSize: fontSize, fontWeight: FontWeight.bold),
+                        decoration: const InputDecoration(
+                          counterText: '',
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.zero,
+                          isDense: true,
+                        ),
+                        onChanged: (val) => _onOtpChanged(idx, val),
+                        onTap: () => _controllers[idx].selection = TextSelection(baseOffset: 0, extentOffset: _controllers[idx].text.length),
+                      ),
+                    ),
+                  )),
+                );
+              },
             ),
             const SizedBox(height: 32),
             SizedBox(

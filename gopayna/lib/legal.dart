@@ -1,7 +1,11 @@
 ﻿import 'package:flutter/material.dart';
 
 class LegalScreen extends StatefulWidget {
-  const LegalScreen({super.key});
+  const LegalScreen({super.key, this.showLogout = true});
+
+  /// Whether to show the logout button in the header.
+  /// Set to false when accessed from registration flow.
+  final bool showLogout;
 
   @override
   State<LegalScreen> createState() => _LegalScreenState();
@@ -183,42 +187,43 @@ class _LegalScreenState extends State<LegalScreen>
                 ),
               ),
             ),
-            GestureDetector(
-              onTap: _handleLogout,
-              child: Container(
-                padding: EdgeInsets.symmetric(
-                  horizontal: isTablet ? 16 : 12,
-                  vertical: isTablet ? 10 : 8,
-                ),
-                decoration: BoxDecoration(
-                  color: _colorScheme.error.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: _colorScheme.error,
-                    width: 1,
+            if (widget.showLogout)
+              GestureDetector(
+                onTap: _handleLogout,
+                child: Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isTablet ? 16 : 12,
+                    vertical: isTablet ? 10 : 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _colorScheme.error.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: _colorScheme.error,
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.logout,
+                        color: _colorScheme.error,
+                        size: isTablet ? 18 : 16,
+                      ),
+                      SizedBox(width: isTablet ? 8 : 4),
+                      Text(
+                        'Logout',
+                        style: TextStyle(
+                          color: _colorScheme.error,
+                          fontSize: isTablet ? 14 : 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.logout,
-                      color: _colorScheme.error,
-                      size: isTablet ? 18 : 16,
-                    ),
-                    SizedBox(width: isTablet ? 8 : 4),
-                    Text(
-                      'Logout',
-                      style: TextStyle(
-                        color: _colorScheme.error,
-                        fontSize: isTablet ? 14 : 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
               ),
-            ),
           ],
         ),
       ),

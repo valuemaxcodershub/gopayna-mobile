@@ -49,7 +49,6 @@ class _BuyEducationPinScreenState extends State<BuyEducationPinScreen>
   bool _isLoading = false;
   double _walletBalance = 0.0;
   String? _token;
-  List<EducationTransaction> _recentTransactions = [];
 
   // NelloByte supported providers: waec and jamb only
   final List<Map<String, dynamic>> _providers = [
@@ -107,52 +106,35 @@ class _BuyEducationPinScreenState extends State<BuyEducationPinScreen>
     ],
   };
 
+  final List<EducationTransaction> _recentTransactions = [
+    EducationTransaction(
+      id: 'EDU001',
+      provider: 'JAMB',
+      candidateNumber: '12345678',
+      candidateName: 'JOHN DOE',
+      package: 'JAMB UTME Registration',
+      amount: 4700,
+      date: DateTime.now().subtract(const Duration(hours: 2)),
+      status: 'Successful',
+      providerColor: const Color(0xFFDC143C),
+    ),
+    EducationTransaction(
+      id: 'EDU002',
+      provider: 'WAEC',
+      candidateNumber: '87654321',
+      candidateName: 'JANE SMITH',
+      package: 'WAEC Result Checker Pin',
+      amount: 1850,
+      date: DateTime.now().subtract(const Duration(days: 1)),
+      status: 'Successful',
+      providerColor: const Color(0xFF0066CC),
+    ),
+  ];
+
   @override
   void initState() {
     super.initState();
     _loadWalletData();
-    _loadTransactionHistory();
-  }
-
-  Future<void> _loadTransactionHistory() async {
-    if (_token == null) {
-      final prefs = await SharedPreferences.getInstance();
-      _token = prefs.getString('jwt');
-    }
-    if (_token != null) {
-      try {
-        final result =
-            await api.fetchVTUHistory(_token!, type: 'education', limit: 5);
-        if (mounted && result['success'] == true) {
-          final transactions = result['data'] as List? ?? [];
-          setState(() {
-            _recentTransactions = transactions.map((t) {
-              final provider = (t['description']?.toString() ?? '')
-                      .toUpperCase()
-                      .contains('JAMB')
-                  ? 'JAMB'
-                  : 'WAEC';
-              return EducationTransaction(
-                id: t['id']?.toString() ?? '',
-                provider: provider,
-                candidateNumber: t['phone']?.toString() ?? '',
-                candidateName: '',
-                package: t['description']?.toString() ?? 'Education Pin',
-                amount: double.tryParse(t['amount']?.toString() ?? '0') ?? 0,
-                date: DateTime.tryParse(t['createdAt']?.toString() ?? '') ??
-                    DateTime.now(),
-                status: t['status']?.toString() ?? 'Pending',
-                providerColor: provider == 'JAMB'
-                    ? const Color(0xFF006400)
-                    : const Color(0xFF0066CC),
-              );
-            }).toList();
-          });
-        }
-      } catch (e) {
-        debugPrint('Error loading education history: $e');
-      }
-    }
   }
 
   Future<void> _loadWalletData() async {
