@@ -12,6 +12,7 @@ import 'support.dart';
 import 'legal.dart';
 import 'app_settings.dart';
 import 'api_service.dart';
+import 'idle_timeout_service.dart';
 
 class SettingScreen extends StatefulWidget {
   final bool launchWithdrawalPinSection;
@@ -832,7 +833,15 @@ class _SettingScreenState extends State<SettingScreen>
             ),
           ),
           TextButton(
-            onPressed: () {
+            onPressed: () async {
+              // Stop idle timeout tracking
+              IdleTimeoutService().dispose();
+              
+              // Clear JWT token
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.remove('jwt');
+              
+              if (!context.mounted) return;
               Navigator.pop(context);
               Navigator.of(context).pushNamedAndRemoveUntil(
                 '/login',

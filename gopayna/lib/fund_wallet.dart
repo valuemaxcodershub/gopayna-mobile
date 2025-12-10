@@ -72,7 +72,7 @@ class _FundWalletScreenState extends State<FundWalletScreen>
       _transactionsLoading = true;
       _transactionsError = null;
     });
-    final response = await fetchWalletTransactions(token: token, limit: 10);
+    final response = await fetchWalletTransactions(token: token, limit: 8);
     if (!mounted) return;
     if (response['error'] != null) {
       setState(() {

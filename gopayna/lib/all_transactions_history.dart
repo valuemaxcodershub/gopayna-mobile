@@ -10,7 +10,8 @@ class TransactionHistoryScreen extends StatefulWidget {
   const TransactionHistoryScreen({super.key});
 
   @override
-  State<TransactionHistoryScreen> createState() => _TransactionHistoryScreenState();
+  State<TransactionHistoryScreen> createState() =>
+      _TransactionHistoryScreenState();
 }
 
 class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
@@ -26,7 +27,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
   String _selectedPeriod = 'This Month';
   final List<String> _periods = [
     'This Month',
-    'Last Month', 
+    'Last Month',
     'Last 3 Months',
     'Last 6 Months',
     'This Year',
@@ -210,14 +211,14 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
         return Theme(
           data: Theme.of(context).copyWith(
             colorScheme: Theme.of(context).colorScheme.copyWith(
-              primary: const Color(0xFF00CA44),
-            ),
+                  primary: const Color(0xFF00CA44),
+                ),
           ),
           child: child!,
         );
       },
     );
-    
+
     if (picked != null) {
       setState(() {
         _customRange = DateTimeRange(
@@ -244,7 +245,8 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
 
   DateTimeRange? _currentRange() {
     if (_selectedPeriod.startsWith('Custom') && _customRange != null) {
-      return DateTimeRange(start: _customRange!.start, end: _endOfDay(_customRange!.end));
+      return DateTimeRange(
+          start: _customRange!.start, end: _endOfDay(_customRange!.end));
     }
 
     final now = DateTime.now();
@@ -257,13 +259,16 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
       case 'Last Month':
         final lastMonthStart = DateTime(now.year, now.month - 1, 1);
         final lastMonthEnd = DateTime(now.year, now.month, 0);
-        return DateTimeRange(start: lastMonthStart, end: _endOfDay(lastMonthEnd));
+        return DateTimeRange(
+            start: lastMonthStart, end: _endOfDay(lastMonthEnd));
       case 'Last 3 Months':
         final start = DateTime(now.year, now.month - 2, 1);
-        return DateTimeRange(start: start, end: _endOfDay(DateTime(now.year, now.month + 1, 0)));
+        return DateTimeRange(
+            start: start, end: _endOfDay(DateTime(now.year, now.month + 1, 0)));
       case 'Last 6 Months':
         final start = DateTime(now.year, now.month - 5, 1);
-        return DateTimeRange(start: start, end: _endOfDay(DateTime(now.year, now.month + 1, 0)));
+        return DateTimeRange(
+            start: start, end: _endOfDay(DateTime(now.year, now.month + 1, 0)));
       case 'This Year':
         return DateTimeRange(
           start: DateTime(now.year, 1, 1),
@@ -385,7 +390,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
 
   Widget _buildTransactionList(bool isTablet) {
     final transactions = _filteredTransactions();
-    
+
     return Container(
       margin: EdgeInsets.symmetric(
         horizontal: isTablet ? 32 : 20,
@@ -430,7 +435,9 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
                                       style: TextStyle(
                                         fontSize: isTablet ? 20 : 18,
                                         fontWeight: FontWeight.bold,
-                                        color: Theme.of(context).colorScheme.onSurface,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurface,
                                       ),
                                     ),
                                     const Spacer(),
@@ -448,7 +455,8 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
                                 child: RefreshIndicator(
                                   onRefresh: _loadTransactions,
                                   child: ListView.builder(
-                                    physics: const AlwaysScrollableScrollPhysics(),
+                                    physics:
+                                        const AlwaysScrollableScrollPhysics(),
                                     padding: EdgeInsets.only(
                                       left: isTablet ? 24 : 20,
                                       right: isTablet ? 24 : 20,
@@ -456,7 +464,11 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
                                     ),
                                     itemCount: transactions.length,
                                     itemBuilder: (context, index) {
-                                      return _buildTransactionCard(transactions[index], isTablet, index, 0);
+                                      return _buildTransactionCard(
+                                          transactions[index],
+                                          isTablet,
+                                          index,
+                                          0);
                                     },
                                   ),
                                 ),
@@ -605,15 +617,17 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
     );
   }
 
-  Widget _buildTransactionCard(WalletTransactionItem transaction, bool isTablet, int index, int sectionIndex) {
+  Widget _buildTransactionCard(WalletTransactionItem transaction, bool isTablet,
+      int index, int sectionIndex) {
     final isIncoming = transaction.isIncoming;
     final statusColor = transaction.statusColor;
     const brandColor = Color(0xFF00CA44);
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     return AnimatedContainer(
-      duration: Duration(milliseconds: 400 + (index * 100) + (sectionIndex * 200)),
+      duration:
+          Duration(milliseconds: 400 + (index * 100) + (sectionIndex * 200)),
       curve: Curves.easeOutCubic,
       margin: EdgeInsets.only(bottom: isTablet ? 16 : 12),
       child: GestureDetector(
@@ -627,12 +641,12 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
         child: Container(
           padding: EdgeInsets.all(isTablet ? 20 : 16),
           decoration: BoxDecoration(
-            color: isDark 
+            color: isDark
                 ? brandColor.withValues(alpha: isIncoming ? 0.12 : 0.06)
                 : brandColor.withValues(alpha: isIncoming ? 0.08 : 0.04),
             borderRadius: BorderRadius.circular(isTablet ? 16 : 12),
             border: Border.all(
-                  color: brandColor.withValues(alpha: isIncoming ? 0.3 : 0.1),
+              color: brandColor.withValues(alpha: isIncoming ? 0.3 : 0.1),
               width: 1,
             ),
           ),
@@ -730,7 +744,6 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
       ),
     );
   }
-
 }
 
 class WalletTransactionItem {
@@ -756,24 +769,98 @@ class WalletTransactionItem {
     required this.isIncoming,
     required this.reference,
     required this.channelLabel,
+    this.metadata,
   });
 
-  factory WalletTransactionItem.fromMap(Map<String, dynamic> data, DateFormat formatter) {
+  final Map<String, dynamic>? metadata;
+
+  factory WalletTransactionItem.fromMap(
+      Map<String, dynamic> data, DateFormat formatter) {
     final rawStatus = (data['status'] ?? 'pending').toString();
-    final createdAt = DateTime.tryParse(data['created_at']?.toString() ?? '')?.toLocal();
+    final createdAt =
+        DateTime.tryParse(data['created_at']?.toString() ?? '')?.toLocal();
     final amountValue = double.tryParse(data['amount']?.toString() ?? '') ?? 0;
-    final direction = (data['type'] ?? data['transaction_type'] ?? data['direction'] ?? '')
-        .toString()
-        .toLowerCase();
-    final isIncoming = direction.isNotEmpty ? direction != 'debit' : amountValue >= 0;
-    final metadata = data['metadata'];
-    final metadataChannel = metadata is Map<String, dynamic> ? metadata['channel'] : null;
-    final channel = (data['channel'] ?? metadataChannel ?? 'Wallet transaction')
-      .toString()
-      .trim();
+    final direction =
+        (data['type'] ?? data['transaction_type'] ?? data['direction'] ?? '')
+            .toString()
+            .toLowerCase();
+    final isIncoming =
+        direction.isNotEmpty ? direction != 'debit' : amountValue >= 0;
+
+    // Parse metadata - handle both string and map types
+    Map<String, dynamic>? metadata;
+    final rawMetadata = data['metadata'];
+    if (rawMetadata is Map<String, dynamic>) {
+      metadata = rawMetadata;
+    } else if (rawMetadata is String && rawMetadata.isNotEmpty) {
+      try {
+        // Handle double-encoded JSON (escaped string)
+        String jsonStr = rawMetadata;
+        if (jsonStr.startsWith('"') && jsonStr.endsWith('"')) {
+          jsonStr = jsonStr
+              .substring(1, jsonStr.length - 1)
+              .replaceAll(r'\"', '"')
+              .replaceAll(r'\\', r'\');
+        }
+        // Parse the JSON properly
+        if (jsonStr.startsWith('{')) {
+          metadata = _parseJsonSafely(jsonStr);
+        }
+      } catch (_) {
+        metadata = null;
+      }
+    }
+
+    // Get service type and build title from metadata
+    final serviceType = metadata?['serviceType']?.toString() ?? '';
+    final metadataDesc = metadata?['description']?.toString() ?? '';
+    final metadataChannel = metadata?['channel']?.toString() ?? '';
+
+    final channel =
+        (data['channel'] ?? serviceType ?? metadataChannel ?? 'wallet')
+            .toString()
+            .trim();
     final reference = (data['reference'] ?? '').toString();
-    final title = channel.isEmpty ? 'Wallet transaction' : _titleCase(channel);
-    final formattedDate = createdAt != null ? formatter.format(createdAt) : '--';
+
+    // Build a better title based on service type
+    String title;
+    if (serviceType == 'airtime') {
+      title = 'Airtime Purchase';
+    } else if (serviceType == 'data') {
+      title = 'Data Purchase';
+    } else if (serviceType == 'electricity') {
+      title = 'Electricity Purchase';
+    } else if (serviceType == 'tv') {
+      title = 'TV Subscription';
+    } else if (serviceType == 'education') {
+      title = 'Education PIN';
+    } else if (serviceType == 'refund') {
+      title = 'Refund';
+    } else if (channel.isNotEmpty && channel != 'wallet' && channel != 'vtu') {
+      title = _titleCase(channel);
+    } else if (metadataDesc.isNotEmpty) {
+      // Extract title from description
+      if (metadataDesc.toLowerCase().contains('airtime')) {
+        title = 'Airtime Purchase';
+      } else if (metadataDesc.toLowerCase().contains('data')) {
+        title = 'Data Purchase';
+      } else if (metadataDesc.toLowerCase().contains('electric')) {
+        title = 'Electricity Purchase';
+      } else if (metadataDesc.toLowerCase().contains('tv')) {
+        title = 'TV Subscription';
+      } else if (metadataDesc.toLowerCase().contains('education') ||
+          metadataDesc.toLowerCase().contains('waec') ||
+          metadataDesc.toLowerCase().contains('jamb')) {
+        title = 'Education PIN';
+      } else {
+        title = 'Wallet Transaction';
+      }
+    } else {
+      title = channel.isEmpty ? 'Wallet Transaction' : _titleCase(channel);
+    }
+
+    final formattedDate =
+        createdAt != null ? formatter.format(createdAt) : '--';
 
     return WalletTransactionItem(
       title: title,
@@ -782,15 +869,147 @@ class WalletTransactionItem {
       createdAt: createdAt,
       statusLabel: _formatStatus(rawStatus),
       statusKey: rawStatus.toLowerCase(),
-      icon: _iconForChannel(channel),
+      icon: _iconForChannel(serviceType.isNotEmpty ? serviceType : channel),
       isIncoming: isIncoming,
       reference: reference,
-      channelLabel: channel.isEmpty ? 'Wallet transaction' : _titleCase(channel),
+      channelLabel: serviceType.isNotEmpty
+          ? _titleCase(serviceType)
+          : (channel.isEmpty ? 'Wallet' : _titleCase(channel)),
+      metadata: metadata,
     );
+  }
+
+  static Map<String, dynamic>? _parseJsonSafely(String jsonStr) {
+    try {
+      // Simple JSON parsing for our known structure
+      final result = <String, dynamic>{};
+      // Remove outer braces and split by commas (not inside quotes)
+      final content = jsonStr.substring(1, jsonStr.length - 1);
+      final regex = RegExp(r'"([^"]+)"\s*:\s*("([^"]*)"|([^,}]+))');
+      for (final match in regex.allMatches(content)) {
+        final key = match.group(1) ?? '';
+        var value = match.group(3) ?? match.group(4) ?? '';
+        value = value.trim();
+        if (value == 'null') {
+          result[key] = null;
+        } else if (value == 'true') {
+          result[key] = true;
+        } else if (value == 'false') {
+          result[key] = false;
+        } else if (double.tryParse(value) != null) {
+          result[key] = double.parse(value);
+        } else {
+          result[key] = value;
+        }
+      }
+      return result.isEmpty ? null : result;
+    } catch (_) {
+      return null;
+    }
   }
 
   TransactionReceiptData toReceiptData() {
     final amountPrefix = isIncoming ? '+' : '-';
+
+    // Build extra details from metadata
+    final List<ReceiptField> extraDetails = [];
+
+    if (metadata != null) {
+      final serviceType = metadata!['serviceType']?.toString() ?? '';
+
+      // Add network for airtime/data
+      final network = metadata!['network']?.toString();
+      if (network != null && network.isNotEmpty) {
+        extraDetails.add(ReceiptField(label: 'Network', value: network));
+      }
+
+      // Add phone number
+      final phone = metadata!['phone']?.toString();
+      if (phone != null && phone.isNotEmpty) {
+        extraDetails.add(ReceiptField(label: 'Phone Number', value: phone));
+      }
+
+      // Add airtime value if different from amount (for discounted purchases)
+      final airtimeValue = metadata!['airtimeValue'];
+      if (airtimeValue != null && serviceType == 'airtime') {
+        extraDetails.add(ReceiptField(
+            label: 'Airtime Value', value: '₦${airtimeValue.toString()}'));
+      }
+
+      // Add discount if applicable
+      final discount = metadata!['discount'];
+      if (discount != null && discount > 0) {
+        extraDetails
+            .add(ReceiptField(label: 'Discount', value: '$discount%'));
+      }
+
+      // Add plan ID for data
+      final planId = metadata!['planId']?.toString();
+      if (planId != null && planId.isNotEmpty && serviceType == 'data') {
+        extraDetails.add(ReceiptField(label: 'Plan ID', value: planId));
+      }
+
+      // Add disco and meter for electricity
+      final disco = metadata!['disco']?.toString();
+      if (disco != null && disco.isNotEmpty) {
+        extraDetails.add(ReceiptField(label: 'Disco', value: disco));
+      }
+
+      final meterNumber = metadata!['meterNumber']?.toString();
+      if (meterNumber != null && meterNumber.isNotEmpty) {
+        extraDetails
+            .add(ReceiptField(label: 'Meter Number', value: meterNumber));
+      }
+
+      // Add electricity amount and service charge
+      final electricityAmount = metadata!['electricityAmount'];
+      if (electricityAmount != null) {
+        extraDetails.add(ReceiptField(
+            label: 'Electricity Amount',
+            value: '₦${electricityAmount.toString()}'));
+      }
+
+      final serviceCharge = metadata!['serviceCharge'];
+      if (serviceCharge != null && serviceCharge > 0) {
+        extraDetails.add(ReceiptField(
+            label: 'Service Charge', value: '₦${serviceCharge.toString()}'));
+      }
+
+      // Add provider and smartcard for TV
+      final provider = metadata!['provider']?.toString();
+      if (provider != null && provider.isNotEmpty && serviceType == 'tv') {
+        extraDetails.add(ReceiptField(label: 'Provider', value: provider));
+      }
+
+      final smartcardNumber = metadata!['smartcardNumber']?.toString();
+      if (smartcardNumber != null && smartcardNumber.isNotEmpty) {
+        extraDetails.add(
+            ReceiptField(label: 'Smartcard Number', value: smartcardNumber));
+      }
+
+      // Add exam details for education
+      final examType = metadata!['examType']?.toString();
+      if (examType != null && examType.isNotEmpty) {
+        extraDetails.add(ReceiptField(label: 'Exam Type', value: examType));
+      }
+
+      final examCode = metadata!['examCode']?.toString();
+      if (examCode != null && examCode.isNotEmpty) {
+        extraDetails.add(ReceiptField(label: 'Exam Code', value: examCode));
+      }
+
+      // Add timestamp from metadata
+      final timestamp = metadata!['timestamp']?.toString();
+      if (timestamp != null && timestamp.isNotEmpty) {
+        try {
+          final dt = DateTime.parse(timestamp).toLocal();
+          extraDetails.add(ReceiptField(
+              label: 'Transaction Time',
+              value: DateFormat('MMM d, yyyy • h:mm:ss a').format(dt)));
+        } catch (_) {}
+      }
+    }
+
     return TransactionReceiptData(
       title: title,
       amountDisplay: '$amountPrefix₦${amount.toStringAsFixed(2)}',
@@ -801,6 +1020,7 @@ class WalletTransactionItem {
       channel: channelLabel,
       reference: reference,
       icon: icon,
+      extraDetails: extraDetails,
     );
   }
 
@@ -841,10 +1061,9 @@ class WalletTransactionItem {
       case 'failed':
         return 'Failed';
       default:
-        return status.isEmpty ? 'Pending' : status[0].toUpperCase() + status.substring(1).toLowerCase();
+        return status.isEmpty
+            ? 'Pending'
+            : status[0].toUpperCase() + status.substring(1).toLowerCase();
     }
   }
 }
-
-
-

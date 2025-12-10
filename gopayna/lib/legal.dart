@@ -1,4 +1,6 @@
 ﻿import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'idle_timeout_service.dart';
 
 class LegalScreen extends StatefulWidget {
   const LegalScreen({super.key, this.showLogout = true});
@@ -86,7 +88,15 @@ class _LegalScreenState extends State<LegalScreen>
             ),
           ),
           TextButton(
-            onPressed: () {
+            onPressed: () async {
+              // Stop idle timeout tracking
+              IdleTimeoutService().dispose();
+              
+              // Clear JWT token
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.remove('jwt');
+              
+              if (!context.mounted) return;
               Navigator.pop(context); // Close dialog
               Navigator.popUntil(context, (route) => route.isFirst); // Go to main screen
               ScaffoldMessenger.of(context).showSnackBar(

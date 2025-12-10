@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api_service.dart' as api;
+import 'service_transaction_history.dart';
 import 'widgets/wallet_visibility_builder.dart';
 import 'widgets/themed_screen_helpers.dart';
 
@@ -75,34 +76,44 @@ class _BuyAirtimeScreenState extends State<BuyAirtimeScreen>
     '9mobile': ['0809', '0818', '0817', '0909', '0908'],
   };
 
+  // Network data with NelloByte codes
+  // NelloByte codes: 01=MTN, 02=GLO, 03=9Mobile, 04=Airtel
   final List<Map<String, dynamic>> _networks = [
     {
       'id': 'mtn',
+      'code': '01',
       'name': 'MTN',
       'color': const Color(0xFFFFCC00),
       'logo': 'assets/mtn_logo.png',
       'textColor': Colors.black,
+      'discount': 3, // Default discount %
     },
     {
       'id': 'airtel',
+      'code': '04',
       'name': 'Airtel',
       'color': const Color(0xFFE60026),
       'logo': 'assets/airtel_logo.png',
       'textColor': Colors.white,
+      'discount': 3,
     },
     {
       'id': 'glo',
+      'code': '02',
       'name': 'GLO',
       'color': const Color(0xFF00CA44),
       'logo': 'assets/glo_logo.png',
       'textColor': Colors.white,
+      'discount': 8,
     },
     {
       'id': '9mobile',
+      'code': '03',
       'name': '9Mobile',
       'color': const Color(0xFF006B3F),
       'logo': 'assets/9mobile_logo.png',
       'textColor': Colors.white,
+      'discount': 7,
     },
   ];
 
@@ -137,6 +148,39 @@ class _BuyAirtimeScreenState extends State<BuyAirtimeScreen>
     _phoneController.addListener(_onPhoneNumberChanged);
     _loadWalletData();
     _loadRecentTransactions();
+    _fetchAirtimePricing();
+  }
+
+  /// Fetch airtime pricing/discounts from admin database
+  Future<void> _fetchAirtimePricing() async {
+    try {
+      final result = await api.fetchAirtimePricing();
+      if (mounted && result['success'] == true) {
+        final data = result['data'] as List? ?? [];
+        if (data.isNotEmpty) {
+          setState(() {
+            // Update networks with fetched pricing data
+            for (final item in data) {
+              final networkId = (item['id'] ?? '').toString().toLowerCase();
+              final code = (item['code'] ?? '').toString();
+              final discount = (item['discount'] as num?)?.toInt() ?? 0;
+
+              // Find and update the network
+              final index = _networks.indexWhere((n) => n['id'] == networkId);
+              if (index != -1) {
+                _networks[index] = {
+                  ..._networks[index],
+                  'code': code.isNotEmpty ? code : _networks[index]['code'],
+                  'discount': discount,
+                };
+              }
+            }
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching airtime pricing: $e');
+    }
   }
 
   /// Detect network from phone number prefix
@@ -170,7 +214,7 @@ class _BuyAirtimeScreenState extends State<BuyAirtimeScreen>
     final token = prefs.getString('jwt');
     if (token == null) return;
 
-    final result = await api.fetchVTUHistory(token, type: 'airtime', limit: 5);
+    final result = await api.fetchVTUHistory(token, type: 'airtime', limit: 8);
     if (mounted && result['success'] == true) {
       final data = result['data'] as List? ?? [];
       setState(() {
@@ -264,17 +308,37 @@ class _BuyAirtimeScreenState extends State<BuyAirtimeScreen>
                   color: card,
                   borderRadius: BorderRadius.circular(isTablet ? 16 : 12),
                 ),
-                child: Column(
-                  children: [
-                    _buildConfirmationRow(
-                        'Network', _selectedNetworkData['name']),
-                    const SizedBox(height: 8),
-                    _buildConfirmationRow(
-                        'Phone Number', _phoneController.text),
-                    const SizedBox(height: 8),
-                    _buildConfirmationRow(
-                        'Amount', '₦${_amountController.text}'),
-                  ],
+                child: Builder(
+                  builder: (context) {
+                    final amount = double.tryParse(_amountController.text) ?? 0;
+                    final discount = (_selectedNetworkData['discount'] as num?)
+                            ?.toDouble() ??
+                        0;
+                    final discountAmount = amount * discount / 100;
+                    final amountToPay = amount - discountAmount;
+
+                    return Column(
+                      children: [
+                        _buildConfirmationRow(
+                            'Network', _selectedNetworkData['name']),
+                        const SizedBox(height: 8),
+                        _buildConfirmationRow(
+                            'Phone Number', _phoneController.text),
+                        const SizedBox(height: 8),
+                        _buildConfirmationRow(
+                            'Airtime Value', '₦${amount.toStringAsFixed(0)}'),
+                        if (discount > 0) ...[
+                          const SizedBox(height: 8),
+                          _buildConfirmationRow('Discount',
+                              '${discount.toStringAsFixed(1)}% (-₦${discountAmount.toStringAsFixed(2)})'),
+                          const SizedBox(height: 8),
+                          _buildConfirmationRow(
+                              'You Pay', '₦${amountToPay.toStringAsFixed(2)}',
+                              highlight: true),
+                        ],
+                      ],
+                    );
+                  },
                 ),
               ),
             ],
@@ -309,7 +373,8 @@ class _BuyAirtimeScreenState extends State<BuyAirtimeScreen>
     );
   }
 
-  Widget _buildConfirmationRow(String label, String value) {
+  Widget _buildConfirmationRow(String label, String value,
+      {bool highlight = false}) {
     return Row(
       children: [
         SizedBox(
@@ -318,8 +383,8 @@ class _BuyAirtimeScreenState extends State<BuyAirtimeScreen>
             label,
             style: TextStyle(
               fontSize: 14,
-              fontWeight: FontWeight.w500,
-              color: colorScheme.onSurface,
+              fontWeight: highlight ? FontWeight.w700 : FontWeight.w500,
+              color: highlight ? colorScheme.primary : colorScheme.onSurface,
             ),
           ),
         ),
@@ -328,9 +393,9 @@ class _BuyAirtimeScreenState extends State<BuyAirtimeScreen>
           child: Text(
             value,
             style: TextStyle(
-              fontSize: 14,
+              fontSize: highlight ? 16 : 14,
               fontWeight: FontWeight.w600,
-              color: colorScheme.onSurface,
+              color: highlight ? colorScheme.primary : colorScheme.onSurface,
             ),
           ),
         ),
@@ -350,8 +415,14 @@ class _BuyAirtimeScreenState extends State<BuyAirtimeScreen>
       return;
     }
 
-    if (amount > _walletBalance) {
-      _showErrorDialog('Insufficient wallet balance.');
+    // Calculate discounted amount (what customer will pay)
+    final discount =
+        (_selectedNetworkData['discount'] as num?)?.toDouble() ?? 0;
+    final amountToPay = amount - (amount * discount / 100);
+
+    if (amountToPay > _walletBalance) {
+      _showErrorDialog(
+          'Insufficient wallet balance. You need ₦${amountToPay.toStringAsFixed(2)}.');
       return;
     }
 
@@ -364,8 +435,11 @@ class _BuyAirtimeScreenState extends State<BuyAirtimeScreen>
       _token!,
       network: _selectedNetwork, // Send network name directly
       phone: _phoneController.text,
-      amount: amount,
+      amount: amount, // Send full airtime value, backend applies discount
     );
+
+    // Debug: Log the full API response
+    debugPrint('[BuyAirtime] API Response: $result');
 
     setState(() {
       _isLoading = false;
@@ -1123,7 +1197,17 @@ class _BuyAirtimeScreenState extends State<BuyAirtimeScreen>
                               ),
                             ),
                             TextButton(
-                              onPressed: () {},
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        const ServiceTransactionHistoryScreen(
+                                      serviceType: ServiceType.airtime,
+                                    ),
+                                  ),
+                                );
+                              },
                               style: TextButton.styleFrom(
                                 padding:
                                     const EdgeInsets.symmetric(horizontal: 8),
@@ -1145,7 +1229,7 @@ class _BuyAirtimeScreenState extends State<BuyAirtimeScreen>
                       ListView.separated(
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
-                        itemCount: _recentTransactions.take(3).length,
+                        itemCount: _recentTransactions.take(8).length,
                         separatorBuilder: (context, index) => Divider(
                           color: border,
                           height: 1,

@@ -18,6 +18,7 @@ import 'buy_exam_pin.dart';
 import 'notification.dart';
 import 'dart:developer';
 import 'api_service.dart';
+import 'idle_timeout_service.dart';
 import 'app_settings.dart';
 import 'widgets/transaction_receipt.dart';
 
@@ -52,6 +53,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   final DateFormat _transactionDateFormat = DateFormat('MMM d, yyyy • h:mma');
   List<Transaction> _transactions = [];
   DateTime? _lastActivity;
+  int _unreadNotificationCount = 0;
 
   @override
   void initState() {
@@ -113,6 +115,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       _loadUserInfo(token);
       _refreshWalletBalance(token: token);
       _loadRecentTransactions(token: token);
+      _fetchUnreadNotificationCount(token: token);
       // Reset activity time on login
       // _lastActivity = DateTime.now();
     }
@@ -162,6 +165,18 @@ class _DashboardScreenState extends State<DashboardScreen>
     });
   }
 
+  Future<void> _fetchUnreadNotificationCount({String? token}) async {
+    token ??= (await SharedPreferences.getInstance()).getString('jwt');
+    if (token == null || token.isEmpty) return;
+    final result = await getUnreadNotificationCount(token);
+    if (!mounted) return;
+    if (result.containsKey('success') && result['success'] == true) {
+      setState(() {
+        _unreadNotificationCount = result['unreadCount'] ?? 0;
+      });
+    }
+  }
+
   Future<void> _loadUserInfo(String token) async {
     try {
       final parts = token.split('.');
@@ -188,7 +203,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         _userName = name;
         _walletBalance = walletBalance ?? _walletBalance;
       });
-      
+
       // Fetch profile to get profile image
       await _loadProfileImage(token);
     } catch (e) {
@@ -204,7 +219,8 @@ class _DashboardScreenState extends State<DashboardScreen>
       final result = await fetchUserProfile(token);
       if (!mounted) return;
       if (result['error'] != null) {
-        log('Profile fetch error: ${result['error']}', name: '_DashboardScreenState');
+        log('Profile fetch error: ${result['error']}',
+            name: '_DashboardScreenState');
         return;
       }
       final user = result['user'] as Map<String, dynamic>?;
@@ -259,6 +275,9 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   Future<void> _logout() async {
+    // Stop idle timeout tracking
+    IdleTimeoutService().dispose();
+
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('jwt');
     if (!mounted) return;
@@ -417,17 +436,51 @@ class _DashboardScreenState extends State<DashboardScreen>
           actions: [
             Padding(
               padding: const EdgeInsets.only(right: 4),
-              child: IconButton(
-                icon: Icon(Icons.notifications_outlined, color: colorScheme.onPrimary),
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const NotificationScreen(),
+              child: Stack(
+                children: [
+                  IconButton(
+                    icon: Icon(Icons.notifications_outlined,
+                        color: colorScheme.onPrimary),
+                    onPressed: () async {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const NotificationScreen(),
+                        ),
+                      );
+                      // Refresh notification count after returning from notifications
+                      _fetchUnreadNotificationCount();
+                    },
+                    tooltip: 'Notifications',
+                  ),
+                  if (_unreadNotificationCount > 0)
+                    Positioned(
+                      right: 8,
+                      top: 8,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 16,
+                          minHeight: 16,
+                        ),
+                        child: Text(
+                          _unreadNotificationCount > 99
+                              ? '99+'
+                              : '$_unreadNotificationCount',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
                     ),
-                  );
-                },
-                tooltip: 'Notifications',
+                ],
               ),
             ),
             Padding(
@@ -658,12 +711,10 @@ class _DashboardScreenState extends State<DashboardScreen>
       ServiceItem(icon: Icons.tv, title: 'TV', color: const Color(0xFF00CA44)),
       ServiceItem(
           icon: Icons.school,
-          title: 'Education',
+          title: 'Exam Pin',
           color: const Color(0xFF00CA44)),
       ServiceItem(
-          icon: Icons.money,
-          title: 'Betting',
-          color: const Color(0xFF00CA44)),
+          icon: Icons.money, title: 'Betting', color: const Color(0xFF00CA44)),
     ];
 
     return ScaleTransition(
@@ -744,7 +795,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                   builder: (context) => const BuyTVSubscriptionScreen(),
                 ),
               );
-            } else if (service.title == 'Education') {
+            } else if (service.title == 'Exam Pin') {
               Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -1178,6 +1229,7 @@ class Transaction {
   final String reference;
   final IconData icon;
   final DateTime? createdAt;
+  final Map<String, dynamic>? metadata;
 
   Transaction({
     required this.title,
@@ -1190,6 +1242,7 @@ class Transaction {
     required this.reference,
     required this.icon,
     required this.createdAt,
+    this.metadata,
   });
 
   factory Transaction.fromApi(Map<String, dynamic> data, DateFormat formatter) {
@@ -1203,30 +1256,119 @@ class Transaction {
             .toLowerCase();
     final isIncoming =
         direction.isNotEmpty ? direction != 'debit' : rawAmount >= 0;
-    final metadata = data['metadata'];
-    final metadataChannel =
-        metadata is Map<String, dynamic> ? metadata['channel'] : null;
-    final channel = (data['channel'] ?? metadataChannel ?? 'Wallet transaction')
-        .toString()
-        .trim();
+
+    // Parse metadata - handle both string and map types
+    Map<String, dynamic>? metadata;
+    final rawMetadata = data['metadata'];
+    if (rawMetadata is Map<String, dynamic>) {
+      metadata = rawMetadata;
+    } else if (rawMetadata is String && rawMetadata.isNotEmpty) {
+      try {
+        metadata = _parseJsonSafely(rawMetadata);
+      } catch (_) {
+        metadata = null;
+      }
+    }
+
+    // Get service type and build title from metadata
+    final serviceType = metadata?['serviceType']?.toString() ?? '';
+    final metadataDesc = metadata?['description']?.toString() ?? '';
+    final metadataChannel = metadata?['channel']?.toString() ?? '';
+
+    final channel =
+        (data['channel'] ?? serviceType ?? metadataChannel ?? 'wallet')
+            .toString()
+            .trim();
     final reference = (data['reference'] ?? '').toString();
 
-    final formattedTitle = _composeTitle(channel, reference);
+    // Build a better title based on service type
+    String title;
+    if (serviceType == 'airtime') {
+      title = 'Airtime Purchase';
+    } else if (serviceType == 'data') {
+      title = 'Data Purchase';
+    } else if (serviceType == 'electricity') {
+      title = 'Electricity Purchase';
+    } else if (serviceType == 'tv') {
+      title = 'TV Subscription';
+    } else if (serviceType == 'education') {
+      title = 'Education PIN';
+    } else if (serviceType == 'refund') {
+      title = 'Refund';
+    } else if (channel.isNotEmpty && channel != 'wallet' && channel != 'vtu') {
+      title = _titleCase(channel);
+    } else if (metadataDesc.isNotEmpty) {
+      if (metadataDesc.toLowerCase().contains('airtime')) {
+        title = 'Airtime Purchase';
+      } else if (metadataDesc.toLowerCase().contains('data')) {
+        title = 'Data Purchase';
+      } else if (metadataDesc.toLowerCase().contains('electric')) {
+        title = 'Electricity Purchase';
+      } else if (metadataDesc.toLowerCase().contains('tv')) {
+        title = 'TV Subscription';
+      } else if (metadataDesc.toLowerCase().contains('education') ||
+          metadataDesc.toLowerCase().contains('waec') ||
+          metadataDesc.toLowerCase().contains('jamb')) {
+        title = 'Education PIN';
+      } else {
+        title = 'Wallet Transaction';
+      }
+    } else {
+      title = channel.isEmpty ? 'Wallet Transaction' : _titleCase(channel);
+    }
+
     final formattedDate =
         createdAt != null ? formatter.format(createdAt) : '--';
 
     return Transaction(
-      title: formattedTitle,
+      title: title,
       amount: rawAmount.abs(),
       date: formattedDate,
       status: _formatStatus(rawStatus),
       isIncoming: isIncoming,
       statusKey: rawStatus.toLowerCase(),
-      channel: channel,
+      channel: serviceType.isNotEmpty ? serviceType : channel,
       reference: reference,
-      icon: _iconForChannel(channel),
+      icon: _iconForChannel(serviceType.isNotEmpty ? serviceType : channel),
       createdAt: createdAt,
+      metadata: metadata,
     );
+  }
+
+  static Map<String, dynamic>? _parseJsonSafely(String jsonStr) {
+    try {
+      final result = <String, dynamic>{};
+      String content = jsonStr;
+      // Handle double-encoded JSON
+      if (content.startsWith('"') && content.endsWith('"')) {
+        content = content
+            .substring(1, content.length - 1)
+            .replaceAll(r'\"', '"')
+            .replaceAll(r'\\', r'\');
+      }
+      if (!content.startsWith('{')) return null;
+      content = content.substring(1, content.length - 1);
+      final regex = RegExp(r'"([^"]+)"\s*:\s*("([^"]*)"|([^,}]+))');
+      for (final match in regex.allMatches(content)) {
+        final key = match.group(1) ?? '';
+        var value = match.group(3) ?? match.group(4) ?? '';
+        value = value.trim();
+        if (value == 'null') {
+          result[key] = null;
+        } else if (value == 'true') {
+          result[key] = true;
+        } else if (value == 'false') {
+          result[key] = false;
+        } else if (double.tryParse(value) != null) {
+          result[key] = double.parse(value);
+        } else {
+          result[key] = value;
+        }
+      }
+      return result.isEmpty ? null : result;
+    } catch (_) {
+      return null;
+    }
   }
 
   bool get isDisplayable => statusKey == 'success' || statusKey == 'failed';
@@ -1246,26 +1388,106 @@ class Transaction {
     final amountPrefix = isIncoming ? '+' : '-';
     final computedDate =
         createdAt != null ? formatter.format(createdAt!) : date;
+
+    // Build extra details from metadata
+    final List<ReceiptField> extraDetails = [];
+
+    if (metadata != null) {
+      final serviceType = metadata!['serviceType']?.toString() ?? '';
+
+      // Add network for airtime/data
+      final network = metadata!['network']?.toString();
+      if (network != null && network.isNotEmpty) {
+        extraDetails.add(ReceiptField(label: 'Network', value: network));
+      }
+
+      // Add phone number
+      final phone = metadata!['phone']?.toString();
+      if (phone != null && phone.isNotEmpty) {
+        extraDetails.add(ReceiptField(label: 'Phone Number', value: phone));
+      }
+
+      // Add airtime value if different from amount (for discounted purchases)
+      final airtimeValue = metadata!['airtimeValue'];
+      if (airtimeValue != null && serviceType == 'airtime') {
+        extraDetails.add(ReceiptField(
+            label: 'Airtime Value', value: '₦${airtimeValue.toString()}'));
+      }
+
+      // Add discount if applicable
+      final discount = metadata!['discount'];
+      if (discount != null && discount > 0) {
+        extraDetails.add(ReceiptField(label: 'Discount', value: '$discount%'));
+      }
+
+      // Add plan ID for data
+      final planId = metadata!['planId']?.toString();
+      if (planId != null && planId.isNotEmpty && serviceType == 'data') {
+        extraDetails.add(ReceiptField(label: 'Plan ID', value: planId));
+      }
+
+      // Add disco and meter for electricity
+      final disco = metadata!['disco']?.toString();
+      if (disco != null && disco.isNotEmpty) {
+        extraDetails.add(ReceiptField(label: 'Disco', value: disco));
+      }
+
+      final meterNumber = metadata!['meterNumber']?.toString();
+      if (meterNumber != null && meterNumber.isNotEmpty) {
+        extraDetails
+            .add(ReceiptField(label: 'Meter Number', value: meterNumber));
+      }
+
+      // Add electricity amount and service charge
+      final electricityAmount = metadata!['electricityAmount'];
+      if (electricityAmount != null) {
+        extraDetails.add(ReceiptField(
+            label: 'Electricity Amount',
+            value: '₦${electricityAmount.toString()}'));
+      }
+
+      final serviceCharge = metadata!['serviceCharge'];
+      if (serviceCharge != null && serviceCharge > 0) {
+        extraDetails.add(ReceiptField(
+            label: 'Service Charge', value: '₦${serviceCharge.toString()}'));
+      }
+
+      // Add provider and smartcard for TV
+      final provider = metadata!['provider']?.toString();
+      if (provider != null && provider.isNotEmpty && serviceType == 'tv') {
+        extraDetails.add(ReceiptField(label: 'Provider', value: provider));
+      }
+
+      final smartcardNumber = metadata!['smartcardNumber']?.toString();
+      if (smartcardNumber != null && smartcardNumber.isNotEmpty) {
+        extraDetails.add(
+            ReceiptField(label: 'Smartcard Number', value: smartcardNumber));
+      }
+
+      // Add exam details for education
+      final examType = metadata!['examType']?.toString();
+      if (examType != null && examType.isNotEmpty) {
+        extraDetails.add(ReceiptField(label: 'Exam Type', value: examType));
+      }
+
+      final examCode = metadata!['examCode']?.toString();
+      if (examCode != null && examCode.isNotEmpty) {
+        extraDetails.add(ReceiptField(label: 'Exam Code', value: examCode));
+      }
+    }
+
     return TransactionReceiptData(
-      title: channel.isEmpty ? 'Wallet transaction' : _titleCase(channel),
+      title: title,
       amountDisplay: '$amountPrefix₦${amount.toStringAsFixed(2)}',
       isCredit: isIncoming,
       statusLabel: status,
       statusColor: statusColor,
       dateLabel: computedDate,
-      channel: channel,
+      channel: _titleCase(channel),
       reference: reference,
       icon: icon,
+      extraDetails: extraDetails,
     );
-  }
-
-  static String _composeTitle(String channel, String reference) {
-    final base = channel.isEmpty ? 'Wallet transaction' : _titleCase(channel);
-    if (reference.isEmpty) return base;
-    final suffix = reference.length <= 8
-        ? reference
-        : reference.substring(reference.length - 8);
-    return '$base • $suffix';
   }
 
   static String _titleCase(String value) {
@@ -1301,6 +1523,3 @@ class Transaction {
     return Icons.swap_horiz;
   }
 }
-
-
-

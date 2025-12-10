@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api_service.dart' as api;
+import 'service_transaction_history.dart';
 import 'widgets/wallet_visibility_builder.dart';
 import 'widgets/themed_screen_helpers.dart';
 
@@ -47,6 +48,11 @@ class _BuyTVSubscriptionScreenState extends State<BuyTVSubscriptionScreen>
   String _selectedProvider = 'dstv';
   String _selectedPackage = '';
   bool _isLoading = false;
+  bool _isVerifying = false;
+  bool _isSmartCardVerified = false;
+  bool _showProviderList = false;
+  bool _showPackageList = false;
+  String? _verifiedCustomerName;
   double _walletBalance = 0.0;
   String? _token;
   List<TVTransaction> _recentTransactions = [];
@@ -76,7 +82,7 @@ class _BuyTVSubscriptionScreenState extends State<BuyTVSubscriptionScreen>
     },
   ];
 
-  // NelloByte package codes from documentation
+  // NelloByte package codes from documentation (fallback values)
   // DStv: 77=DSTV Padi, 78=DSTV Yanga, 79=DSTV Confam, 63=DSTV Compact, 66=DSTV CompactPlus, 67=DSTV Premium
   // GOtv: 64=GOtv Smallie, 61=GOtv Jinja, 62=GOtv Jolli, 65=GOtv Max, 90=GOtv Supa
   // StarTimes: 6=Nova, 7=Basic, 8=Smart, 9=Classic, 10=Super
@@ -190,6 +196,47 @@ class _BuyTVSubscriptionScreenState extends State<BuyTVSubscriptionScreen>
     super.initState();
     _loadWalletData();
     _loadRecentTransactions();
+    _fetchTvPricing();
+  }
+
+  Future<void> _fetchTvPricing() async {
+    try {
+      final result = await api.fetchTvPricing();
+      if (mounted && result['success'] == true) {
+        final packages = result['packages'] as List? ?? [];
+        if (packages.isNotEmpty) {
+          // Group by provider
+          final Map<String, List<Map<String, dynamic>>> grouped = {};
+          for (final item in packages) {
+            final providerId =
+                (item['provider'] ?? item['providerId'] ?? 'dstv')
+                    .toString()
+                    .toLowerCase();
+
+            if (!grouped.containsKey(providerId)) {
+              grouped[providerId] = [];
+            }
+            grouped[providerId]!.add({
+              'bundle': item['name'] ?? item['planName'] ?? 'Package',
+              'code': item['code'] ?? item['id'] ?? '',
+              'price': item['price'] ?? item['sellingPrice'] ?? 0,
+              'duration': '30 Days',
+            });
+          }
+
+          setState(() {
+            // Merge with existing packages, preferring fetched prices
+            grouped.forEach((key, value) {
+              if (value.isNotEmpty) {
+                _packages[key] = value;
+              }
+            });
+          });
+        }
+      }
+    } catch (e) {
+      // Use fallback prices
+    }
   }
 
   Future<void> _loadRecentTransactions() async {
@@ -197,7 +244,7 @@ class _BuyTVSubscriptionScreenState extends State<BuyTVSubscriptionScreen>
     final token = prefs.getString('jwt');
     if (token == null) return;
 
-    final result = await api.fetchVTUHistory(token, type: 'tv', limit: 5);
+    final result = await api.fetchVTUHistory(token, type: 'tv', limit: 8);
     if (mounted && result['success'] == true) {
       final data = result['data'] as List? ?? [];
       setState(() {
@@ -205,12 +252,14 @@ class _BuyTVSubscriptionScreenState extends State<BuyTVSubscriptionScreen>
           final details = tx['details'] as Map<String, dynamic>? ?? {};
           return TVTransaction(
             id: tx['reference']?.toString() ?? '',
-            provider: details['provider']?.toString().toUpperCase() ?? 'Unknown',
+            provider:
+                details['provider']?.toString().toUpperCase() ?? 'Unknown',
             smartCardNumber: details['smartCardNumber']?.toString() ?? '',
             customerName: details['customerName']?.toString() ?? '',
             package: tx['description']?.toString() ?? '',
             amount: (tx['amount'] as num?)?.toDouble() ?? 0,
-            date: DateTime.tryParse(tx['createdAt']?.toString() ?? '') ?? DateTime.now(),
+            date: DateTime.tryParse(tx['createdAt']?.toString() ?? '') ??
+                DateTime.now(),
             status: tx['status'] == 'success' ? 'Successful' : 'Failed',
             providerColor: const Color(0xFF0066CC),
           );
@@ -230,6 +279,78 @@ class _BuyTVSubscriptionScreenState extends State<BuyTVSubscriptionScreen>
         });
       }
     }
+  }
+
+  /// Verify smart card/IUC number with NelloByte API
+  Future<void> _verifySmartCard() async {
+    final smartCard = _smartCardController.text.trim();
+    debugPrint(
+        '[TV] Verifying smart card: $smartCard for provider: $_selectedProvider');
+
+    if (smartCard.isEmpty || smartCard.length < 8) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Please enter a valid smart card number'),
+          backgroundColor: colorScheme.error,
+        ),
+      );
+      return;
+    }
+
+    debugPrint('[TV] Token present: ${_token != null}');
+    if (_token == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Please login again'),
+          backgroundColor: colorScheme.error,
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _isVerifying = true;
+      _isSmartCardVerified = false;
+      _verifiedCustomerName = null;
+    });
+
+    debugPrint('[TV] Calling verifySmartCard API...');
+    final result =
+        await api.verifySmartCard(_token!, _selectedProvider, smartCard);
+    debugPrint('[TV] API result: $result');
+
+    if (mounted) {
+      setState(() {
+        _isVerifying = false;
+      });
+
+      if (result['success'] == true && result['data'] != null) {
+        final customerName = result['data']['customerName']?.toString() ?? '';
+        debugPrint('[TV] Customer name: $customerName');
+        if (customerName.isNotEmpty && customerName != 'INVALID_SMARTCARDNO') {
+          setState(() {
+            _isSmartCardVerified = true;
+            _verifiedCustomerName = customerName;
+          });
+          HapticFeedback.mediumImpact();
+        } else {
+          _showErrorSnackBar(
+              'Invalid smart card number. Please check and try again.');
+        }
+      } else {
+        _showErrorSnackBar(result['error']?.toString() ??
+            'Failed to verify smart card. Please try again.');
+      }
+    }
+  }
+
+  void _showErrorSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: colorScheme.error,
+      ),
+    );
   }
 
   @override
@@ -692,169 +813,164 @@ class _BuyTVSubscriptionScreenState extends State<BuyTVSubscriptionScreen>
                         ],
                 ),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Text(
-                        'Select Provider',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: colorScheme.onSurface,
-                        ),
-                      ),
-                    ),
-                    // Selected Provider Display
-                    Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 20),
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: _selectedProviderData['color'],
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            _selectedProviderData['icon'],
-                            color: _selectedProviderData['textColor'],
-                            size: 24,
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              _selectedProviderData['name'],
-                              style: TextStyle(
-                                color: _selectedProviderData['textColor'],
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    // Provider Grid
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: GridView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 4,
-                          crossAxisSpacing: 10,
-                          mainAxisSpacing: 10,
-                          childAspectRatio: 1.1,
-                        ),
-                        itemCount: _providers.length,
-                        itemBuilder: (context, index) {
-                          final provider = _providers[index];
-                          final isSelected =
-                              _selectedProvider == provider['id'];
-                          final hasLogo = provider['logo'] != null;
-                          return GestureDetector(
-                            onTap: () {
-                              setState(() {
-                                _selectedProvider = provider['id'];
-                                _selectedPackage = '';
-                              });
-                              HapticFeedback.lightImpact();
-                            },
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 200),
-                              padding: const EdgeInsets.all(6),
+                    // Selected Provider Display (tappable dropdown)
+                    GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _showProviderList = !_showProviderList;
+                        });
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 40,
+                              height: 40,
                               decoration: BoxDecoration(
-                                color: isSelected
-                                    ? provider['color'].withValues(alpha: 0.15)
-                                    : cardColor,
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(
-                                  color: isSelected
-                                      ? provider['color']
-                                      : borderColor,
-                                  width: isSelected ? 2 : 1,
+                                color: _selectedProviderData['color'],
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Image.asset(
+                                  _selectedProviderData['logo'],
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) =>
+                                      Icon(
+                                    Icons.live_tv,
+                                    color: _selectedProviderData['textColor'],
+                                    size: 20,
+                                  ),
                                 ),
                               ),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(6),
-                                    child: hasLogo
-                                        ? Image.asset(
-                                            provider['logo'],
-                                            width: 28,
-                                            height: 28,
-                                            fit: BoxFit.contain,
-                                            errorBuilder: (_, __, ___) =>
-                                                Container(
-                                              width: 28,
-                                              height: 28,
-                                              decoration: BoxDecoration(
-                                                color: provider['color'],
-                                                borderRadius:
-                                                    BorderRadius.circular(6),
-                                              ),
-                                              child: Icon(
-                                                Icons.live_tv_outlined,
-                                                color: Colors.white,
-                                                size: 16,
-                                              ),
-                                            ),
-                                          )
-                                        : Container(
-                                            width: 28,
-                                            height: 28,
-                                            decoration: BoxDecoration(
-                                              color: provider['color'],
-                                              borderRadius:
-                                                  BorderRadius.circular(6),
-                                            ),
-                                            child: Icon(
-                                              provider['icon'] ??
-                                                  Icons.live_tv_outlined,
-                                              color: Colors.white,
-                                              size: 16,
-                                            ),
-                                          ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    provider['name'],
-                                    style: TextStyle(
-                                      color: isSelected
-                                          ? provider['color']
-                                          : colorScheme.onSurface,
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                    textAlign: TextAlign.center,
-                                    overflow: TextOverflow.ellipsis,
-                                    maxLines: 1,
-                                  ),
-                                ],
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              _selectedProviderData['name'],
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: colorScheme.onSurface,
                               ),
                             ),
-                          );
-                        },
+                            const Spacer(),
+                            Icon(
+                              _showProviderList
+                                  ? Icons.keyboard_arrow_up
+                                  : Icons.keyboard_arrow_down,
+                              color: mutedTextColor,
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 20),
+                    // Provider Options List
+                    if (_showProviderList)
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: colorScheme.surfaceContainerHighest,
+                          borderRadius: const BorderRadius.only(
+                            bottomLeft: Radius.circular(16),
+                            bottomRight: Radius.circular(16),
+                          ),
+                        ),
+                        child: Column(
+                          children: _providers.map((provider) {
+                            final isSelected =
+                                _selectedProvider == provider['id'];
+                            return GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  _selectedProvider = provider['id'];
+                                  _selectedPackage = '';
+                                  _isSmartCardVerified = false;
+                                  _verifiedCustomerName = null;
+                                  _showProviderList = false;
+                                  _showPackageList = false;
+                                });
+                                HapticFeedback.lightImpact();
+                              },
+                              child: Container(
+                                margin: const EdgeInsets.symmetric(vertical: 4),
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: isSelected
+                                      ? colorScheme.primary
+                                          .withValues(alpha: 0.08)
+                                      : cardColor,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: isSelected
+                                        ? colorScheme.primary
+                                        : Colors.transparent,
+                                    width: 2,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 36,
+                                      height: 36,
+                                      decoration: BoxDecoration(
+                                        color: provider['color'],
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: Image.asset(
+                                          provider['logo'],
+                                          fit: BoxFit.cover,
+                                          errorBuilder:
+                                              (context, error, stackTrace) =>
+                                                  Icon(
+                                            Icons.live_tv,
+                                            color: provider['textColor'],
+                                            size: 18,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Text(
+                                      provider['name'],
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w500,
+                                        color: isSelected
+                                            ? colorScheme.primary
+                                            : colorScheme.onSurface,
+                                      ),
+                                    ),
+                                    const Spacer(),
+                                    if (isSelected)
+                                      Icon(
+                                        Icons.check_circle,
+                                        color: colorScheme.primary,
+                                        size: 20,
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
                   ],
                 ),
               ),
 
               const SizedBox(height: 20),
 
-              // Smart Card Number Field
+              // Smart Card Number Field with Verify Button
               Container(
                 decoration: BoxDecoration(
                   color: cardColor,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: borderColor),
+                  border: Border.all(
+                      color: _isSmartCardVerified ? Colors.green : borderColor),
                   boxShadow: isDarkMode
                       ? null
                       : [
@@ -865,47 +981,121 @@ class _BuyTVSubscriptionScreenState extends State<BuyTVSubscriptionScreen>
                           ),
                         ],
                 ),
-                child: TextFormField(
-                  controller: _smartCardController,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  decoration: InputDecoration(
-                    labelText: 'Smart Card Number',
-                    prefixIcon: Icon(
-                      Icons.credit_card,
-                      color: colorScheme.primary,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextFormField(
+                      controller: _smartCardController,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      onChanged: (value) {
+                        // Reset verification when smart card changes
+                        if (_isSmartCardVerified) {
+                          setState(() {
+                            _isSmartCardVerified = false;
+                            _verifiedCustomerName = null;
+                          });
+                        }
+                      },
+                      decoration: InputDecoration(
+                        labelText: 'Smart Card / IUC Number',
+                        prefixIcon: Icon(
+                          Icons.credit_card,
+                          color: colorScheme.primary,
+                        ),
+                        suffixIcon: _isVerifying
+                            ? Padding(
+                                padding: const EdgeInsets.all(12),
+                                child: SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                        colorScheme.primary),
+                                  ),
+                                ),
+                              )
+                            : TextButton(
+                                onPressed: _verifySmartCard,
+                                child: Text(
+                                  'Verify',
+                                  style: TextStyle(
+                                    color: colorScheme.primary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                        border: OutlineInputBorder(
+                          borderRadius:
+                              const BorderRadius.all(Radius.circular(16)),
+                          borderSide: BorderSide(color: borderColor),
+                        ),
+                        filled: true,
+                        fillColor: cardColor,
+                        contentPadding: const EdgeInsets.all(20),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius:
+                              const BorderRadius.all(Radius.circular(16)),
+                          borderSide: BorderSide(
+                              color: _isSmartCardVerified
+                                  ? Colors.green
+                                  : borderColor),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius:
+                              const BorderRadius.all(Radius.circular(16)),
+                          borderSide: BorderSide(
+                              color: colorScheme.primary, width: 1.5),
+                        ),
+                      ),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                        color: colorScheme.onSurface,
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please enter smart card number';
+                        }
+                        if (value.length < 10) {
+                          return 'Smart card number must be at least 10 digits';
+                        }
+                        return null;
+                      },
                     ),
-                    border: OutlineInputBorder(
-                      borderRadius: const BorderRadius.all(Radius.circular(16)),
-                      borderSide: BorderSide(color: borderColor),
-                    ),
-                    filled: true,
-                    fillColor: cardColor,
-                    contentPadding: const EdgeInsets.all(20),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: const BorderRadius.all(Radius.circular(16)),
-                      borderSide: BorderSide(color: borderColor),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: const BorderRadius.all(Radius.circular(16)),
-                      borderSide:
-                          BorderSide(color: colorScheme.primary, width: 1.5),
-                    ),
-                  ),
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                    color: colorScheme.onSurface,
-                  ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter smart card number';
-                    }
-                    if (value.length < 10) {
-                      return 'Smart card number must be at least 10 digits';
-                    }
-                    return null;
-                  },
+                    // Show verified customer name
+                    if (_isSmartCardVerified && _verifiedCustomerName != null)
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.green.withValues(alpha: 0.1),
+                          borderRadius: const BorderRadius.only(
+                            bottomLeft: Radius.circular(16),
+                            bottomRight: Radius.circular(16),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.check_circle,
+                                color: Colors.green, size: 20),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Customer: $_verifiedCustomerName',
+                                style: TextStyle(
+                                  color: Colors.green.shade700,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
                 ),
               ),
 
@@ -1003,107 +1193,210 @@ class _BuyTVSubscriptionScreenState extends State<BuyTVSubscriptionScreen>
                         ),
                       ),
                     ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: GridView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 1,
-                          crossAxisSpacing: 6,
-                          mainAxisSpacing: 6,
-                          childAspectRatio: 4.5,
+                    // Selected Package Display (tappable dropdown)
+                    GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _showPackageList = !_showPackageList;
+                        });
+                      },
+                      child: Container(
+                        margin: const EdgeInsets.fromLTRB(20, 0, 20, 0),
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: colorScheme.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: borderColor),
                         ),
-                        itemCount: _packages[_selectedProvider]!.length,
-                        itemBuilder: (context, index) {
-                          final package = _packages[_selectedProvider]![index];
-                          final packageId =
-                              '${package['bundle']} - ${package['duration']}';
-                          final isSelected = _selectedPackage == packageId;
-
-                          return GestureDetector(
-                            onTap: () {
-                              setState(() {
-                                _selectedPackage = packageId;
-                              });
-                              HapticFeedback.lightImpact();
-                            },
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 200),
-                              margin: const EdgeInsets.symmetric(vertical: 2),
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 14, vertical: 10),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 40,
+                              height: 40,
                               decoration: BoxDecoration(
-                                color: isSelected
-                                    ? colorScheme.primary
-                                        .withValues(alpha: 0.12)
-                                    : cardColor,
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(
-                                  color: isSelected
-                                      ? colorScheme.primary
-                                      : borderColor,
-                                  width: isSelected ? 2 : 1,
-                                ),
+                                color:
+                                    colorScheme.primary.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(8),
                               ),
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Text(
-                                          package['bundle'],
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 14,
-                                            color: isSelected
-                                                ? colorScheme.primary
-                                                : colorScheme.onSurface,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          package['duration'],
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            color: mutedTextColor,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  Text(
-                                    '₦${package['price']}',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14,
-                                      color: isSelected
-                                          ? colorScheme.primary
-                                          : colorScheme.onSurface,
-                                    ),
-                                  ),
-                                  if (isSelected) ...[
-                                    const SizedBox(width: 8),
-                                    Icon(
-                                      Icons.check_circle,
-                                      color: colorScheme.primary,
-                                      size: 18,
-                                    ),
-                                  ],
-                                ],
+                              child: Icon(
+                                Icons.subscriptions_outlined,
+                                color: colorScheme.primary,
+                                size: 22,
                               ),
                             ),
-                          );
-                        },
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _selectedPackage.isEmpty
+                                  ? Text(
+                                      'Tap to select a package',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: mutedTextColor,
+                                      ),
+                                    )
+                                  : Builder(builder: (context) {
+                                      final selectedPkg =
+                                          _packages[_selectedProvider]!
+                                              .firstWhere(
+                                        (p) =>
+                                            '${p['bundle']} - ${p['duration']}' ==
+                                            _selectedPackage,
+                                        orElse: () => {},
+                                      );
+                                      if (selectedPkg.isEmpty) {
+                                        return Text(
+                                          'Tap to select a package',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            color: mutedTextColor,
+                                          ),
+                                        );
+                                      }
+                                      return Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            selectedPkg['bundle'] ?? '',
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w600,
+                                              color: colorScheme.onSurface,
+                                            ),
+                                          ),
+                                          Row(
+                                            children: [
+                                              Text(
+                                                selectedPkg['duration'] ?? '',
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: mutedTextColor,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Text(
+                                                '₦${selectedPkg['price']}',
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: colorScheme.primary,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      );
+                                    }),
+                            ),
+                            Icon(
+                              _showPackageList
+                                  ? Icons.keyboard_arrow_up
+                                  : Icons.keyboard_arrow_down,
+                              color: mutedTextColor,
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 20),
+                    // Package Options List (expandable)
+                    AnimatedSize(
+                      duration: const Duration(milliseconds: 200),
+                      child: _showPackageList
+                          ? Container(
+                              margin: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+                              constraints: const BoxConstraints(maxHeight: 300),
+                              decoration: BoxDecoration(
+                                color: colorScheme.surfaceContainerHighest,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: ListView.builder(
+                                shrinkWrap: true,
+                                padding: const EdgeInsets.all(8),
+                                itemCount: _packages[_selectedProvider]!.length,
+                                itemBuilder: (context, index) {
+                                  final package =
+                                      _packages[_selectedProvider]![index];
+                                  final packageId =
+                                      '${package['bundle']} - ${package['duration']}';
+                                  final isSelected =
+                                      _selectedPackage == packageId;
+                                  return GestureDetector(
+                                    onTap: () {
+                                      setState(() {
+                                        _selectedPackage = packageId;
+                                        _showPackageList = false;
+                                      });
+                                      HapticFeedback.lightImpact();
+                                    },
+                                    child: Container(
+                                      margin: const EdgeInsets.symmetric(
+                                          vertical: 4),
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        color: isSelected
+                                            ? colorScheme.primary
+                                                .withValues(alpha: 0.08)
+                                            : cardColor,
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: Border.all(
+                                          color: isSelected
+                                              ? colorScheme.primary
+                                              : Colors.transparent,
+                                          width: 2,
+                                        ),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  package['bundle'],
+                                                  style: TextStyle(
+                                                    fontSize: 14,
+                                                    fontWeight: FontWeight.w600,
+                                                    color:
+                                                        colorScheme.onSurface,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 2),
+                                                Text(
+                                                  package['duration'],
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    color: mutedTextColor,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          Text(
+                                            '₦${package['price']}',
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.bold,
+                                              color: colorScheme.primary,
+                                            ),
+                                          ),
+                                          if (isSelected) ...[
+                                            const SizedBox(width: 8),
+                                            Icon(
+                                              Icons.check_circle,
+                                              color: colorScheme.primary,
+                                              size: 20,
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            )
+                          : const SizedBox(height: 20),
+                    ),
                   ],
                 ),
               ),
@@ -1189,7 +1482,17 @@ class _BuyTVSubscriptionScreenState extends State<BuyTVSubscriptionScreen>
                               ),
                             ),
                             TextButton(
-                              onPressed: () {},
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        const ServiceTransactionHistoryScreen(
+                                      serviceType: ServiceType.tv,
+                                    ),
+                                  ),
+                                );
+                              },
                               style: TextButton.styleFrom(
                                 padding:
                                     const EdgeInsets.symmetric(horizontal: 8),
@@ -1211,7 +1514,7 @@ class _BuyTVSubscriptionScreenState extends State<BuyTVSubscriptionScreen>
                       ListView.separated(
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
-                        itemCount: _recentTransactions.take(3).length,
+                        itemCount: _recentTransactions.take(8).length,
                         separatorBuilder: (context, index) => Divider(
                           color: borderColor,
                           height: 1,

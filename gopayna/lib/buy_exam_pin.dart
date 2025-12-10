@@ -47,94 +47,139 @@ class _BuyEducationPinScreenState extends State<BuyEducationPinScreen>
   String _selectedProvider = 'waec';
   String _selectedPackage = '';
   bool _isLoading = false;
+  bool _isLoadingPricing = false;
   double _walletBalance = 0.0;
   String? _token;
 
-  // NelloByte supported providers: waec and jamb only
-  final List<Map<String, dynamic>> _providers = [
-    {
+  // Provider metadata - used to display providers that exist in _packages
+  final Map<String, Map<String, dynamic>> _providerMeta = {
+    'waec': {
       'id': 'waec',
       'name': 'WAEC',
       'fullName': 'West African Examinations Council',
       'color': const Color(0xFF0066CC),
       'logo': 'assets/waec_logo.png',
+      'icon': Icons.school_outlined,
       'textColor': Colors.white,
     },
-    {
+    'jamb': {
       'id': 'jamb',
       'name': 'JAMB',
       'fullName': 'Joint Admissions and Matriculation Board',
       'color': const Color(0xFF006400),
       'logo': 'assets/jamb_logo.png',
+      'icon': Icons.school_outlined,
       'textColor': Colors.white,
     },
-  ];
-
-  // NelloByte exam codes from documentation
-  // WAEC: waec (Result Checker), waec-registration (Registration)
-  // JAMB: utme (UTME PIN), de (Direct Entry PIN)
-  final Map<String, List<Map<String, dynamic>>> _packages = {
-    'waec': [
-      {
-        'bundle': 'WAEC Result Checker Pin',
-        'code': 'waec',
-        'price': 4500,
-        'type': 'Result Checker'
-      },
-      {
-        'bundle': 'WAEC Registration Pin',
-        'code': 'waec-registration',
-        'price': 18900,
-        'type': 'Registration'
-      },
-    ],
-    'jamb': [
-      {
-        'bundle': 'JAMB UTME Registration Pin',
-        'code': 'utme',
-        'price': 5500,
-        'type': 'Registration',
-        'needsProfileId': true
-      },
-      {
-        'bundle': 'JAMB Direct Entry Pin',
-        'code': 'de',
-        'price': 5500,
-        'type': 'Registration',
-        'needsProfileId': true
-      },
-    ],
   };
 
-  final List<EducationTransaction> _recentTransactions = [
-    EducationTransaction(
-      id: 'EDU001',
-      provider: 'JAMB',
-      candidateNumber: '12345678',
-      candidateName: 'JOHN DOE',
-      package: 'JAMB UTME Registration',
-      amount: 4700,
-      date: DateTime.now().subtract(const Duration(hours: 2)),
-      status: 'Successful',
-      providerColor: const Color(0xFFDC143C),
-    ),
-    EducationTransaction(
-      id: 'EDU002',
-      provider: 'WAEC',
-      candidateNumber: '87654321',
-      candidateName: 'JANE SMITH',
-      package: 'WAEC Result Checker Pin',
-      amount: 1850,
-      date: DateTime.now().subtract(const Duration(days: 1)),
-      status: 'Successful',
-      providerColor: const Color(0xFF0066CC),
-    ),
-  ];
+  // Dynamic providers list - populated based on what's in _packages
+  List<Map<String, dynamic>> get _providers {
+    return _packages.keys
+        .where((key) => _providerMeta.containsKey(key))
+        .map((key) => _providerMeta[key]!)
+        .toList();
+  }
+
+  // Dynamic packages fetched from admin pricing API - starts empty
+  Map<String, List<Map<String, dynamic>>> _packages = {};
+
+  // Recent transactions fetched from API
+  List<EducationTransaction> _recentTransactions = [];
 
   @override
   void initState() {
     super.initState();
+    _selectedProvider = ''; // Start with no provider selected
     _loadWalletData();
+    _fetchExamPricing();
+    _loadRecentTransactions();
+  }
+
+  Future<void> _fetchExamPricing() async {
+    setState(() => _isLoadingPricing = true);
+    try {
+      final result = await api.fetchExamPricing();
+      if (mounted && result['success'] == true) {
+        final data = result['data'] as List? ?? [];
+        if (data.isNotEmpty) {
+          // Group by provider
+          final Map<String, List<Map<String, dynamic>>> grouped = {};
+          for (final item in data) {
+            final providerId =
+                (item['id'] ?? item['code'] ?? 'waec').toString().toLowerCase();
+            final providerKey = providerId.contains('jamb')
+                ? 'jamb'
+                : providerId.contains('waec')
+                    ? 'waec'
+                    : providerId;
+
+            // Only add if we have metadata for this provider
+            if (!_providerMeta.containsKey(providerKey)) continue;
+
+            if (!grouped.containsKey(providerKey)) {
+              grouped[providerKey] = [];
+            }
+            grouped[providerKey]!.add({
+              'bundle': item['planName'] ?? item['name'] ?? 'Result Checker',
+              'code': item['code'] ?? item['id'] ?? providerId,
+              'price': item['price'] ?? item['sellingPrice'] ?? 0,
+              'type':
+                  (item['planName'] ?? '').toString().contains('Registration')
+                      ? 'Registration'
+                      : 'Result Checker',
+              'needsProfileId': providerKey == 'jamb',
+            });
+          }
+
+          setState(() {
+            if (grouped.isNotEmpty) {
+              _packages = grouped;
+              // Auto-select first available provider
+              if (_selectedProvider.isEmpty && grouped.keys.isNotEmpty) {
+                _selectedProvider = grouped.keys.first;
+              }
+            }
+          });
+        }
+      }
+    } catch (e) {
+      // Use fallback prices
+    } finally {
+      if (mounted) setState(() => _isLoadingPricing = false);
+    }
+  }
+
+  Future<void> _loadRecentTransactions() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('jwt');
+    if (token == null) return;
+
+    final result = await api.fetchVTUHistory(token, type: 'exam', limit: 8);
+    if (mounted && result['success'] == true) {
+      final data = result['data'] as List? ?? [];
+      setState(() {
+        _recentTransactions = data.map((tx) {
+          final details = tx['details'] as Map<String, dynamic>? ?? {};
+          final providerName =
+              details['provider']?.toString().toUpperCase() ?? 'WAEC';
+          return EducationTransaction(
+            id: tx['reference']?.toString() ?? '',
+            provider: providerName,
+            candidateNumber: details['candidateNumber']?.toString() ?? '',
+            candidateName: details['customerName']?.toString() ?? '',
+            package: tx['description']?.toString() ?? '',
+            amount: (tx['amount'] as num?)?.toDouble() ?? 0,
+            date: DateTime.tryParse(tx['createdAt']?.toString() ?? '') ??
+                DateTime.now(),
+            status: tx['status'] == 'success' ? 'Successful' : 'Failed',
+            providerColor: providerName == 'JAMB'
+                ? const Color(0xFF006400)
+                : const Color(0xFF0066CC),
+          );
+        }).toList();
+      });
+    }
   }
 
   Future<void> _loadWalletData() async {
@@ -158,10 +203,28 @@ class _BuyEducationPinScreenState extends State<BuyEducationPinScreen>
     super.dispose();
   }
 
+  // Helper to safely get current packages for selected provider
+  List<Map<String, dynamic>> get _currentPackages {
+    return _packages[_selectedProvider] ?? [];
+  }
+
+  // Helper to find selected package safely
+  Map<String, dynamic>? _findSelectedPackage() {
+    if (_selectedPackage.isEmpty || _currentPackages.isEmpty) return null;
+    try {
+      return _currentPackages.firstWhere(
+        (package) =>
+            '${package['bundle']} - ${package['type']}' == _selectedPackage,
+      );
+    } catch (e) {
+      return null;
+    }
+  }
+
   void _buyEducationPin() {
     final colorScheme = this.colorScheme;
     if (_formKey.currentState!.validate()) {
-      if (_selectedPackage.isEmpty) {
+      if (_selectedPackage.isEmpty || _findSelectedPackage() == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('Please select a package'),
@@ -177,10 +240,8 @@ class _BuyEducationPinScreenState extends State<BuyEducationPinScreen>
 
   void _showConfirmationDialog() {
     final isTablet = MediaQuery.of(context).size.width > 600;
-    final selectedPackage = _packages[_selectedProvider]!.firstWhere(
-      (package) =>
-          '${package['bundle']} - ${package['type']}' == _selectedPackage,
-    );
+    final selectedPackage = _findSelectedPackage();
+    if (selectedPackage == null) return;
     final colorScheme = this.colorScheme;
     final cardColor = this.cardColor;
     final borderColor = this.borderColor;
@@ -311,13 +372,8 @@ class _BuyEducationPinScreenState extends State<BuyEducationPinScreen>
     }
 
     // Get the selected package details
-    Map<String, dynamic>? selectedPackage;
-    try {
-      selectedPackage = _packages[_selectedProvider]!.firstWhere(
-        (package) =>
-            '${package['bundle']} - ${package['type']}' == _selectedPackage,
-      );
-    } catch (e) {
+    final selectedPackage = _findSelectedPackage();
+    if (selectedPackage == null) {
       _showErrorDialog('Please select a valid package.');
       return;
     }
@@ -376,12 +432,12 @@ class _BuyEducationPinScreenState extends State<BuyEducationPinScreen>
   }
 
   void _showSuccessDialogWithPin(String pin, String serial) {
-    final selectedProviderData =
-        _providers.firstWhere((p) => p['id'] == _selectedProvider);
-    final selectedPackage = _packages[_selectedProvider]!.firstWhere(
-      (package) =>
-          '${package['bundle']} - ${package['type']}' == _selectedPackage,
-    );
+    final selectedProviderData = _providers.isNotEmpty
+        ? _providers.firstWhere((p) => p['id'] == _selectedProvider,
+            orElse: () => _providers.first)
+        : {'name': 'Provider', 'color': const Color(0xFF0066CC)};
+    final selectedPackage =
+        _findSelectedPackage() ?? {'bundle': 'Package', 'price': 0};
     final colorScheme = this.colorScheme;
 
     showDialog(
@@ -557,12 +613,12 @@ class _BuyEducationPinScreenState extends State<BuyEducationPinScreen>
   }
 
   void _showSuccessDialog() {
-    final selectedProviderData =
-        _providers.firstWhere((p) => p['id'] == _selectedProvider);
-    final selectedPackage = _packages[_selectedProvider]!.firstWhere(
-      (package) =>
-          '${package['bundle']} - ${package['type']}' == _selectedPackage,
-    );
+    final selectedProviderData = _providers.isNotEmpty
+        ? _providers.firstWhere((p) => p['id'] == _selectedProvider,
+            orElse: () => _providers.first)
+        : {'name': 'Provider', 'color': const Color(0xFF0066CC)};
+    final selectedPackage =
+        _findSelectedPackage() ?? {'bundle': 'Package', 'price': 0};
     final colorScheme = this.colorScheme;
 
     showDialog(
@@ -651,8 +707,23 @@ class _BuyEducationPinScreenState extends State<BuyEducationPinScreen>
     );
   }
 
-  Map<String, dynamic> get _selectedProviderData =>
-      _providers.firstWhere((p) => p['id'] == _selectedProvider);
+  Map<String, dynamic> get _selectedProviderData {
+    if (_providers.isEmpty) {
+      return {
+        'id': '',
+        'name': 'Provider',
+        'fullName': 'Select a provider',
+        'color': const Color(0xFF0066CC),
+        'logo': '',
+        'icon': Icons.school_outlined,
+        'textColor': Colors.white,
+      };
+    }
+    return _providers.firstWhere(
+      (p) => p['id'] == _selectedProvider,
+      orElse: () => _providers.first,
+    );
+  }
 
   String _formatDate(DateTime date) {
     final now = DateTime.now();
@@ -781,10 +852,19 @@ class _BuyEducationPinScreenState extends State<BuyEducationPinScreen>
                       ),
                       child: Row(
                         children: [
-                          Icon(
-                            _selectedProviderData['icon'],
-                            color: _selectedProviderData['textColor'],
-                            size: 24,
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.asset(
+                              _selectedProviderData['logo'],
+                              width: 32,
+                              height: 32,
+                              fit: BoxFit.contain,
+                              errorBuilder: (_, __, ___) => Icon(
+                                _selectedProviderData['icon'],
+                                color: _selectedProviderData['textColor'],
+                                size: 24,
+                              ),
+                            ),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
@@ -825,7 +905,7 @@ class _BuyEducationPinScreenState extends State<BuyEducationPinScreen>
                           crossAxisCount: 3,
                           crossAxisSpacing: 12,
                           mainAxisSpacing: 12,
-                          childAspectRatio: 1.1,
+                          childAspectRatio: 0.7,
                         ),
                         itemCount: _providers.length,
                         itemBuilder: (context, index) {
@@ -842,7 +922,7 @@ class _BuyEducationPinScreenState extends State<BuyEducationPinScreen>
                             },
                             child: AnimatedContainer(
                               duration: const Duration(milliseconds: 200),
-                              padding: const EdgeInsets.all(8),
+                              padding: const EdgeInsets.all(6),
                               decoration: BoxDecoration(
                                 color: isSelected
                                     ? provider['color'].withValues(alpha: 0.15)
@@ -860,19 +940,19 @@ class _BuyEducationPinScreenState extends State<BuyEducationPinScreen>
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   ClipRRect(
-                                    borderRadius: BorderRadius.circular(8),
+                                    borderRadius: BorderRadius.circular(6),
                                     child: Image.asset(
                                       provider['logo'],
-                                      width: 40,
-                                      height: 40,
+                                      width: 32,
+                                      height: 32,
                                       fit: BoxFit.contain,
                                       errorBuilder: (_, __, ___) => Container(
-                                        width: 40,
-                                        height: 40,
+                                        width: 32,
+                                        height: 32,
                                         decoration: BoxDecoration(
                                           color: provider['color'],
                                           borderRadius:
-                                              BorderRadius.circular(8),
+                                              BorderRadius.circular(6),
                                         ),
                                         child: Center(
                                           child: Text(
@@ -881,7 +961,7 @@ class _BuyEducationPinScreenState extends State<BuyEducationPinScreen>
                                                 .substring(0, 1),
                                             style: const TextStyle(
                                               color: Colors.white,
-                                              fontSize: 20,
+                                              fontSize: 16,
                                               fontWeight: FontWeight.bold,
                                             ),
                                           ),
@@ -889,18 +969,18 @@ class _BuyEducationPinScreenState extends State<BuyEducationPinScreen>
                                       ),
                                     ),
                                   ),
-                                  const SizedBox(height: 6),
+                                  const SizedBox(height: 4),
                                   Text(
                                     provider['name'],
                                     style: TextStyle(
                                       color: isSelected
                                           ? provider['color']
                                           : colorScheme.onSurface,
-                                      fontSize: 12,
+                                      fontSize: 10,
                                       fontWeight: FontWeight.w600,
                                     ),
                                     textAlign: TextAlign.center,
-                                    maxLines: 1,
+                                    maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ],
@@ -1057,99 +1137,131 @@ class _BuyEducationPinScreenState extends State<BuyEducationPinScreen>
                         ),
                       ),
                     ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: GridView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 1,
-                          crossAxisSpacing: 6,
-                          mainAxisSpacing: 6,
-                          childAspectRatio: 4.0,
+                    if (_isLoadingPricing)
+                      Container(
+                        padding: const EdgeInsets.symmetric(vertical: 40),
+                        child: Center(
+                          child: CircularProgressIndicator(
+                            color: colorScheme.primary,
+                          ),
                         ),
-                        itemCount: _packages[_selectedProvider]!.length,
-                        itemBuilder: (context, index) {
-                          final package = _packages[_selectedProvider]![index];
-                          final packageId =
-                              '${package['bundle']} - ${package['type']}';
-                          final isSelected = _selectedPackage == packageId;
+                      )
+                    else if (_currentPackages.isEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(vertical: 40),
+                        child: Center(
+                          child: Text(
+                            _providers.isEmpty
+                                ? 'No exam services available.\nPlease check back later.'
+                                : 'No packages available for this provider.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: mutedTextColor,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                      )
+                    else
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: GridView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          gridDelegate:
+                              const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            crossAxisSpacing: 6,
+                            mainAxisSpacing: 6,
+                            childAspectRatio: 2.3,
+                          ),
+                          itemCount: _currentPackages.length,
+                          itemBuilder: (context, index) {
+                            final package = _currentPackages[index];
+                            final packageId =
+                                '${package['bundle']} - ${package['type']}';
+                            final isSelected = _selectedPackage == packageId;
 
-                          return GestureDetector(
-                            onTap: () {
-                              setState(() {
-                                _selectedPackage = packageId;
-                              });
-                              HapticFeedback.lightImpact();
-                            },
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 200),
-                              margin: const EdgeInsets.all(3),
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: isSelected
-                                    ? colorScheme.primary
-                                        .withValues(alpha: 0.12)
-                                    : cardColor,
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
+                            return GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  _selectedPackage = packageId;
+                                });
+                                HapticFeedback.lightImpact();
+                              },
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 200),
+                                margin: const EdgeInsets.all(3),
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
                                   color: isSelected
                                       ? colorScheme.primary
-                                      : borderColor,
-                                  width: isSelected ? 2 : 1,
+                                          .withValues(alpha: 0.12)
+                                      : cardColor,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: isSelected
+                                        ? colorScheme.primary
+                                        : borderColor,
+                                    width: isSelected ? 2 : 1,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Flexible(
+                                            child: Text(
+                                              package['bundle'],
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 12,
+                                                color: colorScheme.onSurface,
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                          Text(
+                                            package['type'],
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              color: mutedTextColor,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Text(
+                                      '₦${package['price']}',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                        color: colorScheme.onSurface,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    if (isSelected)
+                                      Icon(
+                                        Icons.check_circle,
+                                        color: colorScheme.primary,
+                                        size: 16,
+                                      ),
+                                  ],
                                 ),
                               ),
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Text(
-                                          package['bundle'],
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 14,
-                                            color: colorScheme.onSurface,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          package['type'],
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: mutedTextColor,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  Text(
-                                    '₦${package['price']}',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14,
-                                      color: colorScheme.onSurface,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  if (isSelected)
-                                    Icon(
-                                      Icons.check_circle,
-                                      color: colorScheme.primary,
-                                      size: 16,
-                                    ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
+                            );
+                          },
+                        ),
                       ),
-                    ),
                     const SizedBox(height: 20),
                   ],
                 ),
@@ -1259,7 +1371,7 @@ class _BuyEducationPinScreenState extends State<BuyEducationPinScreen>
                       ListView.separated(
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
-                        itemCount: _recentTransactions.take(3).length,
+                        itemCount: _recentTransactions.take(8).length,
                         separatorBuilder: (context, index) => Divider(
                           color: borderColor,
                           height: 1,

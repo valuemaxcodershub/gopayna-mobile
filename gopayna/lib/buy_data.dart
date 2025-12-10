@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api_service.dart' as api;
+import 'service_transaction_history.dart';
 import 'widgets/wallet_visibility_builder.dart';
 import 'widgets/themed_screen_helpers.dart';
 
@@ -51,16 +52,10 @@ class _BuyDataScreenState extends State<BuyDataScreen>
   // Dynamic data plans fetched from API
   List<Map<String, dynamic>> _fetchedDataPlans = [];
 
-  // Validity filter tabs
+  // Validity filter tabs - simplified to 3 categories
   late TabController _validityTabController;
-  final List<String> _validityTabs = [
-    'All',
-    'Daily',
-    'Weekly',
-    'Monthly',
-    '2+ Months'
-  ];
-  String _selectedValidity = 'All';
+  final List<String> _validityTabs = ['Daily', 'Weekly', 'Monthly'];
+  String _selectedValidity = 'Daily'; // Default to Daily plans
 
   final List<Map<String, dynamic>> _networks = [
     {
@@ -172,11 +167,7 @@ class _BuyDataScreenState extends State<BuyDataScreen>
           .toList();
     }
 
-    // Filter by selected validity
-    if (_selectedValidity == 'All') {
-      return plans;
-    }
-
+    // Filter by selected validity category
     return plans.where((plan) {
       final validity = _getValidityCategory(plan);
       return validity == _selectedValidity;
@@ -184,83 +175,62 @@ class _BuyDataScreenState extends State<BuyDataScreen>
   }
 
   // Extract validity category from plan data or name
+  // Daily: < 7 days, Weekly: 7-29 days, Monthly: 30+ days
   String _getValidityCategory(Map<String, dynamic> plan) {
     // First try to use the validity field from backend
     final validity = (plan['validity'] ?? '').toString().toLowerCase();
     final planName =
         (plan['bundle'] ?? plan['name'] ?? '').toString().toLowerCase();
 
-    // Check validity field first (e.g., "1 day", "7 days", "30 days")
+    // Parse days from validity field (e.g., "1 Day", "7 Days", "30 Days")
+    int days = 0;
+
     if (validity.isNotEmpty) {
       final dayMatch = RegExp(r'(\d+)\s*day').firstMatch(validity);
       if (dayMatch != null) {
-        final days = int.tryParse(dayMatch.group(1) ?? '0') ?? 0;
-        if (days <= 3) return 'Daily';
-        if (days <= 14) return 'Weekly';
-        if (days <= 31) return 'Monthly';
-        return '2+ Months';
+        days = int.tryParse(dayMatch.group(1) ?? '0') ?? 0;
+      } else if (validity.contains('week')) {
+        days = 7;
+      } else if (validity.contains('month')) {
+        days = 30;
+      } else if (validity.contains('year')) {
+        days = 365;
       }
-
-      if (validity.contains('week')) return 'Weekly';
-      if (validity.contains('month')) {
-        if (validity.contains('2') ||
-            validity.contains('3') ||
-            validity.contains('6') ||
-            validity.contains('12')) {
-          return '2+ Months';
-        }
-        return 'Monthly';
-      }
-      if (validity.contains('year')) return '2+ Months';
     }
 
-    // Fallback to parsing from plan name
-    // Daily: 1 day, 2 days, 3 days
-    if (planName.contains('1 day') ||
-        planName.contains('2 day') ||
-        planName.contains('3 day') ||
-        planName.contains('daily')) {
+    // If days not found in validity, try plan name
+    if (days == 0) {
+      final dayMatch = RegExp(r'(\d+)\s*day').firstMatch(planName);
+      if (dayMatch != null) {
+        days = int.tryParse(dayMatch.group(1) ?? '0') ?? 0;
+      } else if (planName.contains('daily')) {
+        days = 1;
+      } else if (planName.contains('week')) {
+        days = 7;
+      } else if (planName.contains('month')) {
+        days = 30;
+      }
+    }
+
+    // Categorize based on days
+    // Daily: 1-6 days (less than 7)
+    // Weekly: 7-29 days
+    // Monthly: 30+ days
+    if (days > 0 && days < 7) {
       return 'Daily';
-    }
-
-    // Weekly: 7 days, 14 days
-    if (planName.contains('7 day') ||
-        planName.contains('14 day') ||
-        planName.contains('week')) {
+    } else if (days >= 7 && days < 30) {
       return 'Weekly';
+    } else {
+      return 'Monthly'; // Default to Monthly for 30+ days or unknown
     }
-
-    // Monthly: 30 days
-    if (planName.contains('30 day') ||
-        (planName.contains('month') &&
-            !planName.contains('2-month') &&
-            !planName.contains('3-month'))) {
-      return 'Monthly';
-    }
-
-    // 2+ Months: 60 days, 90 days, 180 days, 365 days
-    if (planName.contains('60 day') ||
-        planName.contains('90 day') ||
-        planName.contains('180 day') ||
-        planName.contains('365 day') ||
-        planName.contains('2-month') ||
-        planName.contains('3-month') ||
-        planName.contains('year')) {
-      return '2+ Months';
-    }
-
-    // Default to Monthly for plans without clear validity
-    return 'Monthly';
   }
 
   // Get count of plans for each validity category
   Map<String, int> get _validityCounts {
     final counts = <String, int>{
-      'All': 0,
       'Daily': 0,
       'Weekly': 0,
       'Monthly': 0,
-      '2+ Months': 0
     };
 
     List<Map<String, dynamic>> plans;
@@ -272,7 +242,6 @@ class _BuyDataScreenState extends State<BuyDataScreen>
           .toList();
     }
 
-    counts['All'] = plans.length;
     for (final plan in plans) {
       final validity = _getValidityCategory(plan);
       counts[validity] = (counts[validity] ?? 0) + 1;
@@ -411,7 +380,7 @@ class _BuyDataScreenState extends State<BuyDataScreen>
     final token = prefs.getString('jwt');
     if (token == null) return;
 
-    final result = await api.fetchVTUHistory(token, type: 'data', limit: 5);
+    final result = await api.fetchVTUHistory(token, type: 'data', limit: 8);
     if (mounted && result['success'] == true) {
       final data = result['data'] as List? ?? [];
       setState(() {
@@ -454,27 +423,59 @@ class _BuyDataScreenState extends State<BuyDataScreen>
     setState(() {
       _isLoadingPlans = true;
       _fetchedDataPlans = [];
-      _selectedValidity = 'All';
-      _validityTabController.index = 0;
+      _selectedDataPlan = '';
+      _selectedPlanCode = '';
     });
 
     try {
+      // Fetch ALL data plans from admin pricing database (prioritized)
+      final pricingResult = await api.fetchDataPricing(network: networkId);
+
+      if (mounted && pricingResult['success'] == true) {
+        final plans = pricingResult['plans'] as List? ?? [];
+
+        if (plans.isNotEmpty) {
+          final formattedPlans = plans.map((plan) {
+            final price = (plan['price'] as num?)?.round() ?? 0;
+            final validity = plan['validity']?.toString() ?? '';
+
+            return {
+              'bundle': plan['name'] ?? '',
+              'name': plan['name'] ?? '',
+              'price': price.toString(),
+              'code': plan['code'] ?? plan['id'] ?? '',
+              'validity': validity,
+              'category': plan['category'] ?? '',
+              'dataAllowance': plan['dataAllowance'] ?? '',
+              'sortPrice': price,
+            };
+          }).toList();
+
+          // Sort by price ascending
+          formattedPlans.sort((a, b) =>
+              (a['sortPrice'] as int).compareTo(b['sortPrice'] as int));
+
+          setState(() {
+            _fetchedDataPlans = formattedPlans.cast<Map<String, dynamic>>();
+            _isLoadingPlans = false;
+          });
+          return;
+        }
+      }
+
+      // Fallback: try NelloByte live API if admin database is empty
       final result = await api.fetchDataPlans(_token!, networkId);
       if (mounted) {
         if (result['success'] == true) {
           final data = result['data'];
           List<Map<String, dynamic>> plans = [];
 
-          // Backend returns: { "success": true, "plans": [...] }
-          // Each plan: { id, code, network, networkCode, name, price, validity, category }
           if (data is Map) {
             if (data['plans'] != null && data['plans'] is List) {
-              // Standard backend response format
               plans = (data['plans'] as List)
                   .map((p) => Map<String, dynamic>.from(p))
                   .toList();
             } else if (data['data'] != null && data['data'] is List) {
-              // Alternative format
               plans = (data['data'] as List)
                   .map((p) => Map<String, dynamic>.from(p))
                   .toList();
@@ -483,9 +484,7 @@ class _BuyDataScreenState extends State<BuyDataScreen>
             plans = data.map((p) => Map<String, dynamic>.from(p)).toList();
           }
 
-          // Format plans for UI - use backend-standardized fields
           final formattedPlans = plans.map((plan) {
-            // Backend provides: name, price, code, validity, category
             final name =
                 plan['name'] ?? plan['PRODUCT_NAME'] ?? plan['bundle'] ?? '';
             final priceValue =
@@ -497,7 +496,6 @@ class _BuyDataScreenState extends State<BuyDataScreen>
                 (plan['code'] ?? plan['PRODUCT_CODE'] ?? plan['id'] ?? '')
                     .toString();
             final validity = plan['validity'] ?? plan['VALIDITY'] ?? '';
-            final category = plan['category'] ?? '';
 
             return {
               'bundle': name,
@@ -505,12 +503,11 @@ class _BuyDataScreenState extends State<BuyDataScreen>
               'price': price.toString(),
               'code': code,
               'validity': validity,
-              'category': category,
+              'category': plan['category'] ?? '',
               'sortPrice': price,
             };
           }).toList();
 
-          // Sort by price ascending
           formattedPlans.sort((a, b) =>
               (a['sortPrice'] as int).compareTo(b['sortPrice'] as int));
 
@@ -519,7 +516,6 @@ class _BuyDataScreenState extends State<BuyDataScreen>
             _isLoadingPlans = false;
           });
         } else {
-          // Use fallback plans on API error
           setState(() {
             _fetchedDataPlans = [];
             _isLoadingPlans = false;
@@ -1213,6 +1209,211 @@ class _BuyDataScreenState extends State<BuyDataScreen>
 
               const SizedBox(height: 24),
 
+              // Plan Duration Category Selector (After Phone Number)
+              Container(
+                decoration: BoxDecoration(
+                  color: card,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: shadow,
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+                      child: Text(
+                        'Select Plan Duration',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: cs.onSurface,
+                        ),
+                      ),
+                    ),
+                    Container(
+                      margin: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                      decoration: BoxDecoration(
+                        color: surfaceVariant,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: border),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: _selectedValidity,
+                          isExpanded: true,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 8),
+                          borderRadius: BorderRadius.circular(12),
+                          dropdownColor: card,
+                          icon: Icon(Icons.keyboard_arrow_down,
+                              color: cs.primary),
+                          items: _validityTabs.map((tab) {
+                            final count = _validityCounts[tab] ?? 0;
+                            String label;
+                            String subtitle;
+                            IconData icon;
+
+                            switch (tab) {
+                              case 'Daily':
+                                label = 'Daily Plans';
+                                subtitle = 'Less than 7 days validity';
+                                icon = Icons.today;
+                                break;
+                              case 'Weekly':
+                                label = 'Weekly Plans';
+                                subtitle = '7 to 29 days validity';
+                                icon = Icons.date_range;
+                                break;
+                              case 'Monthly':
+                                label = 'Monthly Plans';
+                                subtitle = '30 days and above';
+                                icon = Icons.calendar_month;
+                                break;
+                              default:
+                                label = tab;
+                                subtitle = '';
+                                icon = Icons.data_usage;
+                            }
+
+                            return DropdownMenuItem<String>(
+                              value: tab,
+                              child: Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: cs.primary.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child:
+                                        Icon(icon, color: cs.primary, size: 24),
+                                  ),
+                                  const SizedBox(width: 14),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          label,
+                                          style: TextStyle(
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w600,
+                                            color: cs.onSurface,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          subtitle,
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: muted,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 10, vertical: 5),
+                                    decoration: BoxDecoration(
+                                      color: count > 0
+                                          ? cs.primary.withValues(alpha: 0.15)
+                                          : Colors.grey.withValues(alpha: 0.15),
+                                      borderRadius: BorderRadius.circular(14),
+                                    ),
+                                    child: Text(
+                                      '$count plans',
+                                      style: TextStyle(
+                                        color: count > 0
+                                            ? cs.primary
+                                            : Colors.grey,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (value) {
+                            if (value != null) {
+                              setState(() {
+                                _selectedValidity = value;
+                                _selectedDataPlan = '';
+                                _selectedPlanCode = '';
+                              });
+                              HapticFeedback.selectionClick();
+                            }
+                          },
+                          selectedItemBuilder: (context) {
+                            return _validityTabs.map((tab) {
+                              final count = _validityCounts[tab] ?? 0;
+                              String label;
+                              IconData icon;
+
+                              switch (tab) {
+                                case 'Daily':
+                                  label = 'Daily Plans';
+                                  icon = Icons.today;
+                                  break;
+                                case 'Weekly':
+                                  label = 'Weekly Plans';
+                                  icon = Icons.date_range;
+                                  break;
+                                case 'Monthly':
+                                  label = 'Monthly Plans';
+                                  icon = Icons.calendar_month;
+                                  break;
+                                default:
+                                  label = tab;
+                                  icon = Icons.data_usage;
+                              }
+
+                              return Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: cs.primary.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child:
+                                        Icon(icon, color: cs.primary, size: 20),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Text(
+                                      '$label ($count available)',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                        color: cs.onSurface,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              );
+                            }).toList();
+                          },
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
               // Data Plans Section
               Container(
                 decoration: BoxDecoration(
@@ -1287,12 +1488,14 @@ class _BuyDataScreenState extends State<BuyDataScreen>
                         children: [
                           Row(
                             children: [
-                              Text(
-                                'Available Data Plans',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  color: cs.onSurface,
+                              Expanded(
+                                child: Text(
+                                  '$_selectedValidity Data Plans (${_validityCounts[_selectedValidity] ?? 0})',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: cs.onSurface,
+                                  ),
                                 ),
                               ),
                               if (_isLoadingPlans) ...[
@@ -1310,106 +1513,6 @@ class _BuyDataScreenState extends State<BuyDataScreen>
                             ],
                           ),
                           const SizedBox(height: 12),
-                          // Validity filter tabs
-                          if (!_isLoadingPlans && _fetchedDataPlans.isNotEmpty)
-                            Container(
-                              height: 36,
-                              margin: const EdgeInsets.only(bottom: 12),
-                              child: ListView.builder(
-                                scrollDirection: Axis.horizontal,
-                                itemCount: _validityTabs.length,
-                                itemBuilder: (context, index) {
-                                  final tab = _validityTabs[index];
-                                  final count = _validityCounts[tab] ?? 0;
-                                  final isSelected = _selectedValidity == tab;
-
-                                  // Hide tabs with 0 plans (except 'All')
-                                  if (count == 0 && tab != 'All') {
-                                    return const SizedBox.shrink();
-                                  }
-
-                                  return Padding(
-                                    padding: EdgeInsets.only(
-                                        right: index < _validityTabs.length - 1
-                                            ? 8
-                                            : 0),
-                                    child: GestureDetector(
-                                      onTap: () {
-                                        setState(() {
-                                          _selectedValidity = tab;
-                                          _validityTabController.index = index;
-                                          _selectedDataPlan = '';
-                                          _selectedPlanCode = '';
-                                        });
-                                        HapticFeedback.selectionClick();
-                                      },
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 12, vertical: 6),
-                                        decoration: BoxDecoration(
-                                          color: isSelected
-                                              ? cs.primary
-                                              : cs.primary
-                                                  .withValues(alpha: 0.1),
-                                          borderRadius:
-                                              BorderRadius.circular(18),
-                                          border: Border.all(
-                                            color: isSelected
-                                                ? cs.primary
-                                                : cs.primary
-                                                    .withValues(alpha: 0.3),
-                                            width: 1,
-                                          ),
-                                        ),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Text(
-                                              tab,
-                                              style: TextStyle(
-                                                color: isSelected
-                                                    ? cs.onPrimary
-                                                    : cs.primary,
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                            ),
-                                            if (tab != 'All') ...[
-                                              const SizedBox(width: 4),
-                                              Container(
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                        horizontal: 6,
-                                                        vertical: 2),
-                                                decoration: BoxDecoration(
-                                                  color: isSelected
-                                                      ? cs.onPrimary.withValues(
-                                                          alpha: 0.2)
-                                                      : cs.primary.withValues(
-                                                          alpha: 0.15),
-                                                  borderRadius:
-                                                      BorderRadius.circular(10),
-                                                ),
-                                                child: Text(
-                                                  count.toString(),
-                                                  style: TextStyle(
-                                                    color: isSelected
-                                                        ? cs.onPrimary
-                                                        : cs.primary,
-                                                    fontSize: 10,
-                                                    fontWeight: FontWeight.bold,
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                            ),
                           if (_isLoadingPlans)
                             Center(
                               child: Padding(
@@ -1651,7 +1754,17 @@ class _BuyDataScreenState extends State<BuyDataScreen>
                               ),
                             ),
                             TextButton(
-                              onPressed: () {},
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        const ServiceTransactionHistoryScreen(
+                                      serviceType: ServiceType.data,
+                                    ),
+                                  ),
+                                );
+                              },
                               style: TextButton.styleFrom(
                                 padding:
                                     const EdgeInsets.symmetric(horizontal: 8),
@@ -1673,7 +1786,7 @@ class _BuyDataScreenState extends State<BuyDataScreen>
                       ListView.separated(
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
-                        itemCount: _recentTransactions.take(3).length,
+                        itemCount: _recentTransactions.take(8).length,
                         separatorBuilder: (context, index) => Divider(
                           color: border,
                           height: 1,

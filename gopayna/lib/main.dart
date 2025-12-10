@@ -5,6 +5,10 @@ import 'app_settings.dart';
 import 'login.dart';
 import 'otp_verification.dart';
 import 'dashboard.dart';
+import 'idle_timeout_service.dart';
+
+/// Global navigator key for accessing navigator from anywhere
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() {
   runApp(const MyApp());
@@ -50,40 +54,77 @@ class _MyAppState extends State<MyApp> {
     return _StartDestination.onboarding;
   }
 
+  void _handleIdleTimeout() async {
+    // Clear token and navigate to login
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('jwt');
+    
+    // Show message and navigate to login
+    if (navigatorKey.currentContext != null) {
+      ScaffoldMessenger.of(navigatorKey.currentContext!).showSnackBar(
+        const SnackBar(
+          content: Text('Session expired due to inactivity. Please login again.'),
+          backgroundColor: Colors.orange,
+          duration: Duration(seconds: 4),
+        ),
+      );
+    }
+    
+    // Navigate to login and clear stack
+    navigatorKey.currentState?.pushNamedAndRemoveUntil('/login', (route) => false);
+  }
+
+  void _initializeIdleTimeout() {
+    IdleTimeoutService().initialize(onTimeout: _handleIdleTimeout);
+  }
+
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'GoPayna',
-      theme: _appSettings.lightTheme,
-      darkTheme: _appSettings.darkTheme,
-      themeMode: _appSettings.isDarkMode ? ThemeMode.dark : ThemeMode.light,
-      home: FutureBuilder<_StartDestination>(
-        future: _startDestinationFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState != ConnectionState.done) {
-            return const Scaffold(
-              body: Center(
-                child: CircularProgressIndicator(),
-              ),
-            );
-          }
+    return IdleDetector(
+      child: MaterialApp(
+        navigatorKey: navigatorKey,
+        title: 'GoPayna',
+        theme: _appSettings.lightTheme,
+        darkTheme: _appSettings.darkTheme,
+        themeMode: _appSettings.isDarkMode ? ThemeMode.dark : ThemeMode.light,
+        home: FutureBuilder<_StartDestination>(
+          future: _startDestinationFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState != ConnectionState.done) {
+              return const Scaffold(
+                body: Center(
+                  child: CircularProgressIndicator(),
+                ),
+              );
+            }
 
-          if (snapshot.data == _StartDestination.dashboard) {
+            if (snapshot.data == _StartDestination.dashboard) {
+              // Initialize idle timeout only when user is logged in
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                _initializeIdleTimeout();
+              });
+              return const DashboardScreen();
+            }
+
+            return const GoPaynaHomePage();
+          },
+        ),
+        debugShowCheckedModeBanner: false,
+        routes: {
+          '/login': (context) => LoginScreen(),
+          '/otp': (context) {
+            final email = ModalRoute.of(context)?.settings.arguments as String? ?? '';
+            return OtpVerificationScreen(email: email, purpose: OtpPurpose.registration);
+          },
+          '/dashboard': (context) {
+            // Initialize idle timeout when navigating to dashboard
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              _initializeIdleTimeout();
+            });
             return const DashboardScreen();
-          }
-
-          return const GoPaynaHomePage();
+          },
         },
       ),
-      debugShowCheckedModeBanner: false,
-      routes: {
-        '/login': (context) => LoginScreen(),
-        '/otp': (context) {
-          final email = ModalRoute.of(context)?.settings.arguments as String? ?? '';
-          return OtpVerificationScreen(email: email, purpose: OtpPurpose.registration);
-        },
-        '/dashboard': (context) => const DashboardScreen(),
-      },
     );
   }
 }
