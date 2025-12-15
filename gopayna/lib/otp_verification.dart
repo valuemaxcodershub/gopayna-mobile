@@ -161,9 +161,14 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
     if (!mounted) return;
     setState(() => _isLoading = false);
     if (result['error'] != null) {
+      final errorCode = result['code']?.toString();
       String errorMsg = result['error'].toString().toLowerCase();
       String displayMsg;
-      if (errorMsg.contains('expired')) {
+      
+      // Check if account is suspended by admin
+      if (errorCode == 'ACCOUNT_DEACTIVATED') {
+        displayMsg = result['error'].toString();
+      } else if (errorMsg.contains('expired')) {
         displayMsg = 'The OTP has expired. Please generate a new OTP.';
       } else if (errorMsg.contains('invalid') || errorMsg.contains('incorrect')) {
         displayMsg = 'Incorrect OTP. Please check and retry.';

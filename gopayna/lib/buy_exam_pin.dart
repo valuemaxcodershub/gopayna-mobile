@@ -1173,7 +1173,7 @@ class _BuyEducationPinScreenState extends State<BuyEducationPinScreen>
                             crossAxisCount: 2,
                             crossAxisSpacing: 6,
                             mainAxisSpacing: 6,
-                            childAspectRatio: 2.3,
+                            childAspectRatio: 2.0, // Adjusted for longer text like "WAEC Result Checker"
                           ),
                           itemCount: _currentPackages.length,
                           itemBuilder: (context, index) {
@@ -1221,10 +1221,10 @@ class _BuyEducationPinScreenState extends State<BuyEducationPinScreen>
                                               package['bundle'],
                                               style: TextStyle(
                                                 fontWeight: FontWeight.bold,
-                                                fontSize: 12,
+                                                fontSize: 11,
                                                 color: colorScheme.onSurface,
                                               ),
-                                              maxLines: 1,
+                                              maxLines: 2,
                                               overflow: TextOverflow.ellipsis,
                                             ),
                                           ),

@@ -1271,7 +1271,7 @@ class _BuyAirtimeScreenState extends State<BuyAirtimeScreen>
                                       Row(
                                         children: [
                                           Text(
-                                            '${transaction.network} Airtime',
+                                            '${transaction.phoneNumber} - ₦${transaction.amount}',
                                             style: TextStyle(
                                               fontSize: 14,
                                               fontWeight: FontWeight.w600,
@@ -1279,21 +1279,13 @@ class _BuyAirtimeScreenState extends State<BuyAirtimeScreen>
                                             ),
                                           ),
                                           const Spacer(),
-                                          Text(
-                                            '₦${transaction.amount}',
-                                            style: TextStyle(
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w600,
-                                              color: cs.onSurface,
-                                            ),
-                                          ),
                                         ],
                                       ),
                                       const SizedBox(height: 4),
                                       Row(
                                         children: [
                                           Text(
-                                            transaction.phoneNumber,
+                                            '${transaction.network} Airtime',
                                             style: TextStyle(
                                               fontSize: 12,
                                               color: muted,

@@ -1283,7 +1283,11 @@ class Transaction {
 
     // Build a better title based on service type
     String title;
-    if (serviceType == 'airtime') {
+    
+    // Check if this is a wallet funding (credit) transaction
+    if (isIncoming && (channel == 'card' || channel == 'paystack' || channel == 'bank' || channel == 'transfer')) {
+      title = 'Wallet Funding';
+    } else if (serviceType == 'airtime') {
       title = 'Airtime Purchase';
     } else if (serviceType == 'data') {
       title = 'Data Purchase';

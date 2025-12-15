@@ -1286,56 +1286,60 @@ class _BuyDataScreenState extends State<BuyDataScreen>
                               child: Row(
                                 children: [
                                   Container(
-                                    padding: const EdgeInsets.all(10),
+                                    padding: const EdgeInsets.all(8),
                                     decoration: BoxDecoration(
                                       color: cs.primary.withValues(alpha: 0.1),
-                                      borderRadius: BorderRadius.circular(10),
+                                      borderRadius: BorderRadius.circular(8),
                                     ),
                                     child:
-                                        Icon(icon, color: cs.primary, size: 24),
+                                        Icon(icon, color: cs.primary, size: 20),
                                   ),
-                                  const SizedBox(width: 14),
+                                  const SizedBox(width: 10),
                                   Expanded(
                                     child: Column(
                                       crossAxisAlignment:
                                           CrossAxisAlignment.start,
                                       mainAxisSize: MainAxisSize.min,
+                                      mainAxisAlignment: MainAxisAlignment.center,
                                       children: [
                                         Text(
                                           label,
                                           style: TextStyle(
-                                            fontSize: 15,
+                                            fontSize: 13,
                                             fontWeight: FontWeight.w600,
                                             color: cs.onSurface,
                                           ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
                                         ),
-                                        const SizedBox(height: 2),
                                         Text(
                                           subtitle,
                                           style: TextStyle(
-                                            fontSize: 12,
+                                            fontSize: 10,
                                             color: muted,
                                           ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
                                         ),
                                       ],
                                     ),
                                   ),
                                   Container(
                                     padding: const EdgeInsets.symmetric(
-                                        horizontal: 10, vertical: 5),
+                                        horizontal: 8, vertical: 3),
                                     decoration: BoxDecoration(
                                       color: count > 0
                                           ? cs.primary.withValues(alpha: 0.15)
                                           : Colors.grey.withValues(alpha: 0.15),
-                                      borderRadius: BorderRadius.circular(14),
+                                      borderRadius: BorderRadius.circular(10),
                                     ),
                                     child: Text(
-                                      '$count plans',
+                                      '$count',
                                       style: TextStyle(
                                         color: count > 0
                                             ? cs.primary
                                             : Colors.grey,
-                                        fontSize: 12,
+                                        fontSize: 11,
                                         fontWeight: FontWeight.bold,
                                       ),
                                     ),
@@ -1829,7 +1833,7 @@ class _BuyDataScreenState extends State<BuyDataScreen>
                                         children: [
                                           Expanded(
                                             child: Text(
-                                              '${transaction.network} Data',
+                                              '${transaction.phoneNumber} - ₦${transaction.amount}',
                                               style: TextStyle(
                                                 fontSize: 14,
                                                 fontWeight: FontWeight.w600,
@@ -1837,19 +1841,11 @@ class _BuyDataScreenState extends State<BuyDataScreen>
                                               ),
                                             ),
                                           ),
-                                          Text(
-                                            '₦${transaction.amount}',
-                                            style: TextStyle(
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w600,
-                                              color: cs.onSurface,
-                                            ),
-                                          ),
                                         ],
                                       ),
                                       const SizedBox(height: 4),
                                       Text(
-                                        transaction.dataBundle,
+                                        '${transaction.network} - ${transaction.dataBundle}',
                                         style: TextStyle(
                                           fontSize: 12,
                                           color: muted,
@@ -1859,7 +1855,7 @@ class _BuyDataScreenState extends State<BuyDataScreen>
                                       Row(
                                         children: [
                                           Text(
-                                            transaction.phoneNumber,
+                                            _formatDate(transaction.date),
                                             style: TextStyle(
                                               fontSize: 12,
                                               color: muted,

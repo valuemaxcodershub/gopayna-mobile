@@ -108,10 +108,22 @@ Future<Map<String, dynamic>> loginUser(
     // Log error details to console
     log('Login error: status ${response.statusCode}, body: ${response.body}',
         name: 'api_service');
-    return {
-      'error': _extractErrorMessage(response.body, response.statusCode),
-      'status': response.statusCode,
-    };
+    
+    // Parse response to extract error and email (for OTP verification redirect)
+    try {
+      final decoded = jsonDecode(response.body);
+      return {
+        'error': decoded['error']?.toString() ?? _extractErrorMessage(response.body, response.statusCode),
+        'email': decoded['email'], // Include email for OTP redirect
+        'code': decoded['code'],   // Include error code (e.g., ACCOUNT_DEACTIVATED)
+        'status': response.statusCode,
+      };
+    } catch (e) {
+      return {
+        'error': _extractErrorMessage(response.body, response.statusCode),
+        'status': response.statusCode,
+      };
+    }
   }
 }
 
@@ -163,7 +175,16 @@ Future<Map<String, dynamic>> verifyOtp(String email, String otp) async {
     if (response.statusCode == 200) {
       return json.decode(response.body);
     } else {
-      return {'error': 'Failed to verify OTP'};
+      // Parse response to extract error and code
+      try {
+        final decoded = json.decode(response.body);
+        return {
+          'error': decoded['error']?.toString() ?? 'Failed to verify OTP',
+          'code': decoded['code'],
+        };
+      } catch (e) {
+        return {'error': 'Failed to verify OTP'};
+      }
     }
   } catch (e) {
     return {'error': 'An error occurred while verifying OTP'};
@@ -184,7 +205,16 @@ Future<Map<String, dynamic>> sendPasswordResetOtp(
     if (response.statusCode == 200) {
       return json.decode(response.body);
     } else {
-      return {'error': 'Failed to send OTP'};
+      // Parse response to extract error and code
+      try {
+        final decoded = json.decode(response.body);
+        return {
+          'error': decoded['error']?.toString() ?? 'Failed to send OTP',
+          'code': decoded['code'],
+        };
+      } catch (e) {
+        return {'error': 'Failed to send OTP'};
+      }
     }
   } catch (e) {
     return {'error': 'An error occurred while sending OTP'};
@@ -207,7 +237,16 @@ Future<Map<String, dynamic>> resetPassword(
     if (response.statusCode == 200) {
       return json.decode(response.body);
     } else {
-      return {'error': 'Failed to reset password'};
+      // Parse response to extract error and code
+      try {
+        final decoded = json.decode(response.body);
+        return {
+          'error': decoded['error']?.toString() ?? 'Failed to reset password',
+          'code': decoded['code'],
+        };
+      } catch (e) {
+        return {'error': 'Failed to reset password'};
+      }
     }
   } catch (e) {
     return {'error': 'An error occurred while resetting password'};
@@ -1014,9 +1053,11 @@ Future<Map<String, dynamic>> verifyMeter(
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return {'success': true, 'data': decoded['data'] ?? decoded};
     }
+    // Include canProceed flag from API response (for postpaid meters)
     return {
       'error': decoded['error'] ??
           _extractErrorMessage(responseBody, response.statusCode),
+      'canProceed': decoded['canProceed'] ?? false,
       'status': response.statusCode,
     };
   } catch (e) {

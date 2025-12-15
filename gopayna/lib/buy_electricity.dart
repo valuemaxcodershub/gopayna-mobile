@@ -294,8 +294,28 @@ class _BuyElectricityScreenState extends State<BuyElectricityScreen>
               'Invalid meter number. Please check and try again.');
         }
       } else {
-        _showErrorSnackBar(result['error']?.toString() ??
-            'Failed to verify meter. Please try again.');
+        // Check if the API says user can proceed (common for postpaid meters)
+        final canProceed = result['canProceed'] == true;
+        final errorMessage = result['error']?.toString() ?? 
+            'Failed to verify meter. Please try again.';
+        
+        if (canProceed && _selectedMeterType == 'postpaid') {
+          // For postpaid, allow user to proceed with a warning
+          setState(() {
+            _isMeterVerified = true;
+            _verifiedCustomerName = 'Postpaid Customer'; // Placeholder name
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Postpaid verification unavailable. Please confirm meter number is correct before proceeding.'),
+              backgroundColor: Colors.orange,
+              duration: const Duration(seconds: 4),
+            ),
+          );
+          HapticFeedback.lightImpact();
+        } else {
+          _showErrorSnackBar(errorMessage);
+        }
       }
     }
   }
@@ -1148,6 +1168,9 @@ class _BuyElectricityScreenState extends State<BuyElectricityScreen>
                             if (value != null) {
                               setState(() {
                                 _selectedMeterType = value;
+                                // Reset verification when meter type changes
+                                _isMeterVerified = false;
+                                _verifiedCustomerName = null;
                               });
                               HapticFeedback.selectionClick();
                             }
@@ -1636,7 +1659,7 @@ class _BuyElectricityScreenState extends State<BuyElectricityScreen>
                                         CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        transaction.provider,
+                                        transaction.meterNumber,
                                         style: TextStyle(
                                           fontSize: 14,
                                           fontWeight: FontWeight.w600,
@@ -1645,7 +1668,7 @@ class _BuyElectricityScreenState extends State<BuyElectricityScreen>
                                       ),
                                       const SizedBox(height: 2),
                                       Text(
-                                        'Meter: ${transaction.meterNumber}',
+                                        '${transaction.provider} - ${transaction.package}',
                                         style: TextStyle(
                                           fontSize: 12,
                                           color: muted,

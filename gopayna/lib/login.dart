@@ -149,8 +149,23 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
       if (!mounted) return;
       setState(() => _isLoading = false);
       if (result['error'] != null) {
-        // If error is for email verification, show OTP page
-        if (result['error'].toString().contains('verify your email with OTP')) {
+        final errorCode = result['code']?.toString();
+        final errorMsg = result['error'].toString();
+        
+        // Check if account is deactivated by admin
+        if (errorCode == 'ACCOUNT_DEACTIVATED') {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(errorMsg),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 5),
+            ),
+          );
+          return;
+        }
+        
+        // If error is for email verification, redirect to OTP page
+        if (errorMsg.contains('verify your email with OTP') || errorMsg.contains('verify your email')) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Please verify your email.'), backgroundColor: Colors.orange),
           );
@@ -168,9 +183,9 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
           );
         } else {
           // Show other errors
-          log('Login error: ${result['error']}', name: 'login_screen');
+          log('Login error: $errorMsg', name: 'login_screen');
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(result['error'].toString()), backgroundColor: Colors.red),
+            SnackBar(content: Text(errorMsg), backgroundColor: Colors.red),
           );
         }
       } else {

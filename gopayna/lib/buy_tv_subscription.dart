@@ -63,21 +63,21 @@ class _BuyTVSubscriptionScreenState extends State<BuyTVSubscriptionScreen>
       'id': 'dstv',
       'name': 'DStv',
       'color': const Color(0xFF0066CC),
-      'logo': 'assets/dstv_logo.png',
+      'logo': 'dstv_logo.png',
       'textColor': Colors.white,
     },
     {
       'id': 'gotv',
       'name': 'GOtv',
       'color': const Color(0xFF00A651),
-      'logo': 'assets/gotv_logo.png',
+      'logo': 'gotv_logo.png',
       'textColor': Colors.white,
     },
     {
       'id': 'startimes',
       'name': 'StarTimes',
       'color': const Color(0xFFE4002B),
-      'logo': 'assets/startimes_logo.png',
+      'logo': 'startimes_logo.png',
       'textColor': Colors.white,
     },
   ];
@@ -835,7 +835,7 @@ class _BuyTVSubscriptionScreenState extends State<BuyTVSubscriptionScreen>
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(8),
                                 child: Image.asset(
-                                  _selectedProviderData['logo'],
+                                  'assets/${_selectedProviderData['logo']}',
                                   fit: BoxFit.cover,
                                   errorBuilder: (context, error, stackTrace) =>
                                       Icon(
@@ -921,7 +921,7 @@ class _BuyTVSubscriptionScreenState extends State<BuyTVSubscriptionScreen>
                                       child: ClipRRect(
                                         borderRadius: BorderRadius.circular(8),
                                         child: Image.asset(
-                                          provider['logo'],
+                                          'assets/${provider['logo']}',
                                           fit: BoxFit.cover,
                                           errorBuilder:
                                               (context, error, stackTrace) =>

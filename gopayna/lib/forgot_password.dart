@@ -143,9 +143,14 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       _isLoading = false;
     });
     if (result['error'] != null) {
+      final errorCode = result['code']?.toString();
       String errorMsg = result['error'].toString().toLowerCase();
       String displayMsg;
-      if (errorMsg.contains('not found')) {
+      
+      // Check if account is suspended by admin
+      if (errorCode == 'ACCOUNT_DEACTIVATED') {
+        displayMsg = result['error'].toString();
+      } else if (errorMsg.contains('not found')) {
         displayMsg = 'The detail you entered was not found. Please check and try again.';
       } else {
         displayMsg = result['error'].toString();

@@ -590,19 +590,20 @@ class _SettingScreenState extends State<SettingScreen>
             colorScheme,
             isDark,
           ),
-          _buildSettingsCard(
-            SettingsItem(
-              icon: Icons.pin_outlined,
-              title: 'Set/Reset Withdrawal PIN',
-              hasSwitch: false,
-              onTap: _showWithdrawalPinModal,
-            ),
-            isTablet,
-            7,
-            colorScheme,
-            isDark,
-            cardKey: _withdrawalPinCardKey,
-          ),
+          // TODO: Re-enable withdrawal PIN feature when ready
+          // _buildSettingsCard(
+          //   SettingsItem(
+          //     icon: Icons.pin_outlined,
+          //     title: 'Set/Reset Withdrawal PIN',
+          //     hasSwitch: false,
+          //     onTap: _showWithdrawalPinModal,
+          //   ),
+          //   isTablet,
+          //   7,
+          //   colorScheme,
+          //   isDark,
+          //   cardKey: _withdrawalPinCardKey,
+          // ),
           const SizedBox(height: 32),
           _buildSectionTitle('More', isTablet, colorScheme),
           const SizedBox(height: 16),
