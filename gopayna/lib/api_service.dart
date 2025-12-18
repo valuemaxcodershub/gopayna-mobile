@@ -94,36 +94,41 @@ Future<Map<String, dynamic>> registerUser(String firstName, String lastName,
 
 Future<Map<String, dynamic>> loginUser(
     String usernameOrEmail, String password) async {
-  final response = await http.post(
-    Uri.parse('$baseUrl/login'),
-    headers: {'Content-Type': 'application/json'},
-    body: jsonEncode({
-      'identifier': usernameOrEmail, // <-- use 'identifier'
-      'password': password,
-    }),
-  );
-  if (response.statusCode == 200) {
-    return jsonDecode(response.body);
-  } else {
-    // Log error details to console
-    log('Login error: status ${response.statusCode}, body: ${response.body}',
-        name: 'api_service');
-    
-    // Parse response to extract error and email (for OTP verification redirect)
-    try {
-      final decoded = jsonDecode(response.body);
-      return {
-        'error': decoded['error']?.toString() ?? _extractErrorMessage(response.body, response.statusCode),
-        'email': decoded['email'], // Include email for OTP redirect
-        'code': decoded['code'],   // Include error code (e.g., ACCOUNT_DEACTIVATED)
-        'status': response.statusCode,
-      };
-    } catch (e) {
-      return {
-        'error': _extractErrorMessage(response.body, response.statusCode),
-        'status': response.statusCode,
-      };
+  try {
+    final response = await http.post(
+      Uri.parse('$baseUrl/login'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'identifier': usernameOrEmail, // <-- use 'identifier'
+        'password': password,
+      }),
+    );
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      // Log error details to console
+      log('Login error: status ${response.statusCode}, body: ${response.body}',
+          name: 'api_service');
+      
+      // Parse response to extract error and email (for OTP verification redirect)
+      try {
+        final decoded = jsonDecode(response.body);
+        return {
+          'error': decoded['error']?.toString() ?? _extractErrorMessage(response.body, response.statusCode),
+          'email': decoded['email'], // Include email for OTP redirect
+          'code': decoded['code'],   // Include error code (e.g., ACCOUNT_DEACTIVATED)
+          'status': response.statusCode,
+        };
+      } catch (e) {
+        return {
+          'error': _extractErrorMessage(response.body, response.statusCode),
+          'status': response.statusCode,
+        };
+      }
     }
+  } catch (e) {
+    log('Login exception: $e', name: 'api_service');
+    return {'error': 'Unable to connect. Please check your internet connection.'};
   }
 }
 
@@ -139,6 +144,76 @@ String _extractErrorMessage(String body, int statusCode) {
     }
   } catch (e) {
     return 'HTTP $statusCode: $body';
+  }
+}
+
+/// Cached platform settings
+PlatformSettings? _cachedPlatformSettings;
+DateTime? _settingsCacheTime;
+const _settingsCacheDuration = Duration(minutes: 5);
+
+/// Platform settings model
+class PlatformSettings {
+  final bool maintenanceMode;
+  final bool allowRegistrations;
+  final double maxWalletBalance;
+  final double maxFundingAmount;
+  final double minFundingAmount;
+  final double referralBonusAmount;
+
+  PlatformSettings({
+    this.maintenanceMode = false,
+    this.allowRegistrations = true,
+    this.maxWalletBalance = 100000,
+    this.maxFundingAmount = 40000,
+    this.minFundingAmount = 100,
+    this.referralBonusAmount = 6,
+  });
+
+  factory PlatformSettings.fromJson(Map<String, dynamic> json) {
+    return PlatformSettings(
+      maintenanceMode: json['maintenanceMode'] == true,
+      allowRegistrations: json['allowRegistrations'] != false,
+      maxWalletBalance: (json['maxWalletBalance'] ?? 100000).toDouble(),
+      maxFundingAmount: (json['maxFundingAmount'] ?? 40000).toDouble(),
+      minFundingAmount: (json['minFundingAmount'] ?? 100).toDouble(),
+      referralBonusAmount: (json['referralBonusAmount'] ?? 6).toDouble(),
+    );
+  }
+
+  /// Default settings for fallback
+  static PlatformSettings get defaults => PlatformSettings();
+}
+
+/// Fetch platform settings from API (cached for 5 minutes)
+Future<PlatformSettings> fetchPlatformSettings({bool forceRefresh = false}) async {
+  // Return cached if valid
+  if (!forceRefresh &&
+      _cachedPlatformSettings != null &&
+      _settingsCacheTime != null &&
+      DateTime.now().difference(_settingsCacheTime!) < _settingsCacheDuration) {
+    return _cachedPlatformSettings!;
+  }
+
+  try {
+    final response = await http.get(
+      Uri.parse('$baseUrl/platform-settings'),
+      headers: {'Content-Type': 'application/json'},
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      _cachedPlatformSettings = PlatformSettings.fromJson(data);
+      _settingsCacheTime = DateTime.now();
+      return _cachedPlatformSettings!;
+    } else {
+      log('Failed to fetch platform settings: ${response.statusCode}',
+          name: 'api_service');
+      return _cachedPlatformSettings ?? PlatformSettings.defaults;
+    }
+  } catch (e) {
+    log('Error fetching platform settings: $e', name: 'api_service');
+    return _cachedPlatformSettings ?? PlatformSettings.defaults;
   }
 }
 

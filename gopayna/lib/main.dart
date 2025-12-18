@@ -1,4 +1,6 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'dart:async';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'intro_screen.dart';
 import 'app_settings.dart';
@@ -11,7 +13,27 @@ import 'idle_timeout_service.dart';
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() {
-  runApp(const MyApp());
+  // Global error handling to prevent crashes
+  FlutterError.onError = (FlutterErrorDetails details) {
+    FlutterError.presentError(details);
+    if (kReleaseMode) {
+      // In release mode, log but don't crash
+      debugPrint('Flutter Error: ${details.exception}');
+    }
+  };
+  
+  // Handle async errors - ensure initialization and runApp are in the same zone
+  runZonedGuarded(
+    () {
+      // Ensure Flutter is initialized INSIDE the zone
+      WidgetsFlutterBinding.ensureInitialized();
+      runApp(const MyApp());
+    },
+    (error, stackTrace) {
+      debugPrint('Uncaught error: $error');
+      debugPrint('Stack trace: $stackTrace');
+    },
+  );
 }
 
 class MyApp extends StatefulWidget {

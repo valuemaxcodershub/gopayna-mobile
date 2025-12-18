@@ -34,7 +34,8 @@ class _FundWalletScreenState extends State<FundWalletScreen>
   bool _loading = false;
   double? _walletBalance;
   bool _isVerifying = false;
-  final List<Map<String, dynamic>> _quickAmounts = [
+  PlatformSettings? _platformSettings;
+  List<Map<String, dynamic>> _quickAmounts = [
     {'amount': 1000, 'label': '₦1,000'},
     {'amount': 5000, 'label': '₦5,000'},
     {'amount': 10000, 'label': '₦10,000'},
@@ -130,14 +131,25 @@ class _FundWalletScreenState extends State<FundWalletScreen>
       return;
     }
 
-    if (amount > 40000) {
-      _showSnack('Maximum funding per transaction is ₦40,000.', isError: true);
+    // Use dynamic settings (fallback to defaults)
+    final settings = _platformSettings ?? PlatformSettings.defaults;
+    final maxFunding = settings.maxFundingAmount.toInt();
+    final maxWallet = settings.maxWalletBalance.toInt();
+    final minFunding = settings.minFundingAmount.toInt();
+
+    if (amount < minFunding) {
+      _showSnack('Minimum funding amount is ₦$minFunding.', isError: true);
+      return;
+    }
+
+    if (amount > maxFunding) {
+      _showSnack('Maximum funding per transaction is ₦${_currencyFormat.format(maxFunding).replaceAll('₦', '').trim()}.', isError: true);
       return;
     }
 
     final currentBalance = _walletBalance ?? 0;
-    if (currentBalance + amount > 100000) {
-      _showSnack('Wallet balance cannot exceed ₦100,000. Reduce the amount and try again.', isError: true);
+    if (currentBalance + amount > maxWallet) {
+      _showSnack('Wallet balance cannot exceed ₦${_currencyFormat.format(maxWallet).replaceAll('₦', '').trim()}. Reduce the amount and try again.', isError: true);
       return;
     }
 
@@ -576,7 +588,29 @@ class _FundWalletScreenState extends State<FundWalletScreen>
     _slideController.forward();
     _scaleController.forward();
 
+    // Load platform settings and wallet balance
+    _loadPlatformSettings();
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadWalletBalance());
+  }
+
+  Future<void> _loadPlatformSettings() async {
+    final settings = await fetchPlatformSettings();
+    if (!mounted) return;
+    setState(() {
+      _platformSettings = settings;
+      // Update quick amounts if max funding is different from default
+      final maxFunding = settings.maxFundingAmount.toInt();
+      if (maxFunding != 40000) {
+        _quickAmounts = [
+          {'amount': 1000, 'label': '₦1,000'},
+          {'amount': 5000, 'label': '₦5,000'},
+          {'amount': 10000, 'label': '₦10,000'},
+          {'amount': 20000, 'label': '₦20,000'},
+          if (maxFunding >= 30000) {'amount': 30000, 'label': '₦30,000'},
+          if (maxFunding >= 40000) {'amount': maxFunding, 'label': '₦${_currencyFormat.format(maxFunding).replaceAll('₦', '').trim()}'},
+        ];
+      }
+    });
   }
 
   @override
@@ -836,11 +870,14 @@ class _FundWalletScreenState extends State<FundWalletScreen>
                           return 'Please enter an amount';
                         }
                         final amount = int.tryParse(value);
-                        if (amount == null || amount < 100) {
-                          return 'Minimum amount is ₦100';
+                        final settings = _platformSettings ?? PlatformSettings.defaults;
+                        final minFunding = settings.minFundingAmount.toInt();
+                        final maxFunding = settings.maxFundingAmount.toInt();
+                        if (amount == null || amount < minFunding) {
+                          return 'Minimum amount is ₦$minFunding';
                         }
-                        if (amount > 40000) {
-                          return 'Maximum amount you can fund at a time is ₦40,000';
+                        if (amount > maxFunding) {
+                          return 'Maximum amount you can fund at a time is ₦${_currencyFormat.format(maxFunding).replaceAll('₦', '').trim()}';
                         }
                         return null;
                       },

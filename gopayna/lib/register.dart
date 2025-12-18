@@ -406,6 +406,32 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
                                     if (_formKey.currentState!.validate()) {
                                       HapticFeedback.lightImpact();
                                       setState(() => _isLoading = true);
+                                      
+                                      // Check platform settings before registration
+                                      final settings = await fetchPlatformSettings();
+                                      if (settings.maintenanceMode) {
+                                        if (!context.mounted) return;
+                                        setState(() => _isLoading = false);
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(
+                                            content: Text('Service is currently under maintenance. Please try again later.'),
+                                            backgroundColor: Colors.red,
+                                          ),
+                                        );
+                                        return;
+                                      }
+                                      if (!settings.allowRegistrations) {
+                                        if (!context.mounted) return;
+                                        setState(() => _isLoading = false);
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(
+                                            content: Text('New registrations are temporarily disabled. Please try again later.'),
+                                            backgroundColor: Colors.red,
+                                          ),
+                                        );
+                                        return;
+                                      }
+                                      
                                       final result = await registerUser(
                                         _firstNameController.text,
                                         _lastNameController.text,
