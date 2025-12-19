@@ -1,0 +1,125 @@
+workflows:
+  ios-workflow:
+    name: iOS Workflow
+    max_build_duration: 120
+    instance_type: mac_mini_m1
+    integrations:
+      app_store_connect: codemagic
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+      vars:
+        # iOS Bundle identifier
+        BUNDLE_ID: "com.gopayna.app"
+        APP_STORE_CONNECT_ISSUER_ID: Encrypted(...) # Add your App Store Connect Issuer ID
+        APP_STORE_CONNECT_KEY_IDENTIFIER: Encrypted(...) # Add your App Store Connect Key ID
+        APP_STORE_CONNECT_PRIVATE_KEY: Encrypted(...) # Add your App Store Connect Private Key
+        CERTIFICATE_PRIVATE_KEY: Encrypted(...) # Add your iOS Distribution Certificate Private Key
+        # Optional: If you have a specific team ID
+        # APP_STORE_CONNECT_TEAM_ID: Encrypted(...)
+      node: 18
+    cache:
+      cache_paths:
+        - $FLUTTER_ROOT/.pub-cache
+        - $HOME/.gradle/caches
+        - $HOME/Library/Caches/CocoaPods
+    triggering:
+      events:
+        - push
+        - tag
+        - pull_request
+      branch_patterns:
+        - pattern: main
+          include: true
+          source: true
+        - pattern: develop
+          include: true
+          source: true
+        - pattern: release/*
+          include: true
+          source: true
+    scripts:
+      - name: Set up code signing settings on Xcode project
+        script: |
+          xcode-project use-profiles
+      - name: Get Flutter dependencies
+        script: |
+          flutter pub get
+      - name: Install CocoaPods dependencies
+        script: |
+          cd ios && pod install
+      - name: Set up provisioning profiles settings on Xcode project
+        script: |
+          xcode-project use-profiles
+      - name: Build ipa for distribution
+        script: |
+          flutter build ipa --release \
+            --build-name=1.0.$BUILD_NUMBER \
+            --build-number=$BUILD_NUMBER
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - flutter_drive.log
+    publishing:
+      email:
+        recipients:
+          - user@example.com # Replace with your email
+        notify:
+          success: true
+          failure: true
+      app_store_connect:
+        auth: integration
+        # Configuration for App Store Connect
+        submit_to_testflight: true
+        submit_to_app_store: false # Set to true when ready for production
+        
+  # Optional: Add a debug workflow for testing
+  ios-debug:
+    name: iOS Debug Build
+    max_build_duration: 60
+    instance_type: mac_mini_m1
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+      vars:
+        BUNDLE_ID: "com.gopayna.app"
+    cache:
+      cache_paths:
+        - $FLUTTER_ROOT/.pub-cache
+    triggering:
+      events:
+        - pull_request
+      branch_patterns:
+        - pattern: develop
+          include: true
+          source: true
+        - pattern: feature/*
+          include: true
+          source: true
+    scripts:
+      - name: Get Flutter dependencies
+        script: |
+          flutter pub get
+      - name: Install CocoaPods dependencies
+        script: |
+          cd ios && pod install
+      - name: Flutter analyze
+        script: |
+          flutter analyze
+      - name: Run Flutter tests
+        script: |
+          flutter test
+      - name: Build iOS debug
+        script: |
+          flutter build ios --debug --no-codesign
+    artifacts:
+      - flutter_drive.log
+    publishing:
+      email:
+        recipients:
+          - user@example.com # Replace with your email
+        notify:
+          success: false
+          failure: true
