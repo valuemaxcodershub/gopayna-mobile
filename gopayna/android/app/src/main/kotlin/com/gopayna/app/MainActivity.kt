@@ -1,4 +1,4 @@
-package com.example.gopayna
+package com.gopayna.app
 
 import io.flutter.embedding.android.FlutterActivity
 

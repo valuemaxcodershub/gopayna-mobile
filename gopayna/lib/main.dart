@@ -9,23 +9,23 @@ import 'otp_verification.dart';
 import 'dashboard.dart';
 import 'idle_timeout_service.dart';
 
-/// Global navigator key for accessing navigator from anywhere
+
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() {
-  // Global error handling to prevent crashes
+  
   FlutterError.onError = (FlutterErrorDetails details) {
     FlutterError.presentError(details);
     if (kReleaseMode) {
-      // In release mode, log but don't crash
+      
       debugPrint('Flutter Error: ${details.exception}');
     }
   };
   
-  // Handle async errors - ensure initialization and runApp are in the same zone
+ 
   runZonedGuarded(
     () {
-      // Ensure Flutter is initialized INSIDE the zone
+      
       WidgetsFlutterBinding.ensureInitialized();
       runApp(const MyApp());
     },
@@ -77,11 +77,11 @@ class _MyAppState extends State<MyApp> {
   }
 
   void _handleIdleTimeout() async {
-    // Clear token and navigate to login
+    
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('jwt');
     
-    // Show message and navigate to login
+    
     if (navigatorKey.currentContext != null) {
       ScaffoldMessenger.of(navigatorKey.currentContext!).showSnackBar(
         const SnackBar(
@@ -92,7 +92,7 @@ class _MyAppState extends State<MyApp> {
       );
     }
     
-    // Navigate to login and clear stack
+    
     navigatorKey.currentState?.pushNamedAndRemoveUntil('/login', (route) => false);
   }
 

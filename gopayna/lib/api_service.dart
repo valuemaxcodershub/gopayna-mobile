@@ -452,6 +452,13 @@ String _generateRequestSignature({
 
   // Data to sign: timestamp + bodyHash (must match backend algorithm)
   final dataToSign = '$timestamp$bodyHash';
+  
+  // Debug logging for signature debugging
+  if (kDebugMode) {
+    print('[SIGNATURE_DEBUG] Body String: $bodyString');
+    print('[SIGNATURE_DEBUG] Body Hash: $bodyHash');
+    print('[SIGNATURE_DEBUG] Data to Sign: $dataToSign');
+  }
 
   // Generate HMAC-SHA256 signature
   final hmac = Hmac(sha256, utf8.encode(_appSigningKey));
@@ -474,6 +481,14 @@ Map<String, String> _signedAuthorizedHeaders(
 
   // Format: "timestamp.signature" to match backend expectation
   final signatureHeader = '$timestamp.$signature';
+  
+  // Debug logging for signature issues
+  if (kDebugMode) {
+    print('[API_DEBUG] Timestamp: $timestamp');
+    print('[API_DEBUG] Body: ${body ?? "{}"}');
+    print('[API_DEBUG] Signature: $signature');
+    print('[API_DEBUG] Full Header: $signatureHeader');
+  }
 
   return {
     'Content-Type': 'application/json',
@@ -1211,10 +1226,15 @@ Future<Map<String, dynamic>> buyAirtime(
   String? bonusType,
 }) async {
   try {
+    // Convert amount to int if it's a whole number to match JavaScript JSON.stringify behavior
+    // JavaScript: JSON.stringify({amount: 100.0}) => {"amount":100}
+    // Dart: jsonEncode({amount: 100.0}) => {"amount":100.0}
+    final numAmount = amount == amount.truncateToDouble() ? amount.toInt() : amount;
+    
     final body = {
       'network': network,
       'phone': phone,
-      'amount': amount,
+      'amount': numAmount,
     };
     if (bonusType != null) {
       body['bonusType'] = bonusType;
@@ -1292,11 +1312,14 @@ Future<Map<String, dynamic>> buyElectricity(
   String? phone,
 }) async {
   try {
+    // Convert amount to int if whole number for JS compatibility
+    final numAmount = amount == amount.truncateToDouble() ? amount.toInt() : amount;
+    
     final bodyJson = jsonEncode({
       'disco': disco,
       'meterType': meterType,
       'meterNumber': meterNumber,
-      'amount': amount,
+      'amount': numAmount,
       'phone': phone ?? '',
     });
     final response = await http.post(
