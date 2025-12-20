@@ -11,13 +11,8 @@
     <key>uploadSymbols</key>
     <true/>
     <key>signingStyle</key>
-    <string>manual</string>
-    <key>provisioningProfiles</key>
-    <dict>
-        <key>com.gopayna.app</key>
-        <string>GoPayna App Store Distribution</string>
-    </dict>
-    <key>signingCertificate</key>
-    <string>iPhone Distribution</string>
+    <string>automatic</string>
+    <key>teamID</key>
+    <string>TQWXNLXN3C</string>
 </dict>
 </plist>
