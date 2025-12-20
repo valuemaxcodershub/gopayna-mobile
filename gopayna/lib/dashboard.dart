@@ -9,7 +9,7 @@ import 'referral_screen.dart';
 import 'all_transactions_history.dart';
 import 'support.dart';
 import 'fund_wallet.dart';
-// import 'withdraw_fund.dart'; // TODO: Re-enable when withdrawal feature is ready
+
 import 'buy_airtime.dart';
 import 'buy_data.dart';
 import 'buy_electricity.dart';
@@ -760,7 +760,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                   behavior: SnackBarBehavior.floating,
                 ),
               );
-              // TODO: Re-enable when ready
+              
               // Navigator.push(
               //   context,
               //   MaterialPageRoute(
