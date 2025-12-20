@@ -11,8 +11,13 @@
     <key>uploadSymbols</key>
     <true/>
     <key>signingStyle</key>
-    <string>automatic</string>
+    <string>manual</string>
     <key>teamID</key>
     <string>TQWXNLXN3C</string>
+    <key>provisioningProfiles</key>
+    <dict>
+        <key>com.gopayna.app</key>
+        <string>match AppStore com.gopayna.app</string>
+    </dict>
 </dict>
 </plist>
