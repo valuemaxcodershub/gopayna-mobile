@@ -27,7 +27,7 @@ class _ReferrerPageState extends State<ReferrerPage>
   bool _showHistory = false;
   double? _referralBalance;
   double? _walletBalance;
-  int _referralSuccessCount = 0;
+  int _referralPendingCount = 0;
   bool _isProcessingWithdrawal = false;
   bool _isSummaryLoading = true;
   String? _summaryError;
@@ -137,8 +137,8 @@ class _ReferrerPageState extends State<ReferrerPage>
             double.tryParse(user['referralBonusWallet']?.toString() ?? '') ?? 0;
         _walletBalance =
             double.tryParse(user['walletBalance']?.toString() ?? '') ?? 0;
-        _referralSuccessCount =
-            int.tryParse(user['referralSuccessCount']?.toString() ?? '0') ?? 0;
+        _referralPendingCount =
+            int.tryParse(user['referralPendingCount']?.toString() ?? '0') ?? 0;
         _isSummaryLoading = false;
       });
 
@@ -673,7 +673,7 @@ class _ReferrerPageState extends State<ReferrerPage>
                 ),
                 SizedBox(width: isTablet ? 8 : 6),
                 Text(
-                  '$_referralSuccessCount successful referrals',
+                  '$_referralPendingCount/3 pending referrals',
                   style: TextStyle(
                     color: _colorScheme.onPrimary.withValues(alpha: 0.85),
                     fontSize: isTablet ? 14 : 12,
@@ -1096,7 +1096,11 @@ class _ReferrerPageState extends State<ReferrerPage>
                       style: TextStyle(
                         fontSize: isTablet ? 18 : 16,
                         fontWeight: FontWeight.bold,
-                        color: accentColor,
+                        color: earning.status.toLowerCase() == 'pending' 
+                          ? _mutedText 
+                          : earning.type.toLowerCase().contains('withdraw')
+                            ? Colors.red
+                            : accentColor,
                       ),
                     ),
                     SizedBox(height: isTablet ? 4 : 2),
@@ -1106,7 +1110,11 @@ class _ReferrerPageState extends State<ReferrerPage>
                         vertical: isTablet ? 4 : 2,
                       ),
                       decoration: BoxDecoration(
-                        color: accentColor,
+                        color: earning.status.toLowerCase() == 'pending' 
+                          ? Colors.orange 
+                          : earning.status.toLowerCase() == 'completed'
+                            ? accentColor
+                            : Colors.red,
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
@@ -1275,6 +1283,7 @@ String _deriveReferralType(String rawType) {
     case 'referral_progress':
       return 'Referral Signup';
     case 'referral_bonus':
+      return 'Referral Bonus';
     default:
       return 'Referral Bonus';
   }
