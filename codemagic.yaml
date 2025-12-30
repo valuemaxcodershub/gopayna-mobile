@@ -1,5 +1,53 @@
 workflows:
-  # iOS App Store Distribution Build
+  # iOS Development Build (No Code Signing - For Testing)
+  ios-development:
+    name: iOS Development Build
+    max_build_duration: 60
+    instance_type: mac_mini_m1
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+      vars:
+        BUNDLE_ID: "com.gopayna.app.dev"
+    cache:
+      cache_paths:
+        - $FLUTTER_ROOT/.pub-cache
+        - $HOME/Library/Caches/CocoaPods
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
+          source: true
+    scripts:
+      - name: Get Flutter dependencies
+        script: |
+          flutter pub get
+      - name: Install CocoaPods dependencies
+        script: |
+          cd ios && pod install
+      - name: Flutter analyze
+        script: |
+          flutter analyze
+      - name: Build iOS for development (no signing)
+        script: |
+          flutter build ios --debug --no-codesign \
+            --build-name=1.0.$BUILD_NUMBER \
+            --build-number=$BUILD_NUMBER
+    artifacts:
+      - build/ios/iphoneos/Runner.app
+      - flutter_drive.log
+    publishing:
+      email:
+        recipients:
+          - valuemaxcodershub@gmail.com
+        notify:
+          success: true
+          failure: true
+
+  # iOS App Store Distribution Build (Requires Code Signing)
   ios-appstore:
     name: iOS App Store Build
     max_build_duration: 120
@@ -12,10 +60,11 @@ workflows:
       cocoapods: default
       vars:
         BUNDLE_ID: "com.gopayna.app"
-        APP_STORE_CONNECT_ISSUER_ID: Encrypted(...) # Add your App Store Connect Issuer ID
-        APP_STORE_CONNECT_KEY_IDENTIFIER: Encrypted(...) # Add your App Store Connect Key ID
-        APP_STORE_CONNECT_PRIVATE_KEY: Encrypted(...) # Add your App Store Connect Private Key
-        CERTIFICATE_PRIVATE_KEY: Encrypted(...) # Add your iOS Distribution Certificate Private Key
+        # These will be set in Codemagic web interface as encrypted variables
+        # APP_STORE_CONNECT_ISSUER_ID: Set in Codemagic UI
+        # APP_STORE_CONNECT_KEY_IDENTIFIER: Set in Codemagic UI  
+        # APP_STORE_CONNECT_PRIVATE_KEY: Set in Codemagic UI
+        # CERTIFICATE_PRIVATE_KEY: Set in Codemagic UI
     cache:
       cache_paths:
         - $FLUTTER_ROOT/.pub-cache
@@ -57,7 +106,7 @@ workflows:
     publishing:
       email:
         recipients:
-          - user@example.com # Replace with your email
+          - valuemaxcodershub@gmail.com # Replace with your email
         notify:
           success: true
           failure: true
@@ -112,7 +161,7 @@ workflows:
     publishing:
       email:
         recipients:
-          - user@example.com # Replace with your email
+          - valuemaxcodershub@gmail.com # Replace with your email
         notify:
           success: false
           failure: true
