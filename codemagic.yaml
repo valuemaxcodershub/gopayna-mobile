@@ -1,5 +1,65 @@
 workflows:
-  # iOS Device Testing Build (Signed for iPhone)
+  # TestFlight Distribution (No UDID Required)
+  ios-testflight:
+    name: iOS TestFlight Build
+    max_build_duration: 60
+    instance_type: mac_mini_m1
+    integrations:
+      app_store_connect: codemagic
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.gopayna.app
+      vars:
+        BUNDLE_ID: "com.gopayna.app"
+        # Set these in Codemagic UI as encrypted variables
+        # APP_STORE_CONNECT_ISSUER_ID: Your issuer ID
+        # APP_STORE_CONNECT_KEY_IDENTIFIER: Your key ID  
+        # APP_STORE_CONNECT_PRIVATE_KEY: Your private key
+    cache:
+      cache_paths:
+        - $FLUTTER_ROOT/.pub-cache
+        - $HOME/Library/Caches/CocoaPods
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: release
+          include: true
+          source: true
+    scripts:
+      - name: Get Flutter dependencies
+        script: |
+          flutter pub get
+      - name: Install CocoaPods dependencies
+        script: |
+          cd ios && pod install
+      - name: Flutter analyze
+        script: |
+          flutter analyze
+      - name: Build IPA for TestFlight
+        script: |
+          flutter build ipa --release \
+            --export-method=app-store \
+            --build-name=1.0.$BUILD_NUMBER \
+            --build-number=$BUILD_NUMBER
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - flutter_drive.log
+    publishing:
+      email:
+        recipients:
+          - valuemaxcodershub@gmail.com
+        notify:
+          success: true
+          failure: true
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        submit_to_app_store: false
   ios-device:
     name: iOS Device Testing Build
     max_build_duration: 60
