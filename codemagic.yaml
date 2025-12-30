@@ -1,15 +1,18 @@
 workflows:
-  # iOS Development Build (No Code Signing - For Testing)
+  # iOS Development Build (For Device Testing)
   ios-development:
-    name: iOS Development Build
+    name: iOS Development Build  
     max_build_duration: 60
     instance_type: mac_mini_m1
+    integrations:
+      app_store_connect: codemagic
     environment:
       flutter: stable
       xcode: latest
       cocoapods: default
       vars:
         BUNDLE_ID: "com.gopayna.app.dev"
+        # Will use automatic code signing for development
     cache:
       cache_paths:
         - $FLUTTER_ROOT/.pub-cache
@@ -31,13 +34,14 @@ workflows:
       - name: Flutter analyze
         script: |
           flutter analyze
-      - name: Build iOS for development (no signing)
+      - name: Build IPA for development
         script: |
-          flutter build ios --debug --no-codesign \
+          flutter build ipa --release \
+            --export-method=development \
             --build-name=1.0.$BUILD_NUMBER \
             --build-number=$BUILD_NUMBER
     artifacts:
-      - build/ios/iphoneos/Runner.app
+      - build/ios/ipa/*.ipa
       - flutter_drive.log
     publishing:
       email:
