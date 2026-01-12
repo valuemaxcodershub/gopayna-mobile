@@ -4,8 +4,6 @@ workflows:
     name: iOS TestFlight Build
     max_build_duration: 60
     instance_type: mac_mini_m1
-    integrations:
-      app_store_connect: codemagic
     environment:
       flutter: stable
       xcode: latest
@@ -16,9 +14,9 @@ workflows:
       vars:
         BUNDLE_ID: "com.gopayna.app"
         # Set these in Codemagic UI as encrypted variables
-        # APP_STORE_CONNECT_ISSUER_ID: Your issuer ID
-        # APP_STORE_CONNECT_KEY_IDENTIFIER: Your key ID  
-        # APP_STORE_CONNECT_PRIVATE_KEY: Your private key
+        APP_STORE_CONNECT_ISSUER_ID: Your issuer ID
+        APP_STORE_CONNECT_KEY_IDENTIFIER: Your key ID  
+        APP_STORE_CONNECT_PRIVATE_KEY: Your private key
     cache:
       cache_paths:
         - $FLUTTER_ROOT/.pub-cache
@@ -57,7 +55,10 @@ workflows:
           success: true
           failure: true
       app_store_connect:
-        auth: integration
+        auth: api_key
+        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
+        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
+        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
         submit_to_testflight: true
         submit_to_app_store: false
   ios-device:
