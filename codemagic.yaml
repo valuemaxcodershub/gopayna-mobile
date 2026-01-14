@@ -23,7 +23,8 @@ workflows:
       cache_paths:
         - $FLUTTER_ROOT/.pub-cache
         - $HOME/Library/Caches/CocoaPods
-    trigger
+    triggering:
+      events:
         - push
       branch_patterns:
         - pattern: main
