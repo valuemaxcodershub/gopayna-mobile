@@ -15,10 +15,6 @@ workflows:
         bundle_identifier: com.gopayna.app3
       vars:
         BUNDLE_ID: "com.gopayna.app3"
-        # Set these in Codemagic UI as encrypted variables
-        APP_STORE_CONNECT_ISSUER_ID: Your issuer ID
-        APP_STORE_CONNECT_KEY_IDENTIFIER: Your key ID  
-        APP_STORE_CONNECT_PRIVATE_KEY: Your private key
     cache:
       cache_paths:
         - $FLUTTER_ROOT/.pub-cache
@@ -171,12 +167,7 @@ workflows:
       xcode: latest
       cocoapods: default
       vars:
-        BUNDLE_ID: "com.gopayna.app"
-        # These will be set in Codemagic web interface as encrypted variables
-        # APP_STORE_CONNECT_ISSUER_ID: Set in Codemagic UI
-        # APP_STORE_CONNECT_KEY_IDENTIFIER: Set in Codemagic UI  
-        # APP_STORE_CONNECT_PRIVATE_KEY: Set in Codemagic UI
-        # CERTIFICATE_PRIVATE_KEY: Set in Codemagic UI
+        BUNDLE_ID: "com.gopayna.app3"
     cache:
       cache_paths:
         - $FLUTTER_ROOT/.pub-cache
