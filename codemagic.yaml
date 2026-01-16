@@ -12,9 +12,9 @@ workflows:
       cocoapods: default
       ios_signing:
         distribution_type: app_store
-        bundle_identifier: com.gopayna.app2
+        bundle_identifier: com.gopayna.app3
       vars:
-        BUNDLE_ID: "com.gopayna.app2"
+        BUNDLE_ID: "com.gopayna.app3"
         # Set these in Codemagic UI as encrypted variables
         APP_STORE_CONNECT_ISSUER_ID: Your issuer ID
         APP_STORE_CONNECT_KEY_IDENTIFIER: Your key ID  
@@ -70,9 +70,9 @@ workflows:
       cocoapods: default
       ios_signing:
         distribution_type: development
-        bundle_identifier: com.gopayna.app2
+        bundle_identifier: com.gopayna.app3
       vars:
-        BUNDLE_ID: "com.gopayna.app2"
+        BUNDLE_ID: "com.gopayna.app3"
     cache:
       cache_paths:
         - $FLUTTER_ROOT/.pub-cache
