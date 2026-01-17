@@ -15,9 +15,6 @@ workflows:
         bundle_identifier: com.gopayna.app3
       vars:
         BUNDLE_ID: "com.gopayna.app3"
-        APP_STORE_CONNECT_ISSUER_ID: $APP_STORE_CONNECT_ISSUER_ID
-        APP_STORE_CONNECT_KEY_IDENTIFIER: $APP_STORE_CONNECT_KEY_IDENTIFIER
-        APP_STORE_CONNECT_PRIVATE_KEY: $APP_STORE_CONNECT_PRIVATE_KEY
     cache:
       cache_paths:
         - $FLUTTER_ROOT/.pub-cache
