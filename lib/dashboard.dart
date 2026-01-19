@@ -395,7 +395,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                       builder: (context) => const SettingScreen(),
                     ),
                   );
-                  _refreshWalletBalance();
+                  if (mounted) _refreshWalletBalance();
                 },
                 child: Container(
                   width: 40,
@@ -815,7 +815,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                   builder: (context) => const BuyAirtimeScreen(),
                 ),
               );
-              _refreshWalletBalance();
+              if (mounted) _refreshWalletBalance();
             } else if (service.title == 'Data') {
               await Navigator.push(
                 context,
@@ -823,7 +823,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                   builder: (context) => const BuyDataScreen(),
                 ),
               );
-              _refreshWalletBalance();
+              if (mounted) _refreshWalletBalance();
             } else if (service.title == 'Electricity') {
               await Navigator.push(
                 context,
@@ -831,7 +831,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                   builder: (context) => const BuyElectricityScreen(),
                 ),
               );
-              _refreshWalletBalance();
+              if (mounted) _refreshWalletBalance();
             } else if (service.title == 'TV') {
               await Navigator.push(
                 context,
@@ -839,7 +839,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                   builder: (context) => const BuyTVSubscriptionScreen(),
                 ),
               );
-              _refreshWalletBalance();
+              if (mounted) _refreshWalletBalance();
             } else if (service.title == 'Education') {
               await Navigator.push(
                 context,
@@ -847,7 +847,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                   builder: (context) => const BuyEducationPinScreen(),
                 ),
               );
-              _refreshWalletBalance();
+              if (mounted) _refreshWalletBalance();
             }
           },
           child: Container(
@@ -932,7 +932,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                         builder: (context) => const TransactionHistoryScreen(),
                       ),
                     );
-                    _refreshWalletBalance();
+                    if (mounted) _refreshWalletBalance();
                   },
                   child: Text(
                     'View All',
@@ -1125,7 +1125,7 @@ class _DashboardScreenState extends State<DashboardScreen>
               builder: (context) => const SettingScreen(),
             ),
           );
-          _refreshWalletBalance();
+          if (mounted) _refreshWalletBalance();
         }
 
         // Navigate to Referrer page when Reffer tab is tapped
@@ -1136,7 +1136,7 @@ class _DashboardScreenState extends State<DashboardScreen>
               builder: (context) => const ReferrerPage(),
             ),
           );
-          _refreshWalletBalance();
+          if (mounted) _refreshWalletBalance();
         }
 
         // Navigate to Support page when Help tab is tapped
@@ -1147,7 +1147,7 @@ class _DashboardScreenState extends State<DashboardScreen>
               builder: (context) => const SupportScreen(),
             ),
           );
-          _refreshWalletBalance();
+          if (mounted) _refreshWalletBalance();
         }
       },
       child: AnimatedContainer(
