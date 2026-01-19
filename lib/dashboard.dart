@@ -46,7 +46,7 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   bool _balanceVisible = false;
   int _selectedTab = 0;
-  
+
   List<Transaction> _recentTransactions = [];
   bool _transactionsLoading = false;
 
@@ -96,7 +96,8 @@ class _DashboardScreenState extends State<DashboardScreen>
         });
       }
     } catch (e) {
-      log('Error loading recent transactions: $e', name: '_DashboardScreenState');
+      log('Error loading recent transactions: $e',
+          name: '_DashboardScreenState');
     } finally {
       if (mounted) {
         setState(() {
@@ -164,7 +165,6 @@ class _DashboardScreenState extends State<DashboardScreen>
       // _lastActivity = DateTime.now();
     }
   }
-
 
   Future<void> _refreshWalletBalance({String? token}) async {
     token ??= (await SharedPreferences.getInstance()).getString('jwt');
@@ -388,13 +388,14 @@ class _DashboardScreenState extends State<DashboardScreen>
           title: Row(
             children: [
               GestureDetector(
-                onTap: () {
-                  Navigator.push(
+                onTap: () async {
+                  await Navigator.push(
                     context,
                     MaterialPageRoute(
                       builder: (context) => const SettingScreen(),
                     ),
                   );
+                  _refreshWalletBalance();
                 },
                 child: Container(
                   width: 40,
@@ -604,7 +605,9 @@ class _DashboardScreenState extends State<DashboardScreen>
                       style: TextStyle(
                         color: colorScheme.onPrimary,
                         fontSize: _balanceVisible
-                            ? (isTablet ? 28 : 22) // Reduced font size for better fit
+                            ? (isTablet
+                                ? 28
+                                : 22) // Reduced font size for better fit
                             : (isTablet ? 18 : 16),
                         fontWeight: FontWeight.bold,
                         letterSpacing: _balanceVisible ? 1 : 2,
@@ -615,13 +618,15 @@ class _DashboardScreenState extends State<DashboardScreen>
                       children: [
                         Flexible(
                           child: GestureDetector(
-                            onTap: () {
-                              Navigator.push(
+                            onTap: () async {
+                              await Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (context) => const FundWalletScreen(),
+                                  builder: (context) =>
+                                      const FundWalletScreen(),
                                 ),
                               );
+                              _refreshWalletBalance();
                             },
                             child: Container(
                               padding: EdgeInsets.symmetric(
@@ -629,12 +634,13 @@ class _DashboardScreenState extends State<DashboardScreen>
                                 vertical: isTablet ? 10 : 8,
                               ),
                               decoration: BoxDecoration(
-                                color: colorScheme.onPrimary.withValues(alpha: 0.2),
+                                color: colorScheme.onPrimary
+                                    .withValues(alpha: 0.2),
                                 borderRadius:
                                     BorderRadius.circular(isTablet ? 22 : 18),
                                 border: Border.all(
-                                  color:
-                                      colorScheme.onPrimary.withValues(alpha: 0.35),
+                                  color: colorScheme.onPrimary
+                                      .withValues(alpha: 0.35),
                                   width: 1,
                                 ),
                               ),
@@ -666,13 +672,15 @@ class _DashboardScreenState extends State<DashboardScreen>
                         SizedBox(width: isTablet ? 12 : 6),
                         Flexible(
                           child: GestureDetector(
-                            onTap: () {
-                              Navigator.push(
+                            onTap: () async {
+                              await Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (context) => const TransactionHistoryScreen(),
+                                  builder: (context) =>
+                                      const TransactionHistoryScreen(),
                                 ),
                               );
+                              _refreshWalletBalance();
                             },
                             child: Container(
                               padding: EdgeInsets.symmetric(
@@ -684,8 +692,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                                 borderRadius:
                                     BorderRadius.circular(isTablet ? 22 : 18),
                                 border: Border.all(
-                                  color:
-                                      Colors.white.withValues(alpha: 0.3),
+                                  color: Colors.white.withValues(alpha: 0.3),
                                   width: 1,
                                 ),
                               ),
@@ -700,7 +707,9 @@ class _DashboardScreenState extends State<DashboardScreen>
                                   SizedBox(width: isTablet ? 6 : 4),
                                   Flexible(
                                     child: Text(
-                                      isTablet ? 'Transaction History' : 'History',
+                                      isTablet
+                                          ? 'Transaction History'
+                                          : 'History',
                                       style: TextStyle(
                                         color: Colors.white,
                                         fontSize: isTablet ? 12 : 10,
@@ -781,7 +790,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         duration: Duration(milliseconds: 200 + (index * 50)),
         curve: Curves.easeOutCubic,
         child: GestureDetector(
-          onTap: () {
+          onTap: () async {
             HapticFeedback.lightImpact();
             if (service.title == 'Betting') {
               // Withdrawal functionality temporarily disabled
@@ -792,7 +801,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                   behavior: SnackBarBehavior.floating,
                 ),
               );
-              
+
               // Navigator.push(
               //   context,
               //   MaterialPageRoute(
@@ -800,40 +809,45 @@ class _DashboardScreenState extends State<DashboardScreen>
               //   ),
               // );
             } else if (service.title == 'Airtime') {
-              Navigator.push(
+              await Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (context) => const BuyAirtimeScreen(),
                 ),
               );
+              _refreshWalletBalance();
             } else if (service.title == 'Data') {
-              Navigator.push(
+              await Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (context) => const BuyDataScreen(),
                 ),
               );
+              _refreshWalletBalance();
             } else if (service.title == 'Electricity') {
-              Navigator.push(
+              await Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (context) => const BuyElectricityScreen(),
                 ),
               );
+              _refreshWalletBalance();
             } else if (service.title == 'TV') {
-              Navigator.push(
+              await Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (context) => const BuyTVSubscriptionScreen(),
                 ),
               );
+              _refreshWalletBalance();
             } else if (service.title == 'Education') {
-              Navigator.push(
+              await Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (context) => const BuyEducationPinScreen(),
                 ),
               );
+              _refreshWalletBalance();
             }
           },
           child: Container(
@@ -885,7 +899,7 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   Widget _buildRecentTransactions(bool isTablet) {
     final colorScheme = Theme.of(context).colorScheme;
-    
+
     if (_recentTransactions.isEmpty && !_transactionsLoading) {
       return const SizedBox.shrink();
     }
@@ -911,13 +925,14 @@ class _DashboardScreenState extends State<DashboardScreen>
               ),
               if (_recentTransactions.isNotEmpty)
                 GestureDetector(
-                  onTap: () {
-                    Navigator.push(
+                  onTap: () async {
+                    await Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (context) => const TransactionHistoryScreen(),
                       ),
                     );
+                    _refreshWalletBalance();
                   },
                   child: Text(
                     'View All',
@@ -945,9 +960,11 @@ class _DashboardScreenState extends State<DashboardScreen>
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: _recentTransactions.length,
-              separatorBuilder: (context, index) => SizedBox(height: isTablet ? 12 : 8),
+              separatorBuilder: (context, index) =>
+                  SizedBox(height: isTablet ? 12 : 8),
               itemBuilder: (context, index) {
-                return _buildRecentTransactionItem(_recentTransactions[index], isTablet);
+                return _buildRecentTransactionItem(
+                    _recentTransactions[index], isTablet);
               },
             ),
         ],
@@ -1056,9 +1073,6 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
-
-
-
   Widget _buildBottomNavigation(bool isTablet) {
     final colorScheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -1097,7 +1111,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     final colorScheme = Theme.of(context).colorScheme;
     final unselectedColor = colorScheme.onSurface.withValues(alpha: 0.55);
     return GestureDetector(
-      onTap: () {
+      onTap: () async {
         setState(() {
           _selectedTab = index;
         });
@@ -1105,32 +1119,35 @@ class _DashboardScreenState extends State<DashboardScreen>
 
         // Navigate to Settings screen when Settings tab is tapped
         if (index == 3 && label == 'Settings') {
-          Navigator.push(
+          await Navigator.push(
             context,
             MaterialPageRoute(
               builder: (context) => const SettingScreen(),
             ),
           );
+          _refreshWalletBalance();
         }
 
         // Navigate to Referrer page when Reffer tab is tapped
         if (index == 2 && label == 'Reffer') {
-          Navigator.push(
+          await Navigator.push(
             context,
             MaterialPageRoute(
               builder: (context) => const ReferrerPage(),
             ),
           );
+          _refreshWalletBalance();
         }
 
         // Navigate to Support page when Help tab is tapped
         if (index == 1 && label == 'Help') {
-          Navigator.push(
+          await Navigator.push(
             context,
             MaterialPageRoute(
               builder: (context) => const SupportScreen(),
             ),
           );
+          _refreshWalletBalance();
         }
       },
       child: AnimatedContainer(
@@ -1241,9 +1258,13 @@ class Transaction {
 
     // Build a better title based on service type
     String title;
-    
+
     // Check if this is a wallet funding (credit) transaction
-    if (isIncoming && (channel == 'card' || channel == 'paystack' || channel == 'bank' || channel == 'transfer')) {
+    if (isIncoming &&
+        (channel == 'card' ||
+            channel == 'paystack' ||
+            channel == 'bank' ||
+            channel == 'transfer')) {
       title = 'Wallet Funding';
     } else if (serviceType == 'airtime') {
       title = 'Airtime Purchase';
@@ -1276,7 +1297,8 @@ class Transaction {
         title = 'Wallet Transaction';
       }
     } else {
-      title = channel.isEmpty ? 'Wallet Transaction' : _titleCaseStatic(channel);
+      title =
+          channel.isEmpty ? 'Wallet Transaction' : _titleCaseStatic(channel);
     }
 
     final formattedDate =
@@ -1356,25 +1378,28 @@ class Transaction {
 
     if (metadata != null) {
       final serviceType = metadata!['serviceType']?.toString() ?? '';
-      
+
       // Add Service Type
       String serviceDisplayName = _getServiceDisplayName(serviceType);
       if (serviceDisplayName.isNotEmpty) {
-        extraDetails.add(ReceiptField(label: 'Service', value: serviceDisplayName));
+        extraDetails
+            .add(ReceiptField(label: 'Service', value: serviceDisplayName));
       }
-      
+
       // Add Service Provider
       String serviceProvider = _getServiceProvider(serviceType, metadata!);
       if (serviceProvider.isNotEmpty) {
-        extraDetails.add(ReceiptField(label: 'Service Provider', value: serviceProvider));
+        extraDetails.add(
+            ReceiptField(label: 'Service Provider', value: serviceProvider));
       }
-      
+
       // Add Recipient (Phone/Meter/Smart Card/Email)
       String recipient = _getRecipient(serviceType, metadata!);
       if (recipient.isNotEmpty) {
-        extraDetails.add(ReceiptField(label: _getRecipientLabel(serviceType), value: recipient));
+        extraDetails.add(ReceiptField(
+            label: _getRecipientLabel(serviceType), value: recipient));
       }
-      
+
       // Add additional service-specific details
       _addServiceSpecificDetails(serviceType, metadata!, extraDetails);
     }
@@ -1392,7 +1417,7 @@ class Transaction {
       extraDetails: extraDetails,
     );
   }
-  
+
   // Helper function to get service display name
   String _getServiceDisplayName(String serviceType) {
     switch (serviceType.toLowerCase()) {
@@ -1410,9 +1435,10 @@ class Transaction {
         return serviceType.isNotEmpty ? serviceType.toUpperCase() : '';
     }
   }
-  
+
   // Helper function to get service provider
-  String _getServiceProvider(String serviceType, Map<String, dynamic> metadata) {
+  String _getServiceProvider(
+      String serviceType, Map<String, dynamic> metadata) {
     switch (serviceType.toLowerCase()) {
       case 'airtime':
       case 'data':
@@ -1431,7 +1457,7 @@ class Transaction {
         return '';
     }
   }
-  
+
   // Helper function to get recipient
   String _getRecipient(String serviceType, Map<String, dynamic> metadata) {
     switch (serviceType.toLowerCase()) {
@@ -1446,7 +1472,9 @@ class Transaction {
         }
         return metadata['meterNumber']?.toString() ?? '';
       case 'tv':
-        return metadata['smartcardNumber']?.toString() ?? metadata['smartCardNumber']?.toString() ?? '';
+        return metadata['smartcardNumber']?.toString() ??
+            metadata['smartCardNumber']?.toString() ??
+            '';
       case 'education':
         final email = metadata['email']?.toString();
         if (email != null && email.isNotEmpty) {
@@ -1457,7 +1485,7 @@ class Transaction {
         return '';
     }
   }
-  
+
   // Helper function to get recipient label
   String _getRecipientLabel(String serviceType) {
     switch (serviceType.toLowerCase()) {
@@ -1469,12 +1497,12 @@ class Transaction {
       case 'tv':
         return 'Smart Card Number';
       case 'education':
-        return 'Purchase To'; // Can be email or candidate number  
+        return 'Purchase To'; // Can be email or candidate number
       default:
         return 'Recipient';
     }
   }
-  
+
   // Helper function to get disco display name
   String _getDiscoDisplayName(String disco) {
     switch (disco.toUpperCase()) {
@@ -1512,9 +1540,10 @@ class Transaction {
         return disco.isNotEmpty ? disco.toUpperCase() : 'Unknown';
     }
   }
-  
+
   // Helper function to add service-specific additional details
-  void _addServiceSpecificDetails(String serviceType, Map<String, dynamic> metadata, List<ReceiptField> extraDetails) {
+  void _addServiceSpecificDetails(String serviceType,
+      Map<String, dynamic> metadata, List<ReceiptField> extraDetails) {
     switch (serviceType.toLowerCase()) {
       case 'airtime':
         // Add airtime value if different from amount (discounted purchases)
@@ -1523,14 +1552,15 @@ class Transaction {
           extraDetails.add(ReceiptField(
               label: 'Airtime Value', value: '₦${airtimeValue.toString()}'));
         }
-        
+
         // Add discount if applicable
         final discount = metadata['discount'];
         if (discount != null && discount > 0) {
-          extraDetails.add(ReceiptField(label: 'Discount', value: '$discount%'));
+          extraDetails
+              .add(ReceiptField(label: 'Discount', value: '$discount%'));
         }
         break;
-        
+
       case 'data':
         // Add plan ID for data
         final planId = metadata['planId']?.toString();
@@ -1538,49 +1568,59 @@ class Transaction {
           extraDetails.add(ReceiptField(label: 'Plan ID', value: planId));
         }
         break;
-        
+
       case 'electricity':
         // Add meter number if email was primary recipient
         final email = metadata['email']?.toString();
         final meterNumber = metadata['meterNumber']?.toString();
-        if (email != null && email.isNotEmpty && meterNumber != null && meterNumber.isNotEmpty) {
-          extraDetails.add(ReceiptField(label: 'Meter Number', value: meterNumber));
+        if (email != null &&
+            email.isNotEmpty &&
+            meterNumber != null &&
+            meterNumber.isNotEmpty) {
+          extraDetails
+              .add(ReceiptField(label: 'Meter Number', value: meterNumber));
         }
-        
+
         // Add electricity amount and service charge
         final electricityAmount = metadata['electricityAmount'];
         if (electricityAmount != null) {
           extraDetails.add(ReceiptField(
-              label: 'Electricity Amount', value: '₦${electricityAmount.toString()}'));
+              label: 'Electricity Amount',
+              value: '₦${electricityAmount.toString()}'));
         }
-        
+
         final serviceCharge = metadata['serviceCharge'];
         if (serviceCharge != null && serviceCharge > 0) {
           extraDetails.add(ReceiptField(
               label: 'Service Charge', value: '₦${serviceCharge.toString()}'));
         }
         break;
-        
+
       case 'tv':
         // Add customer name if available
         final customerName = metadata['customerName']?.toString();
         if (customerName != null && customerName.isNotEmpty) {
-          extraDetails.add(ReceiptField(label: 'Customer Name', value: customerName));
+          extraDetails
+              .add(ReceiptField(label: 'Customer Name', value: customerName));
         }
         break;
-        
+
       case 'education':
         // Add exam code
         final examCode = metadata['examCode']?.toString();
         if (examCode != null && examCode.isNotEmpty) {
           extraDetails.add(ReceiptField(label: 'Exam Code', value: examCode));
         }
-        
+
         // Add candidate details if email was primary
         final email = metadata['email']?.toString();
         final candidateNumber = metadata['candidateNumber']?.toString();
-        if (email != null && email.isNotEmpty && candidateNumber != null && candidateNumber.isNotEmpty) {
-          extraDetails.add(ReceiptField(label: 'Candidate Number', value: candidateNumber));
+        if (email != null &&
+            email.isNotEmpty &&
+            candidateNumber != null &&
+            candidateNumber.isNotEmpty) {
+          extraDetails.add(
+              ReceiptField(label: 'Candidate Number', value: candidateNumber));
         }
         break;
     }
