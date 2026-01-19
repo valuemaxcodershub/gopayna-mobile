@@ -1118,7 +1118,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         HapticFeedback.lightImpact();
 
         // Navigate to Settings screen when Settings tab is tapped
-        if (index == 3 && label == 'Settings') {
+        if (index == 3 && label == 'Settings' && mounted) {
           await Navigator.push(
             context,
             MaterialPageRoute(
@@ -1129,7 +1129,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         }
 
         // Navigate to Referrer page when Reffer tab is tapped
-        if (index == 2 && label == 'Reffer') {
+        if (index == 2 && label == 'Reffer' && mounted) {
           await Navigator.push(
             context,
             MaterialPageRoute(
@@ -1140,7 +1140,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         }
 
         // Navigate to Support page when Help tab is tapped
-        if (index == 1 && label == 'Help') {
+        if (index == 1 && label == 'Help' && mounted) {
           await Navigator.push(
             context,
             MaterialPageRoute(
