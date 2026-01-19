@@ -1,4 +1,1 @@
 #include "Generated.xcconfig"
-CODE_SIGN_STYLE = Automatic
-DEVELOPMENT_TEAM = TQWXNLXN3C
-CODE_SIGN_IDENTITY = Apple Distribution
