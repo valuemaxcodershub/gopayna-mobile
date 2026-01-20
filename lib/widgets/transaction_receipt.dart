@@ -207,7 +207,12 @@ class _TransactionReceiptSheet extends StatelessWidget {
   }
 
   Future<void> _shareReceipt(TransactionReceiptData data) async {
-    await Share.share(data.buildShareMessage(), subject: 'GoPayna Receipt');
+    await SharePlus.instance.share(
+      ShareParams(
+        text: data.buildShareMessage(),
+        subject: 'GoPayna Receipt',
+      ),
+    );
   }
 }
 

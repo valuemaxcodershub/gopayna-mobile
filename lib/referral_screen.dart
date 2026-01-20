@@ -1185,7 +1185,12 @@ class _ReferrerPageState extends State<ReferrerPage>
 
     HapticFeedback.lightImpact();
     try {
-      await Share.share(message, subject: 'Join me on Gopayna');
+      await SharePlus.instance.share(
+        ShareParams(
+          text: message,
+          subject: 'Join me on Gopayna',
+        ),
+      );
     } catch (_) {
       Clipboard.setData(ClipboardData(text: message));
       _showSnack('Share unavailable. Referral message copied.');
