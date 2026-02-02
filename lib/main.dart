@@ -9,23 +9,18 @@ import 'otp_verification.dart';
 import 'dashboard.dart';
 import 'services/inactivity_service.dart';
 
-
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() {
-  
   FlutterError.onError = (FlutterErrorDetails details) {
     FlutterError.presentError(details);
     if (kReleaseMode) {
-      
       debugPrint('Flutter Error: ${details.exception}');
     }
   };
-  
- 
+
   runZonedGuarded(
     () {
-      
       WidgetsFlutterBinding.ensureInitialized();
       runApp(const MyApp());
     },
@@ -53,7 +48,7 @@ class _MyAppState extends State<MyApp> {
     _appSettings = AppSettings();
     _appSettings.addListener(_onThemeChanged);
     _startDestinationFuture = _determineStartDestination();
-    
+
     // Initialize inactivity service
     InactivityService().initialize(onTimeout: _handleInactivityTimeout);
   }
@@ -86,20 +81,22 @@ class _MyAppState extends State<MyApp> {
     // Clear stored session data
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('jwt');
-    
+
     // Show session expired message
     if (navigatorKey.currentContext != null) {
       ScaffoldMessenger.of(navigatorKey.currentContext!).showSnackBar(
         const SnackBar(
-          content: Text('Session expired due to inactivity. Please login again.'),
+          content:
+              Text('Session expired due to inactivity. Please login again.'),
           backgroundColor: Colors.orange,
           duration: Duration(seconds: 4),
         ),
       );
     }
-    
+
     // Navigate to login screen
-    navigatorKey.currentState?.pushNamedAndRemoveUntil('/login', (route) => false);
+    navigatorKey.currentState
+        ?.pushNamedAndRemoveUntil('/login', (route) => false);
   }
 
   @override
@@ -133,8 +130,10 @@ class _MyAppState extends State<MyApp> {
         routes: {
           '/login': (context) => LoginScreen(),
           '/otp': (context) {
-            final email = ModalRoute.of(context)?.settings.arguments as String? ?? '';
-            return OtpVerificationScreen(email: email, purpose: OtpPurpose.registration);
+            final email =
+                ModalRoute.of(context)?.settings.arguments as String? ?? '';
+            return OtpVerificationScreen(
+                email: email, purpose: OtpPurpose.registration);
           },
           '/dashboard': (context) => const DashboardScreen(),
         },
@@ -152,11 +151,12 @@ class GoPaynaHomePage extends StatefulWidget {
   State<GoPaynaHomePage> createState() => _GoPaynaHomePageState();
 }
 
-class _GoPaynaHomePageState extends State<GoPaynaHomePage> with TickerProviderStateMixin {
+class _GoPaynaHomePageState extends State<GoPaynaHomePage>
+    with TickerProviderStateMixin {
   late AnimationController _logoController;
   late AnimationController _fadeController;
   late AnimationController _buttonController;
-  
+
   late Animation<double> _logoScale;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _buttonSlide;
@@ -165,17 +165,17 @@ class _GoPaynaHomePageState extends State<GoPaynaHomePage> with TickerProviderSt
   @override
   void initState() {
     super.initState();
-    
+
     _logoController = AnimationController(
       duration: const Duration(milliseconds: 1800),
       vsync: this,
     );
-    
+
     _fadeController = AnimationController(
       duration: const Duration(milliseconds: 1200),
       vsync: this,
     );
-    
+
     _buttonController = AnimationController(
       duration: const Duration(milliseconds: 1000),
       vsync: this,
@@ -236,127 +236,141 @@ class _GoPaynaHomePageState extends State<GoPaynaHomePage> with TickerProviderSt
     final size = MediaQuery.of(context).size;
     final isTablet = size.width > 600;
     final brandColor = Theme.of(context).colorScheme.primary;
-    
+
     return Scaffold(
       backgroundColor: brandColor,
       body: SafeArea(
-        child: Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: isTablet ? 60.0 : 40.0,
-            vertical: isTablet ? 60.0 : 40.0,
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              const Spacer(flex: 2),
-              
-              AnimatedBuilder(
-                animation: _logoController,
-                builder: (context, child) {
-                  return Transform.scale(
-                    scale: _logoScale.value,
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        // Logo
-                        SizedBox(
-                          width: isTablet ? 120 : 100,
-                          height: isTablet ? 120 : 100,
-                          child: Image.asset(
-                            'assets/logowhite.png',
-                            fit: BoxFit.contain,
+        child: Center(
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: isTablet ? 60.0 : 32.0,
+              vertical: isTablet ? 60.0 : 40.0,
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                const Spacer(flex: 2),
+
+                // Animated Logo and Title Section
+                AnimatedBuilder(
+                  animation: _logoController,
+                  builder: (context, child) {
+                    return Transform.scale(
+                      scale: _logoScale.value,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          // Logo - centered properly
+                          Center(
+                            child: SizedBox(
+                              width: isTablet ? 120 : 100,
+                              height: isTablet ? 120 : 100,
+                              child: Image.asset(
+                                'assets/logowhite.png',
+                                fit: BoxFit.contain,
+                              ),
+                            ),
                           ),
-                        ),
-                        
-                        SizedBox(height: isTablet ? 20 : 16),
-                        
-                        // App Name
-                        Text(
-                          'GoPayna',
-                          style: TextStyle(
-                            fontSize: isTablet ? 32 : 28,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                            letterSpacing: 1.0,
+
+                          SizedBox(height: isTablet ? 20 : 16),
+
+                          // App Name - centered
+                          Center(
+                            child: Text(
+                              'GoPayna',
+                              style: TextStyle(
+                                fontSize: isTablet ? 32 : 28,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                                letterSpacing: 1.0,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
                           ),
-                          textAlign: TextAlign.center,
+                        ],
+                      ),
+                    );
+                  },
+                ),
+
+                SizedBox(height: isTablet ? 16 : 12),
+
+                // Animated Tagline - centered
+                FadeTransition(
+                  opacity: _fadeAnimation,
+                  child: Center(
+                    child: Container(
+                      constraints: BoxConstraints(
+                        maxWidth: isTablet ? 350 : 280,
+                      ),
+                      child: Text(
+                        'Your best Payment in seconds',
+                        style: TextStyle(
+                          fontSize: isTablet ? 16 : 15,
+                          fontWeight: FontWeight.w400,
+                          color: Colors.white.withValues(alpha: 0.9),
+                          height: 1.4,
+                          letterSpacing: 0.3,
                         ),
-                      ],
+                        textAlign: TextAlign.center,
+                      ),
                     ),
-                  );
-                },
-              ),
-              
-              SizedBox(height: isTablet ? 16 : 12),
-              
-              // Animated Tagline
-              FadeTransition(
-                opacity: _fadeAnimation,
-                child: Container(
-                  constraints: BoxConstraints(
-                    maxWidth: isTablet ? 350 : 280,
-                  ),
-                  child: Text(
-                    'Your best Payment in seconds',
-                    style: TextStyle(
-                      fontSize: isTablet ? 16 : 15,
-                      fontWeight: FontWeight.w400,
-                      color: Colors.white.withValues(alpha: 0.9),
-                      height: 1.4,
-                      letterSpacing: 0.3,
-                    ),
-                    textAlign: TextAlign.center,
                   ),
                 ),
-              ),
-              
-              const Spacer(flex: 3),
-              
-              // Animated Get Started button
-              SlideTransition(
-                position: _buttonSlide,
-                child: ScaleTransition(
-                  scale: _buttonScale,
-                  child: Container(
-                    width: isTablet ? 280 : 250,
-                    height: isTablet ? 56 : 52,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(28),
-                      color: Colors.white,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.1),
-                          blurRadius: 20,
-                          offset: const Offset(0, 10),
-                          spreadRadius: 0,
+
+                const Spacer(flex: 3),
+
+                // Animated Get Started button - centered
+                SlideTransition(
+                  position: _buttonSlide,
+                  child: ScaleTransition(
+                    scale: _buttonScale,
+                    child: Center(
+                      child: Container(
+                        width: isTablet ? 280 : 250,
+                        height: isTablet ? 56 : 52,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(28),
+                          color: Colors.white,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.1),
+                              blurRadius: 20,
+                              offset: const Offset(0, 10),
+                              spreadRadius: 0,
+                            ),
+                            BoxShadow(
+                              color: Colors.white.withValues(alpha: 0.2),
+                              blurRadius: 8,
+                              offset: const Offset(0, -2),
+                              spreadRadius: 0,
+                            ),
+                          ],
                         ),
-                        BoxShadow(
-                          color: Colors.white.withValues(alpha: 0.2),
-                          blurRadius: 8,
-                          offset: const Offset(0, -2),
-                          spreadRadius: 0,
-                        ),
-                      ],
-                    ),
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(28),
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (context) => const LoadingPage()),
-                          );
-                        },
-                        child: Center(
-                          child: Text(
-                            'Get Started',
-                            style: TextStyle(
-                              fontSize: isTablet ? 18 : 16,
-                              fontWeight: FontWeight.w600,
-                              color: brandColor,
-                              letterSpacing: 0.5,
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(28),
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (context) => const LoadingPage()),
+                              );
+                            },
+                            child: Center(
+                              child: Text(
+                                'Get Started',
+                                style: TextStyle(
+                                  fontSize: isTablet ? 18 : 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: brandColor,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
                             ),
                           ),
                         ),
@@ -364,14 +378,13 @@ class _GoPaynaHomePageState extends State<GoPaynaHomePage> with TickerProviderSt
                     ),
                   ),
                 ),
-              ),
-              
-              SizedBox(height: isTablet ? 60 : 50),
-            ],
+
+                SizedBox(height: isTablet ? 60 : 50),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 }
-
