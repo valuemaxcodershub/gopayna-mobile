@@ -9,8 +9,9 @@ class InactivityService {
   InactivityService._internal();
 
   Timer? _inactivityTimer;
-  static const Duration _inactivityDuration = Duration(minutes: 7);
+  static const Duration _inactivityDuration = Duration(minutes: 10);
   VoidCallback? _onInactivityTimeout;
+  static const String _lastActivityKey = 'last_activity_at';
 
   /// Initialize the inactivity service with a callback for when timeout occurs
   void initialize({required VoidCallback onTimeout}) {
@@ -23,6 +24,7 @@ class InactivityService {
     _inactivityTimer = Timer(_inactivityDuration, () {
       _handleInactivityTimeout();
     });
+    _storeLastActivity();
   }
 
   /// Stop the inactivity timer (call when user logs out)
@@ -36,9 +38,15 @@ class InactivityService {
     // Clear stored session data
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('jwt');
+    await prefs.remove(_lastActivityKey);
     
     // Call the logout callback
     _onInactivityTimeout?.call();
+  }
+
+  Future<void> _storeLastActivity() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_lastActivityKey, DateTime.now().millisecondsSinceEpoch);
   }
 
   /// Dispose of resources

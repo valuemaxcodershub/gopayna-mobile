@@ -8,6 +8,7 @@ import 'login.dart';
 import 'otp_verification.dart';
 import 'dashboard.dart';
 import 'services/inactivity_service.dart';
+import 'api_service.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
@@ -41,6 +42,8 @@ class MyApp extends StatefulWidget {
 class _MyAppState extends State<MyApp> {
   late AppSettings _appSettings;
   late Future<_StartDestination> _startDestinationFuture;
+  static const String _lastActivityKey = 'last_activity_at';
+  static const Duration _sessionReauthDuration = Duration(minutes: 10);
 
   @override
   void initState() {
@@ -67,6 +70,22 @@ class _MyAppState extends State<MyApp> {
   Future<_StartDestination> _determineStartDestination() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('jwt');
+    final lastActivityMs = prefs.getInt(_lastActivityKey);
+
+    if (token != null && token.isNotEmpty) {
+      if (lastActivityMs == null) {
+        await prefs.remove('jwt');
+        return _StartDestination.onboarding;
+      }
+
+      final lastActivity = DateTime.fromMillisecondsSinceEpoch(lastActivityMs);
+      final idleTime = DateTime.now().difference(lastActivity);
+      if (idleTime >= _sessionReauthDuration) {
+        await prefs.remove('jwt');
+        await prefs.remove(_lastActivityKey);
+        return _StartDestination.onboarding;
+      }
+    }
 
     if (token != null && token.isNotEmpty) {
       // Start inactivity timer for logged-in users
@@ -80,7 +99,12 @@ class _MyAppState extends State<MyApp> {
   void _handleInactivityTimeout() async {
     // Clear stored session data
     final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('jwt');
+    if (token != null && token.isNotEmpty) {
+      await logoutUser(token);
+    }
     await prefs.remove('jwt');
+    await prefs.remove(_lastActivityKey);
 
     // Show session expired message
     if (navigatorKey.currentContext != null) {
@@ -250,8 +274,6 @@ class _GoPaynaHomePageState extends State<GoPaynaHomePage>
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                const Spacer(flex: 2),
-
                 // Animated Logo and Title Section
                 AnimatedBuilder(
                   animation: _logoController,
@@ -321,7 +343,7 @@ class _GoPaynaHomePageState extends State<GoPaynaHomePage>
                   ),
                 ),
 
-                const Spacer(flex: 3),
+                SizedBox(height: isTablet ? 48 : 40),
 
                 // Animated Get Started button - centered
                 SlideTransition(
@@ -378,8 +400,7 @@ class _GoPaynaHomePageState extends State<GoPaynaHomePage>
                     ),
                   ),
                 ),
-
-                SizedBox(height: isTablet ? 60 : 50),
+                SizedBox(height: isTablet ? 40 : 32),
               ],
             ),
           ),

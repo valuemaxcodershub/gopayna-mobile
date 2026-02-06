@@ -292,7 +292,12 @@ class _DashboardScreenState extends State<DashboardScreen>
     IdleTimeoutService().dispose();
 
     final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('jwt');
+    if (token != null && token.isNotEmpty) {
+      await logoutUser(token);
+    }
     await prefs.remove('jwt');
+    await prefs.remove('last_activity_at');
     if (!mounted) return;
     Navigator.pushAndRemoveUntil(
       context,

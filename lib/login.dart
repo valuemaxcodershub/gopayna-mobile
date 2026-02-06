@@ -160,12 +160,13 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
       setState(() => _isLoading = true);
       
       // Get device ID for single-device login enforcement
-      final deviceId = await CredentialsService.getOrCreateDeviceId();
+      final deviceInfo = await CredentialsService.getDeviceIdInfo();
       
       final result = await loginUser(
         _usernameController.text,
         _passwordController.text,
-        deviceId: deviceId,
+        deviceId: deviceInfo.deviceId,
+        forceLogin: deviceInfo.isNew,
       );
       if (!mounted) return;
       setState(() => _isLoading = false);
@@ -188,12 +189,55 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
         
         // Check for device conflict
         if (errorCode == 'DEVICE_CONFLICT') {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('This account is already logged in on another device. Please log out from the other device first.'),
-              backgroundColor: Colors.orange,
-              duration: const Duration(seconds: 5),
-            ),
+          final shouldForce = await showDialog<bool>(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('Active session detected'),
+                  content: const Text(
+                      'This account is already logged in on another device. Do you want to sign out from other devices and continue here?'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      child: const Text('Cancel'),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, true),
+                      child: const Text('Continue'),
+                    ),
+                  ],
+                ),
+              ) ??
+              false;
+
+          if (!shouldForce) {
+            return;
+          }
+
+          setState(() => _isLoading = true);
+          final retryResult = await loginUser(
+            _usernameController.text,
+            _passwordController.text,
+            deviceId: deviceInfo.deviceId,
+            forceLogin: true,
+          );
+          if (!mounted) return;
+          setState(() => _isLoading = false);
+
+          if (retryResult['error'] != null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(retryResult['error'].toString()), backgroundColor: Colors.red),
+            );
+            return;
+          }
+
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('jwt', retryResult['token']);
+          await CredentialsService.saveUsername(_usernameController.text.trim());
+          InactivityService().resetTimer();
+          if (!mounted) return;
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const DashboardScreen()),
           );
           return;
         }

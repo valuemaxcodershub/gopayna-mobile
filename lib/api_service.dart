@@ -93,7 +93,7 @@ Future<Map<String, dynamic>> registerUser(String firstName, String lastName,
 }
 
 Future<Map<String, dynamic>> loginUser(
-    String usernameOrEmail, String password, {String? deviceId}) async {
+    String usernameOrEmail, String password, {String? deviceId, bool forceLogin = false}) async {
   try {
     final requestBody = {
       'identifier': usernameOrEmail, // <-- use 'identifier'
@@ -103,6 +103,10 @@ Future<Map<String, dynamic>> loginUser(
     // Add device ID if provided for single-device login enforcement
     if (deviceId != null) {
       requestBody['deviceId'] = deviceId;
+    }
+
+    if (forceLogin) {
+      requestBody['forceLogin'] = true;
     }
     
     final response = await http.post(
@@ -136,6 +140,17 @@ Future<Map<String, dynamic>> loginUser(
   } catch (e) {
     log('Login exception: $e', name: 'api_service');
     return {'error': 'Unable to connect. Please check your internet connection.'};
+  }
+}
+
+Future<void> logoutUser(String token) async {
+  try {
+    await http.post(
+      Uri.parse('$baseUrl/logout'),
+      headers: _authorizedJsonHeaders(token),
+    );
+  } catch (e) {
+    log('Logout request failed: $e', name: 'api_service');
   }
 }
 
