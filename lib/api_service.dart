@@ -95,7 +95,7 @@ Future<Map<String, dynamic>> registerUser(String firstName, String lastName,
 Future<Map<String, dynamic>> loginUser(
     String usernameOrEmail, String password, {String? deviceId, bool forceLogin = false}) async {
   try {
-    final requestBody = {
+    final Map<String, dynamic> requestBody = {
       'identifier': usernameOrEmail, // <-- use 'identifier'
       'password': password,
     };
