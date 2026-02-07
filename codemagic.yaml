@@ -1,10 +1,11 @@
 workflows:
+  # TestFlight Distribution (No UDID Required)
   ios-testflight:
-    name: iOS TestFlight (Auto Signing)
-    max_build_duration: 90
+    name: iOS TestFlight Build
+    max_build_duration: 60
     instance_type: mac_mini_m1
     integrations:
-      app_store_connect: codemagic
+      app_store_connect: codemagic Gopayna
     environment:
       flutter: stable
       xcode: latest
@@ -12,13 +13,204 @@ workflows:
       ios_signing:
         distribution_type: app_store
         bundle_identifier: com.gopayna.app3
+      vars:
+        BUNDLE_ID: "com.gopayna.app3"
+        APPLE_TEAM_ID: "TQWXNLXN3C"
+    cache:
+      cache_paths:
+        - $FLUTTER_ROOT/.pub-cache
+        - $HOME/Library/Caches/CocoaPods
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
+          source: true
     scripts:
-      - flutter pub get
-      - cd ios && pod install
-      - flutter build ipa --release
+      - name: Set up keychain for code signing
+        script: |
+          keychain initialize
+      - name: Install signing certificates
+        script: |
+          keychain add-certificates
+      - name: Get Flutter dependencies
+        script: |
+          flutter pub get
+      - name: Install CocoaPods dependencies
+        script: |
+          cd ios && pod install
+      - name: Flutter analyze
+        script: |
+          flutter analyze
+      - name: Apply provisioning profiles
+        script: |
+          xcode-project use-profiles
+      - name: Print signing environment
+        script: |
+          printenv | grep -E "APPLE_TEAM_ID|APP_STORE_CONNECT_PROFILE" || true
+      - name: List installed provisioning profiles
+        script: |
+          ls -la "$HOME/Library/MobileDevice/Provisioning Profiles" || true
+      - name: Create export options plist
+        script: |
+          TEAM_ID="${APPLE_TEAM_ID:-TQWXNLXN3C}"
+          PROFILE_PATH=$(ls "$HOME/Library/MobileDevice/Provisioning Profiles"/*.mobileprovision | head -n 1)
+          security cms -D -i "$PROFILE_PATH" > "$CM_BUILD_DIR/profile.plist"
+          PROFILE_NAME=$(/usr/libexec/PlistBuddy -c "Print :Name" "$CM_BUILD_DIR/profile.plist")
+          PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print :UUID" "$CM_BUILD_DIR/profile.plist")
+          if [ -z "$PROFILE_NAME" ]; then echo "Missing provisioning profile name"; exit 1; fi
+          cat <<EOF > $CM_BUILD_DIR/export_options.plist
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store</string>
+            <key>signingStyle</key>
+            <string>manual</string>
+            <key>teamID</key>
+            <string>${TEAM_ID}</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>${BUNDLE_ID}</key>
+              <string>${PROFILE_NAME}</string>
+            </dict>
+          </dict>
+          </plist>
+          EOF
+          echo "Using profile: $PROFILE_NAME ($PROFILE_UUID)"
+      - name: Build IPA for TestFlight
+        script: |
+          flutter build ipa --release \
+            --build-name=1.0.$BUILD_NUMBER \
+            --build-number=$BUILD_NUMBER \
+            --export-options-plist=$CM_BUILD_DIR/export_options.plist
+      - name: List IPA output
+        script: |
+          ls -la build/ios/ipa || true
     artifacts:
       - build/ios/ipa/*.ipa
+      - build/ios/archive/*.xcarchive
+      - flutter_drive.log
     publishing:
+      email:
+        recipients:
+          - valuemaxcodershub@gmail.com
+        notify:
+          success: true
+          failure: true
       app_store_connect:
         auth: integration
         submit_to_testflight: true
+        submit_to_app_store: false
+
+  # iOS App Store Distribution Build (Requires Code Signing)
+  ios-appstore:
+    name: iOS App Store Build
+    max_build_duration: 120
+    instance_type: mac_mini_m1
+    integrations:
+      app_store_connect: codemagic Gopayna
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.gopayna.app3
+      vars:
+        BUNDLE_ID: "com.gopayna.app3"
+        APPLE_TEAM_ID: "TQWXNLXN3C"
+    cache:
+      cache_paths:
+        - $FLUTTER_ROOT/.pub-cache
+        - $HOME/Library/Caches/CocoaPods
+    triggering:
+      events:
+        - push
+        - tag
+      branch_patterns:
+        - pattern: main
+          include: true
+          source: true
+        - pattern: release/*
+          include: true
+          source: true
+    scripts:
+      - name: Set up keychain for code signing
+        script: |
+          keychain initialize
+      - name: Install signing certificates
+        script: |
+          keychain add-certificates
+      - name: Get Flutter dependencies
+        script: |
+          flutter pub get
+      - name: Install CocoaPods dependencies
+        script: |
+          cd ios && pod install
+      - name: Flutter analyze
+        script: |
+          flutter analyze
+      - name: Apply provisioning profiles
+        script: |
+          xcode-project use-profiles
+      - name: Print signing environment
+        script: |
+          printenv | grep -E "APPLE_TEAM_ID|APP_STORE_CONNECT_PROFILE" || true
+      - name: List installed provisioning profiles
+        script: |
+          ls -la "$HOME/Library/MobileDevice/Provisioning Profiles" || true
+      - name: Create export options plist
+        script: |
+          TEAM_ID="${APPLE_TEAM_ID:-TQWXNLXN3C}"
+          PROFILE_PATH=$(ls "$HOME/Library/MobileDevice/Provisioning Profiles"/*.mobileprovision | head -n 1)
+          security cms -D -i "$PROFILE_PATH" > "$CM_BUILD_DIR/profile.plist"
+          PROFILE_NAME=$(/usr/libexec/PlistBuddy -c "Print :Name" "$CM_BUILD_DIR/profile.plist")
+          PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print :UUID" "$CM_BUILD_DIR/profile.plist")
+          if [ -z "$PROFILE_NAME" ]; then echo "Missing provisioning profile name"; exit 1; fi
+          cat <<EOF > $CM_BUILD_DIR/export_options.plist
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store</string>
+            <key>signingStyle</key>
+            <string>manual</string>
+            <key>teamID</key>
+            <string>${TEAM_ID}</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>${BUNDLE_ID}</key>
+              <string>${PROFILE_NAME}</string>
+            </dict>
+          </dict>
+          </plist>
+          EOF
+          echo "Using profile: $PROFILE_NAME ($PROFILE_UUID)"
+      - name: Build IPA for App Store
+        script: |
+          flutter build ipa --release \
+            --build-name=1.0.$BUILD_NUMBER \
+            --build-number=$BUILD_NUMBER \
+            --export-options-plist=$CM_BUILD_DIR/export_options.plist
+      - name: List IPA output
+        script: |
+          ls -la build/ios/ipa || true
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - build/ios/archive/*.xcarchive
+      - flutter_drive.log
+    publishing:
+      email:
+        recipients:
+          - valuemaxcodershub@gmail.com
+        notify:
+          success: true
+          failure: true
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        submit_to_app_store: false
