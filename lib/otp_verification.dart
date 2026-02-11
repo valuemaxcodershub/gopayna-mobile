@@ -210,9 +210,10 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
         elevation: 0,
       ),
       backgroundColor: Colors.white,
-      body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
-        child: Column(
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
+          child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Text(
@@ -318,7 +319,8 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
               ),
               child: const Text('Generate New OTP'),
             ),
-          ],
+            ],
+          ),
         ),
       ),
     );

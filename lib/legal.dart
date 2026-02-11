@@ -124,14 +124,17 @@ class _LegalScreenState extends State<LegalScreen>
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: Column(
-        children: [
-          _buildCustomStatusBar(statusBarHeight),
-          _buildHeader(isTablet),
-          Expanded(
-            child: _buildLegalContent(isTablet),
-          ),
-        ],
+      body: SafeArea(
+        top: false,
+        child: Column(
+          children: [
+            _buildCustomStatusBar(statusBarHeight),
+            _buildHeader(isTablet),
+            Expanded(
+              child: _buildLegalContent(isTablet),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -760,7 +760,9 @@ class _DashboardScreenState extends State<DashboardScreen>
           title: 'Education',
           color: const Color(0xFF00CA44)),
       ServiceItem(
-          icon: Icons.money, title: 'Betting', color: const Color(0xFF00CA44)),
+          icon: Icons.card_giftcard,
+          title: 'Earn',
+          color: const Color(0xFF00CA44)),
     ];
 
     return ScaleTransition(
@@ -797,22 +799,13 @@ class _DashboardScreenState extends State<DashboardScreen>
         child: GestureDetector(
           onTap: () async {
             HapticFeedback.lightImpact();
-            if (service.title == 'Betting') {
-              // Withdrawal functionality temporarily disabled
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: const Text('Betting feature coming soon!'),
-                  backgroundColor: colorScheme.primary,
-                  behavior: SnackBarBehavior.floating,
+            if (service.title == 'Earn') {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const ReferrerPage(),
                 ),
               );
-
-              // Navigator.push(
-              //   context,
-              //   MaterialPageRoute(
-              //     builder: (context) => const WithdrawFundScreen(),
-              //   ),
-              // );
             } else if (service.title == 'Airtime') {
               await Navigator.push(
                 context,
@@ -1103,7 +1096,7 @@ class _DashboardScreenState extends State<DashboardScreen>
           children: [
             _buildNavItem(Icons.home, 'Home', 0, isTablet),
             _buildNavItem(Icons.headset_mic, 'Help', 1, isTablet),
-            _buildNavItem(Icons.people, 'Reffer', 2, isTablet),
+            _buildNavItem(Icons.people, 'Refer', 2, isTablet),
             _buildNavItem(Icons.settings, 'Settings', 3, isTablet),
           ],
         ),
@@ -1133,8 +1126,8 @@ class _DashboardScreenState extends State<DashboardScreen>
           if (mounted) _refreshWalletBalance();
         }
 
-        // Navigate to Referrer page when Reffer tab is tapped
-        if (index == 2 && label == 'Reffer' && mounted) {
+        // Navigate to Referrer page when Refer tab is tapped
+        if (index == 2 && label == 'Refer' && mounted) {
           await Navigator.push(
             context,
             MaterialPageRoute(

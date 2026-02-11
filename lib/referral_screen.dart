@@ -308,14 +308,17 @@ class _ReferrerPageState extends State<ReferrerPage>
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: Column(
-        children: [
-          _buildCustomStatusBar(statusBarHeight),
-          _buildHeader(isTablet),
-          Expanded(
-            child: _buildContent(isTablet),
-          ),
-        ],
+      body: SafeArea(
+        top: false,
+        child: Column(
+          children: [
+            _buildCustomStatusBar(statusBarHeight),
+            _buildHeader(isTablet),
+            Expanded(
+              child: _buildContent(isTablet),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -373,7 +376,7 @@ class _ReferrerPageState extends State<ReferrerPage>
             SizedBox(width: isTablet ? 12 : 8),
             Expanded(
               child: Text(
-                'Refferals',
+                'Referrals',
                 style: TextStyle(
                   fontSize: isTablet ? 24 : 20,
                   fontWeight: FontWeight.bold,

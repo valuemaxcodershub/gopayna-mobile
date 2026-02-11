@@ -202,20 +202,23 @@ class _NotificationScreenState extends State<NotificationScreen>
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
-      body: Column(
-        children: [
-          _buildCustomStatusBar(statusBarHeight),
-          _buildHeader(isTablet, _unreadCount),
-          Expanded(
-            child: _isLoading
-                ? const Center(
-                    child: CircularProgressIndicator(color: Color(0xFF00CA44)),
-                  )
-                : _error != null
-                    ? _buildErrorView(isTablet)
-                    : _buildNotificationList(isTablet),
-          ),
-        ],
+      body: SafeArea(
+        top: false,
+        child: Column(
+          children: [
+            _buildCustomStatusBar(statusBarHeight),
+            _buildHeader(isTablet, _unreadCount),
+            Expanded(
+              child: _isLoading
+                  ? const Center(
+                      child: CircularProgressIndicator(color: Color(0xFF00CA44)),
+                    )
+                  : _error != null
+                      ? _buildErrorView(isTablet)
+                      : _buildNotificationList(isTablet),
+            ),
+          ],
+        ),
       ),
     );
   }

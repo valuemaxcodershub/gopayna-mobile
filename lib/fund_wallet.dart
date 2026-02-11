@@ -654,15 +654,16 @@ class _FundWalletScreenState extends State<FundWalletScreen>
         centerTitle: true,
         systemOverlayStyle: statusBarStyle,
       ),
-      body: FadeTransition(
-        opacity: _fadeAnimation,
-        child: SlideTransition(
-          position: _slideAnimation,
-          child: SingleChildScrollView(
-            padding: EdgeInsets.all(isTablet ? 32 : 20),
-            child: Form(
-              key: _formKey,
-              child: Column(
+      body: SafeArea(
+        child: FadeTransition(
+          opacity: _fadeAnimation,
+          child: SlideTransition(
+            position: _slideAnimation,
+            child: SingleChildScrollView(
+              padding: EdgeInsets.all(isTablet ? 32 : 20),
+              child: Form(
+                key: _formKey,
+                child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Current Balance Card
@@ -924,6 +925,7 @@ class _FundWalletScreenState extends State<FundWalletScreen>
 
                   _buildRecentTransactionsSection(),
                 ],
+                ),
               ),
             ),
           ),

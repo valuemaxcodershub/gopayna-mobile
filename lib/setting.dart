@@ -264,14 +264,17 @@ class _SettingScreenState extends State<SettingScreen>
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
-      body: Column(
-        children: [
-          _buildCustomStatusBar(statusBarHeight),
-          _buildHeader(isTablet),
-          Expanded(
-            child: _buildContent(isTablet),
-          ),
-        ],
+      body: SafeArea(
+        top: false,
+        child: Column(
+          children: [
+            _buildCustomStatusBar(statusBarHeight),
+            _buildHeader(isTablet),
+            Expanded(
+              child: _buildContent(isTablet),
+            ),
+          ],
+        ),
       ),
     );
   }

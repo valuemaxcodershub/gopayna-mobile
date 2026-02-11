@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api_service.dart' as api;
 import 'service_transaction_history.dart';
+import 'fund_wallet.dart';
 import 'widgets/wallet_visibility_builder.dart';
 import 'widgets/themed_screen_helpers.dart';
 
@@ -61,6 +62,7 @@ class _BuyElectricityScreenState extends State<BuyElectricityScreen>
   String? _token;
   double _serviceCharge = 100; // Default service charge, fetched from API
   List<ElectricityTransaction> _recentTransactions = [];
+  Map<String, double> _discoMinAmounts = {};
 
   // NelloByte Disco codes: 01=IKEDC, 02=EKEDC, 03=AEDC, 04=KEDCO, 05=EEDC, 06=PHED, 07=IBEDC, 08=KAEDCO, 09=JED, 10=BEDC, 11=YEDC
   final List<Map<String, dynamic>> _providers = [
@@ -177,7 +179,7 @@ class _BuyElectricityScreenState extends State<BuyElectricityScreen>
   ];
 
   // Quick amount options for electricity
-  final List<int> _quickAmounts = [5000, 10000, 20000, 30000, 50000, 100000];
+  final List<int> _quickAmounts = [1000, 5000, 10000, 20000, 30000, 50000, 100000];
 
   @override
   void initState() {
@@ -194,8 +196,23 @@ class _BuyElectricityScreenState extends State<BuyElectricityScreen>
         // Get service charge from API response
         final serviceCharge =
             (result['serviceCharge'] as num?)?.toDouble() ?? 100;
+        final data = result['data'] as List? ?? [];
+        final minAmounts = <String, double>{};
+
+        for (final item in data) {
+          if (item is Map) {
+            final code = item['code'] ?? item['id'] ?? item['planId'];
+            if (code == null) continue;
+            final codeValue = code.toString();
+            final minAmount = (item['minAmount'] as num?)?.toDouble();
+            if (minAmount != null && minAmount > 0) {
+              minAmounts[codeValue] = minAmount;
+            }
+          }
+        }
         setState(() {
           _serviceCharge = serviceCharge;
+          _discoMinAmounts = minAmounts;
         });
       }
     } catch (e) {
@@ -225,7 +242,11 @@ class _BuyElectricityScreenState extends State<BuyElectricityScreen>
             amount: (tx['amount'] as num?)?.toDouble() ?? 0,
             date: DateTime.tryParse(tx['createdAt']?.toString() ?? '') ??
                 DateTime.now(),
-            status: tx['status'] == 'success' ? 'Successful' : 'Failed',
+            status: tx['status'] == 'success'
+              ? 'Successful'
+              : tx['status'] == 'pending'
+                ? 'Pending'
+                : 'Failed',
             providerColor: const Color(0xFF0066CC),
           );
         }).toList();
@@ -412,6 +433,59 @@ class _BuyElectricityScreenState extends State<BuyElectricityScreen>
     );
   }
 
+  Future<void> _showInsufficientWalletDialog(double totalToPay) async {
+    final isTablet = MediaQuery.of(context).size.width > 600;
+    final cs = colorScheme;
+    final muted = mutedTextColor;
+
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(isTablet ? 20 : 16),
+        ),
+        title: Text(
+          'Insufficient Balance',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: isTablet ? 20 : 18,
+            color: cs.onSurface,
+          ),
+        ),
+        content: Text(
+          'You need ₦${totalToPay.toStringAsFixed(0)} to complete this purchase. Please fund your wallet.',
+          style: TextStyle(
+            fontSize: isTablet ? 14 : 13,
+            color: muted,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text('Cancel', style: TextStyle(color: muted)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.of(context).pop();
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const FundWalletScreen(),
+                ),
+              );
+              if (mounted) _loadWalletData();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: cs.primary,
+              foregroundColor: cs.onPrimary,
+            ),
+            child: const Text('Fund Wallet'),
+          ),
+        ],
+      ),
+    );
+  }
+
   // Get disco code from provider - use the code property from _providers list
   String _getDiscoCode(String providerId) {
     final provider = _providers.firstWhere(
@@ -419,6 +493,15 @@ class _BuyElectricityScreenState extends State<BuyElectricityScreen>
       orElse: () => {'code': '01'},
     );
     return provider['code']?.toString() ?? '01';
+  }
+
+  double _getMinimumAmountForProvider(String providerId) {
+    final code = _getDiscoCode(providerId);
+    final minAmount = _discoMinAmounts[code];
+    if (minAmount != null && minAmount > 0) {
+      return minAmount;
+    }
+    return 1000.0;
   }
 
   @override
@@ -432,16 +515,23 @@ class _BuyElectricityScreenState extends State<BuyElectricityScreen>
   void _buyElectricity() {
     if (_formKey.currentState!.validate()) {
       final amount = _parseAmount(_amountController.text);
-      final minimumAmount = _selectedMeterType == 'prepaid' ? 5000 : _minimumPayment;
+      final minimumAmount = _selectedMeterType == 'prepaid'
+          ? _getMinimumAmountForProvider(_selectedProvider)
+          : _minimumPayment;
       if (amount < minimumAmount) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(_selectedMeterType == 'prepaid' 
-                ? 'Minimum amount is ₦5,000 for prepaid meters'
+                ? 'Minimum amount is ₦${minimumAmount.toStringAsFixed(0)} for prepaid meters'
                 : 'Minimum payment is ₦${_minimumPayment.toStringAsFixed(0)}'),
             backgroundColor: colorScheme.error,
           ),
         );
+        return;
+      }
+      final totalToPay = amount + _serviceCharge;
+      if (totalToPay > _walletBalance) {
+        _showInsufficientWalletDialog(totalToPay);
         return;
       }
       _showConfirmationDialog();
@@ -587,11 +677,13 @@ class _BuyElectricityScreenState extends State<BuyElectricityScreen>
 
     final amount = _parseAmount(_amountController.text);
     final totalToPay = amount + _serviceCharge;
-    final minimumAmount = _selectedMeterType == 'prepaid' ? 5000 : _minimumPayment;
+    final minimumAmount = _selectedMeterType == 'prepaid'
+        ? _getMinimumAmountForProvider(_selectedProvider)
+        : _minimumPayment;
 
     if (amount < minimumAmount) {
       _showErrorDialog(_selectedMeterType == 'prepaid' 
-          ? 'Minimum amount is ₦5,000 for prepaid meters.'
+          ? 'Minimum amount is ₦${minimumAmount.toStringAsFixed(0)} for prepaid meters.'
           : 'Minimum payment is ₦${_minimumPayment.toStringAsFixed(0)}.');
       return;
     }
@@ -606,9 +698,9 @@ class _BuyElectricityScreenState extends State<BuyElectricityScreen>
       _isLoading = true;
     });
 
-    // Convert provider ID to NelloByte disco code
+    
     final discoCode = _getDiscoCode(_selectedProvider);
-    // Meter type: 01=Prepaid, 02=Postpaid
+    
     final meterTypeCode = _selectedMeterType == 'prepaid' ? '01' : '02';
 
     final result = await api.buyElectricity(
@@ -617,7 +709,7 @@ class _BuyElectricityScreenState extends State<BuyElectricityScreen>
       meterType: meterTypeCode,
       meterNumber: _meterNumberController.text,
       amount:
-          amount, // Send electricity amount only, backend adds service charge
+          amount, 
       email: _emailController.text,
     );
 
@@ -1194,11 +1286,12 @@ class _BuyElectricityScreenState extends State<BuyElectricityScreen>
         ],
         systemOverlayStyle: statusBarStyle,
       ),
-      body: SingleChildScrollView(
-        padding: EdgeInsets.all(isTablet ? 32 : 20),
-        child: Form(
-          key: _formKey,
-          child: Column(
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: EdgeInsets.all(isTablet ? 32 : 20),
+          child: Form(
+            key: _formKey,
+            child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               WalletVisibilityBuilder(
@@ -1751,7 +1844,7 @@ class _BuyElectricityScreenState extends State<BuyElectricityScreen>
                       decoration: InputDecoration(
                         labelText: 'Amount (₦)',
                         hintText: _selectedMeterType == 'prepaid' 
-                            ? 'Enter custom amount (min. ₦5,000)'
+                          ? 'Enter custom amount (min. ₦${_getMinimumAmountForProvider(_selectedProvider).toStringAsFixed(0)})'
                             : _outstandingBill > 0 
                                 ? 'Outstanding: ₦${_outstandingBill.toStringAsFixed(0)}, Min: ₦${_minimumPayment.toStringAsFixed(0)} - Enter any amount'
                                 : 'Enter custom amount (min. ₦1,000)',
@@ -1810,8 +1903,10 @@ class _BuyElectricityScreenState extends State<BuyElectricityScreen>
                         final amount = _parseAmount(value);
                         
                         if (_selectedMeterType == 'prepaid') {
-                          if (amount < 5000) {
-                            return 'Minimum amount for prepaid is ₦5,000';
+                          final minAmount =
+                              _getMinimumAmountForProvider(_selectedProvider);
+                          if (amount < minAmount) {
+                            return 'Minimum amount for prepaid is ₦${minAmount.toStringAsFixed(0)}';
                           }
                         } else { // postpaid
                           final minAmount = _minimumPayment > 0 ? _minimumPayment : 1000.0;
@@ -2153,6 +2248,7 @@ class _BuyElectricityScreenState extends State<BuyElectricityScreen>
                 ),
               ],
             ],
+            ),
           ),
         ),
       ),

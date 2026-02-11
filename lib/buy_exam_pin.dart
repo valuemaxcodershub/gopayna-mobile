@@ -867,11 +867,12 @@ class _BuyEducationPinScreenState extends State<BuyEducationPinScreen>
         ],
         systemOverlayStyle: statusBarStyle,
       ),
-      body: SingleChildScrollView(
-        padding: EdgeInsets.all(isTablet ? 32 : 20),
-        child: Form(
-          key: _formKey,
-          child: Column(
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: EdgeInsets.all(isTablet ? 32 : 20),
+          child: Form(
+            key: _formKey,
+            child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               WalletVisibilityBuilder(
@@ -1618,6 +1619,7 @@ class _BuyEducationPinScreenState extends State<BuyEducationPinScreen>
                 ),
               ],
             ],
+            ),
           ),
         ),
       ),

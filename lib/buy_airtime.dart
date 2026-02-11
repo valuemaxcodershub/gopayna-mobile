@@ -689,11 +689,12 @@ class _BuyAirtimeScreenState extends State<BuyAirtimeScreen>
         ],
         systemOverlayStyle: statusBarStyle,
       ),
-      body: SingleChildScrollView(
-        padding: EdgeInsets.all(isTablet ? 32 : 20),
-        child: Form(
-          key: _formKey,
-          child: Column(
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: EdgeInsets.all(isTablet ? 32 : 20),
+          child: Form(
+            key: _formKey,
+            child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               WalletVisibilityBuilder(
@@ -1354,6 +1355,7 @@ class _BuyAirtimeScreenState extends State<BuyAirtimeScreen>
                 const SizedBox(height: 20),
               ],
             ],
+            ),
           ),
         ),
       ),

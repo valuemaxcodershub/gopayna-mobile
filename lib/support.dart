@@ -100,14 +100,17 @@ class _SupportScreenState extends State<SupportScreen>
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: Column(
-        children: [
-          _buildCustomStatusBar(statusBarHeight),
-          _buildHeader(isTablet),
-          Expanded(
-            child: _buildContent(isTablet),
-          ),
-        ],
+      body: SafeArea(
+        top: false,
+        child: Column(
+          children: [
+            _buildCustomStatusBar(statusBarHeight),
+            _buildHeader(isTablet),
+            Expanded(
+              child: _buildContent(isTablet),
+            ),
+          ],
+        ),
       ),
     );
   }

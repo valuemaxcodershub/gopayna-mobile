@@ -966,11 +966,12 @@ class _BuyDataScreenState extends State<BuyDataScreen>
         ],
         systemOverlayStyle: statusBarStyle,
       ),
-      body: SingleChildScrollView(
-        padding: EdgeInsets.all(isTablet ? 32 : 20),
-        child: Form(
-          key: _formKey,
-          child: Column(
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: EdgeInsets.all(isTablet ? 32 : 20),
+          child: Form(
+            key: _formKey,
+            child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               WalletVisibilityBuilder(
@@ -1922,6 +1923,7 @@ class _BuyDataScreenState extends State<BuyDataScreen>
                 const SizedBox(height: 20),
               ],
             ],
+            ),
           ),
         ),
       ),
