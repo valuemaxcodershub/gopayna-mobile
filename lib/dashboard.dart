@@ -1247,6 +1247,9 @@ class Transaction {
     final serviceType = metadata?['serviceType']?.toString() ?? '';
     final metadataDesc = metadata?['description']?.toString() ?? '';
     final metadataChannel = metadata?['channel']?.toString() ?? '';
+    
+    // Check for description field from API (preferred for labels like "GoPayna Credit")
+    final apiDescription = data['description']?.toString().trim();
 
     final channel =
         (data['channel'] ?? serviceType ?? metadataChannel ?? 'wallet')
@@ -1257,8 +1260,12 @@ class Transaction {
     // Build a better title based on service type
     String title;
 
+    // Use API description first if available (handles GoPayna Credit, Admin Debit, etc.)
+    if (apiDescription != null && apiDescription.isNotEmpty) {
+      title = apiDescription;
+    }
     // Check if this is a wallet funding (credit) transaction
-    if (isIncoming &&
+    else if (isIncoming &&
         (channel == 'card' ||
             channel == 'paystack' ||
             channel == 'bank' ||

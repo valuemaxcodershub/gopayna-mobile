@@ -776,13 +776,8 @@ class _SettingScreenState extends State<SettingScreen>
         );
         break;
       default:
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('$setting feature coming soon!'),
-            backgroundColor: Theme.of(context).colorScheme.primary,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        // All settings implemented - no fallback needed
+        break;
     }
   }
 

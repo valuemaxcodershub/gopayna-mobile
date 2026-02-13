@@ -300,7 +300,23 @@ class _FundWalletScreenState extends State<FundWalletScreen>
     final amount = double.tryParse(tx['amount']?.toString() ?? '') ?? 0;
     final reference = (tx['reference'] ?? '--').toString();
     final createdAt = tx['created_at']?.toString();
+    
+    // Check for description from API first (handles "GoPayna Credit", "GoPayna Debit", etc.)
+    final description = tx['description']?.toString().trim();
     final channel = (tx['channel'] ?? 'Paystack').toString();
+    
+    // Use description if available, otherwise format the channel name
+    String displayLabel;
+    if (description != null && description.isNotEmpty) {
+      displayLabel = description;
+    } else {
+      // Format channel name: admin_credit -> Admin Credit
+      displayLabel = channel
+          .split('_')
+          .map((word) => word.isEmpty ? '' : word[0].toUpperCase() + word.substring(1).toLowerCase())
+          .join(' ');
+    }
+    
     final card = cardColor;
     final muted = mutedTextColor;
     final border = borderColor;
@@ -358,7 +374,7 @@ class _FundWalletScreenState extends State<FundWalletScreen>
                   children: [
                     Expanded(
                       child: Text(
-                        '${_statusLabel(status)} - $channel',
+                        '${_statusLabel(status)} - $displayLabel',
                         style:
                             TextStyle(fontSize: 13, color: _statusColor(status)),
                         overflow: TextOverflow.ellipsis,

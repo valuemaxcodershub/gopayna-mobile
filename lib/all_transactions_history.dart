@@ -853,6 +853,9 @@ class WalletTransactionItem {
     final serviceType = metadata?['serviceType']?.toString() ?? '';
     final metadataDesc = metadata?['description']?.toString() ?? '';
     final metadataChannel = metadata?['channel']?.toString() ?? '';
+    
+    // Check for description field from API (preferred for labels like "GoPayna Credit")
+    final apiDescription = data['description']?.toString().trim();
 
     final channel =
         (data['channel'] ?? serviceType ?? metadataChannel ?? 'wallet')
@@ -862,7 +865,10 @@ class WalletTransactionItem {
 
     // Build a better title based on service type
     String title;
-    if (serviceType == 'airtime') {
+    if (apiDescription != null && apiDescription.isNotEmpty) {
+      // Use description from API if available (handles GoPayna Credit, etc.)
+      title = apiDescription;
+    } else if (serviceType == 'airtime') {
       title = 'Airtime Purchase';
     } else if (serviceType == 'data') {
       title = 'Data Purchase';
