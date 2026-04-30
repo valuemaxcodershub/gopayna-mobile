@@ -47,6 +47,7 @@ class _BuyDataScreenState extends State<BuyDataScreen>
   bool _showNetworkList = false;
   double _walletBalance = 0.0;
   String? _token;
+  String _dataPlansEmptyMessage = 'No synced data plans available';
   List<DataTransaction> _recentTransactions = [];
 
   // Dynamic data plans fetched from API
@@ -88,42 +89,6 @@ class _BuyDataScreenState extends State<BuyDataScreen>
     },
   ];
 
-  // Fallback static data plans (used when API fails)
-  final Map<String, List<Map<String, String>>> _fallbackDataPlans = {
-    'mtn': [
-      {'bundle': '500MB - 30 Days', 'price': '130', 'code': '500'},
-      {'bundle': '1GB - 30 Days', 'price': '250', 'code': 'M1024'},
-      {'bundle': '2GB - 30 Days', 'price': '500', 'code': 'M2024'},
-      {'bundle': '3GB - 30 Days', 'price': '750', 'code': '3000'},
-      {'bundle': '5GB - 30 Days', 'price': '1250', 'code': '5000'},
-      {'bundle': '10GB - 30 Days', 'price': '2500', 'code': '10000'},
-    ],
-    'airtel': [
-      {'bundle': '500MB - 30 Days', 'price': '130', 'code': 'AIRT500'},
-      {'bundle': '1GB - 30 Days', 'price': '250', 'code': 'AIRT1GB'},
-      {'bundle': '2GB - 30 Days', 'price': '500', 'code': 'AIRT2GB'},
-      {'bundle': '5GB - 30 Days', 'price': '1250', 'code': 'AIRT5GB'},
-      {'bundle': '10GB - 30 Days', 'price': '2500', 'code': 'AIRT10GB'},
-      {'bundle': '15GB - 30 Days', 'price': '3750', 'code': 'AIRT15GB'},
-    ],
-    'glo': [
-      {'bundle': '500MB - 30 Days', 'price': '130', 'code': 'G500'},
-      {'bundle': '1GB - 30 Days', 'price': '250', 'code': 'G1000'},
-      {'bundle': '2GB - 30 Days', 'price': '500', 'code': 'G2000'},
-      {'bundle': '3GB - 30 Days', 'price': '750', 'code': 'G3000'},
-      {'bundle': '5GB - 30 Days', 'price': '1250', 'code': 'G5000'},
-      {'bundle': '10GB - 30 Days', 'price': '2500', 'code': 'G10000'},
-    ],
-    '9mobile': [
-      {'bundle': '500MB - 30 Days', 'price': '130', 'code': '9MOB500'},
-      {'bundle': '1GB - 30 Days', 'price': '250', 'code': '9MOB1GB'},
-      {'bundle': '2GB - 30 Days', 'price': '500', 'code': '9MOB2GB'},
-      {'bundle': '3GB - 30 Days', 'price': '750', 'code': '9MOB3GB'},
-      {'bundle': '5GB - 30 Days', 'price': '1250', 'code': '9MOB5GB'},
-      {'bundle': '10GB - 30 Days', 'price': '2500', 'code': '9MOB10GB'},
-    ],
-  };
-
   // Nigerian mobile number prefixes for auto-detection
   static const Map<String, List<String>> _networkPrefixes = {
     'mtn': [
@@ -155,17 +120,9 @@ class _BuyDataScreenState extends State<BuyDataScreen>
     '9mobile': ['0809', '0818', '0817', '0909', '0908'],
   };
 
-  // Get current data plans (fetched or fallback), filtered by validity
+  // Get current synced data plans filtered by validity.
   List<Map<String, dynamic>> get _currentDataPlans {
-    List<Map<String, dynamic>> plans;
-    if (_fetchedDataPlans.isNotEmpty) {
-      plans = _fetchedDataPlans;
-    } else {
-      // Convert fallback plans to same format
-      plans = (_fallbackDataPlans[_selectedNetwork] ?? [])
-          .map((p) => Map<String, dynamic>.from(p))
-          .toList();
-    }
+    final plans = _fetchedDataPlans;
 
     // Filter by selected validity category
     return plans.where((plan) {
@@ -177,6 +134,11 @@ class _BuyDataScreenState extends State<BuyDataScreen>
   // Extract validity category from plan data or name
   // Daily: < 7 days, Weekly: 7-29 days, Monthly: 30+ days
   String _getValidityCategory(Map<String, dynamic> plan) {
+    final durationCategory = (plan['durationCategory'] ?? '').toString();
+    if (_validityTabs.contains(durationCategory)) {
+      return durationCategory;
+    }
+
     // First try to use the validity field from backend
     final validity = (plan['validity'] ?? '').toString().toLowerCase();
     final planName =
@@ -233,14 +195,7 @@ class _BuyDataScreenState extends State<BuyDataScreen>
       'Monthly': 0,
     };
 
-    List<Map<String, dynamic>> plans;
-    if (_fetchedDataPlans.isNotEmpty) {
-      plans = _fetchedDataPlans;
-    } else {
-      plans = (_fallbackDataPlans[_selectedNetwork] ?? [])
-          .map((p) => Map<String, dynamic>.from(p))
-          .toList();
-    }
+    final plans = _fetchedDataPlans;
 
     for (final plan in plans) {
       final validity = _getValidityCategory(plan);
@@ -425,10 +380,11 @@ class _BuyDataScreenState extends State<BuyDataScreen>
       _fetchedDataPlans = [];
       _selectedDataPlan = '';
       _selectedPlanCode = '';
+      _dataPlansEmptyMessage = 'No synced data plans available';
     });
 
     try {
-      // Fetch ALL data plans from admin pricing database (prioritized)
+      // Data plans are sourced only from admin-saved pricing for the active provider.
       final pricingResult = await api.fetchDataPricing(network: networkId);
 
       if (mounted && pricingResult['success'] == true) {
@@ -445,6 +401,7 @@ class _BuyDataScreenState extends State<BuyDataScreen>
               'price': price.toString(),
               'code': plan['code'] ?? plan['id'] ?? '',
               'validity': validity,
+              'durationCategory': plan['durationCategory'] ?? '',
               'category': plan['category'] ?? '',
               'dataAllowance': plan['dataAllowance'] ?? '',
               'sortPrice': price,
@@ -458,69 +415,21 @@ class _BuyDataScreenState extends State<BuyDataScreen>
           setState(() {
             _fetchedDataPlans = formattedPlans.cast<Map<String, dynamic>>();
             _isLoadingPlans = false;
+            _dataPlansEmptyMessage = 'No synced data plans available';
           });
           return;
         }
       }
 
-      // Fallback: try NelloByte live API if admin database is empty
-      final result = await api.fetchDataPlans(_token!, networkId);
       if (mounted) {
-        if (result['success'] == true) {
-          final data = result['data'];
-          List<Map<String, dynamic>> plans = [];
-
-          if (data is Map) {
-            if (data['plans'] != null && data['plans'] is List) {
-              plans = (data['plans'] as List)
-                  .map((p) => Map<String, dynamic>.from(p))
-                  .toList();
-            } else if (data['data'] != null && data['data'] is List) {
-              plans = (data['data'] as List)
-                  .map((p) => Map<String, dynamic>.from(p))
-                  .toList();
-            }
-          } else if (data is List) {
-            plans = data.map((p) => Map<String, dynamic>.from(p)).toList();
-          }
-
-          final formattedPlans = plans.map((plan) {
-            final name =
-                plan['name'] ?? plan['PRODUCT_NAME'] ?? plan['bundle'] ?? '';
-            final priceValue =
-                plan['price'] ?? plan['PRODUCT_AMOUNT'] ?? plan['amount'] ?? 0;
-            final price = (priceValue is num)
-                ? priceValue.round()
-                : (int.tryParse(priceValue.toString()) ?? 0);
-            final code =
-                (plan['code'] ?? plan['PRODUCT_CODE'] ?? plan['id'] ?? '')
-                    .toString();
-            final validity = plan['validity'] ?? plan['VALIDITY'] ?? '';
-
-            return {
-              'bundle': name,
-              'name': name,
-              'price': price.toString(),
-              'code': code,
-              'validity': validity,
-              'category': plan['category'] ?? '',
-              'sortPrice': price,
-            };
-          }).toList();
-
-          formattedPlans.sort((a, b) =>
-              (a['sortPrice'] as int).compareTo(b['sortPrice'] as int));
-
-          setState(() {
-            _fetchedDataPlans = formattedPlans;
-            _isLoadingPlans = false;
-          });
-        } else {
-          setState(() {
-            _fetchedDataPlans = [];
-            _isLoadingPlans = false;
-          });
-        }
+        final errorMessage = pricingResult['error']?.toString();
+        setState(() {
+          _fetchedDataPlans = [];
+          _isLoadingPlans = false;
+          _dataPlansEmptyMessage = errorMessage != null && errorMessage.isNotEmpty
+              ? errorMessage
+              : 'No synced data plans available for the active provider';
+        });
       }
     } catch (e) {
       debugPrint('Error fetching data plans: $e');
@@ -528,6 +437,7 @@ class _BuyDataScreenState extends State<BuyDataScreen>
         setState(() {
           _fetchedDataPlans = [];
           _isLoadingPlans = false;
+          _dataPlansEmptyMessage = 'Unable to load synced data plans right now';
         });
       }
     }
@@ -1553,9 +1463,10 @@ class _BuyDataScreenState extends State<BuyDataScreen>
                                 padding: const EdgeInsets.all(20),
                                 child: Text(
                                   _fetchedDataPlans.isEmpty
-                                      ? 'No data plans available'
+                                      ? _dataPlansEmptyMessage
                                       : 'No ${_selectedValidity.toLowerCase()} plans available',
                                   style: TextStyle(color: muted, fontSize: 14),
+                                  textAlign: TextAlign.center,
                                 ),
                               ),
                             )

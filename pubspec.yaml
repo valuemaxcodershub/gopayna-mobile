@@ -44,8 +44,7 @@ dependencies:
   crypto: ^3.0.3
 
 dependency_overrides:
-  web: ^0.5.1
-  
+
 
 
 dev_dependencies:
@@ -74,6 +73,7 @@ flutter:
     - assets/neco_logo.png
     - assets/jamb_logo.png
     # Electricity DisCo logos
+    - assets/aple_logo.png
     - assets/ikedc_logo.png
     - assets/ekedc_logo.png
     - assets/aedc_logo.png

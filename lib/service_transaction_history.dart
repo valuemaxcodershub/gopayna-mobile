@@ -188,8 +188,9 @@ class _ServiceTransactionHistoryScreenState
         centerTitle: true,
         systemOverlayStyle: SystemUiOverlayStyle(
           statusBarColor: Colors.transparent,
-          statusBarIconBrightness:
-              cs.brightness == Brightness.dark ? Brightness.light : Brightness.dark,
+          statusBarIconBrightness: cs.brightness == Brightness.dark
+              ? Brightness.light
+              : Brightness.dark,
         ),
       ),
       body: SafeArea(
@@ -602,11 +603,8 @@ class ServiceTransaction {
 
       // Add discount if applicable
       final discount = details!['discount'];
-      if (discount != null &&
-          discount is num &&
-          discount > 0) {
-        extraDetails
-            .add(ReceiptField(label: 'Discount', value: '$discount%'));
+      if (discount != null && discount is num && discount > 0) {
+        extraDetails.add(ReceiptField(label: 'Discount', value: '$discount%'));
       }
 
       // Add plan ID for data
@@ -644,11 +642,33 @@ class ServiceTransaction {
             label: 'Service Charge', value: '₦${serviceCharge.toString()}'));
       }
 
+      final deliveryEmail = details!['email']?.toString();
+      if (deliveryEmail != null &&
+          deliveryEmail.isNotEmpty &&
+          (serviceType == ServiceType.electricity ||
+              serviceType == ServiceType.education)) {
+        extraDetails
+            .add(ReceiptField(label: 'Delivery Email', value: deliveryEmail));
+      }
+
       // Add token for electricity (only for prepaid meters)
       final token = details!['token']?.toString();
       final meterType = details!['meterType']?.toString() ?? '01';
       if (token != null && token.isNotEmpty && meterType == '01') {
         extraDetails.add(ReceiptField(label: 'Token', value: token));
+        if (deliveryEmail != null && deliveryEmail.isNotEmpty) {
+          extraDetails.add(ReceiptField(
+              label: 'Delivery Receipt',
+              value: 'Token sent to $deliveryEmail and stored here.'));
+        }
+      } else if (serviceType == ServiceType.electricity &&
+          meterType == '01' &&
+          deliveryEmail != null &&
+          deliveryEmail.isNotEmpty) {
+        extraDetails.add(ReceiptField(
+            label: 'Delivery Receipt',
+            value:
+                'Token will appear here after completion and is queued for $deliveryEmail.'));
       }
 
       // Add provider and smartcard for TV
@@ -656,8 +676,18 @@ class ServiceTransaction {
       if (provider != null &&
           provider.isNotEmpty &&
           serviceType == ServiceType.tv) {
+        extraDetails.add(
+            ReceiptField(label: 'Provider', value: provider.toUpperCase()));
+      }
+
+      if (serviceType == ServiceType.tv &&
+          deliveryEmail != null &&
+          deliveryEmail.isNotEmpty) {
         extraDetails
-            .add(ReceiptField(label: 'Provider', value: provider.toUpperCase()));
+            .add(ReceiptField(label: 'Delivery Email', value: deliveryEmail));
+        extraDetails.add(ReceiptField(
+            label: 'Delivery Receipt',
+            value: 'Subscription confirmation sent to $deliveryEmail.'));
       }
 
       final smartcardNumber = details!['smartcardNumber']?.toString();
@@ -669,8 +699,8 @@ class ServiceTransaction {
       // Add exam details for education
       final examType = details!['examType']?.toString();
       if (examType != null && examType.isNotEmpty) {
-        extraDetails
-            .add(ReceiptField(label: 'Exam Type', value: examType.toUpperCase()));
+        extraDetails.add(
+            ReceiptField(label: 'Exam Type', value: examType.toUpperCase()));
       }
 
       final examCode = details!['examCode']?.toString();
@@ -682,6 +712,30 @@ class ServiceTransaction {
       final quantity = details!['quantity'];
       if (quantity != null && serviceType == ServiceType.education) {
         extraDetails.add(ReceiptField(label: 'Quantity', value: '$quantity'));
+      }
+
+      if (serviceType == ServiceType.education) {
+        final pins = details!['pins'];
+        final pin = details!['pin'];
+        final resolvedPins = pins is List
+            ? pins
+                .map((entry) => entry.toString())
+                .where((entry) => entry.isNotEmpty)
+                .toList()
+            : (pin != null && pin.toString().isNotEmpty
+                ? [pin.toString()]
+                : <String>[]);
+        if (resolvedPins.isNotEmpty) {
+          extraDetails.add(ReceiptField(
+              label: resolvedPins.length > 1 ? 'PINs' : 'PIN',
+              value: resolvedPins.join('\n')));
+          if (deliveryEmail != null && deliveryEmail.isNotEmpty) {
+            extraDetails.add(ReceiptField(
+                label: 'Delivery Receipt',
+                value:
+                    'PIN${resolvedPins.length > 1 ? 's' : ''} sent to $deliveryEmail and stored here.'));
+          }
+        }
       }
     }
 

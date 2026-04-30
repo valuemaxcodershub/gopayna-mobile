@@ -92,14 +92,14 @@ Future<Map<String, dynamic>> registerUser(String firstName, String lastName,
   }
 }
 
-Future<Map<String, dynamic>> loginUser(
-    String usernameOrEmail, String password, {String? deviceId, bool forceLogin = false}) async {
+Future<Map<String, dynamic>> loginUser(String usernameOrEmail, String password,
+    {String? deviceId, bool forceLogin = false}) async {
   try {
     final Map<String, dynamic> requestBody = {
       'identifier': usernameOrEmail, // <-- use 'identifier'
       'password': password,
     };
-    
+
     // Add device ID if provided for single-device login enforcement
     if (deviceId != null) {
       requestBody['deviceId'] = deviceId;
@@ -108,7 +108,7 @@ Future<Map<String, dynamic>> loginUser(
     if (forceLogin) {
       requestBody['forceLogin'] = true;
     }
-    
+
     final response = await http.post(
       Uri.parse('$baseUrl/login'),
       headers: {'Content-Type': 'application/json'},
@@ -120,14 +120,16 @@ Future<Map<String, dynamic>> loginUser(
       // Log error details to console
       log('Login error: status ${response.statusCode}, body: ${response.body}',
           name: 'api_service');
-      
+
       // Parse response to extract error and email (for OTP verification redirect)
       try {
         final decoded = jsonDecode(response.body);
         return {
-          'error': decoded['error']?.toString() ?? _extractErrorMessage(response.body, response.statusCode),
+          'error': decoded['error']?.toString() ??
+              _extractErrorMessage(response.body, response.statusCode),
           'email': decoded['email'], // Include email for OTP redirect
-          'code': decoded['code'],   // Include error code (e.g., ACCOUNT_DEACTIVATED, DEVICE_CONFLICT)
+          'code': decoded[
+              'code'], // Include error code (e.g., ACCOUNT_DEACTIVATED, DEVICE_CONFLICT)
           'status': response.statusCode,
         };
       } catch (e) {
@@ -139,7 +141,9 @@ Future<Map<String, dynamic>> loginUser(
     }
   } catch (e) {
     log('Login exception: $e', name: 'api_service');
-    return {'error': 'Unable to connect. Please check your internet connection.'};
+    return {
+      'error': 'Unable to connect. Please check your internet connection.'
+    };
   }
 }
 
@@ -208,7 +212,8 @@ class PlatformSettings {
 }
 
 /// Fetch platform settings from API (cached for 5 minutes)
-Future<PlatformSettings> fetchPlatformSettings({bool forceRefresh = false}) async {
+Future<PlatformSettings> fetchPlatformSettings(
+    {bool forceRefresh = false}) async {
   // Return cached if valid
   if (!forceRefresh &&
       _cachedPlatformSettings != null &&
@@ -471,19 +476,12 @@ String _generateRequestSignature({
   // Use the EXACT same body string that will be sent to backend
   // The backend uses JSON.stringify(req.body), so we need to match that format
   final bodyString = body ?? '{}';
-  
+
   // Create body hash (SHA256 of the body string as-is)
   final bodyHash = sha256.convert(utf8.encode(bodyString)).toString();
 
   // Data to sign: timestamp + bodyHash (must match backend algorithm)
   final dataToSign = '$timestamp$bodyHash';
-  
-  // Debug logging for signature debugging
-  if (kDebugMode) {
-    print('[SIGNATURE_DEBUG] Body String: $bodyString');
-    print('[SIGNATURE_DEBUG] Body Hash: $bodyHash');
-    print('[SIGNATURE_DEBUG] Data to Sign: $dataToSign');
-  }
 
   // Generate HMAC-SHA256 signature
   final hmac = Hmac(sha256, utf8.encode(_appSigningKey));
@@ -506,14 +504,6 @@ Map<String, String> _signedAuthorizedHeaders(
 
   // Format: "timestamp.signature" to match backend expectation
   final signatureHeader = '$timestamp.$signature';
-  
-  // Debug logging for signature issues
-  if (kDebugMode) {
-    print('[API_DEBUG] Timestamp: $timestamp');
-    print('[API_DEBUG] Body: ${body ?? "{}"}');
-    print('[API_DEBUG] Signature: $signature');
-    print('[API_DEBUG] Full Header: $signatureHeader');
-  }
 
   return {
     'Content-Type': 'application/json',
@@ -1154,30 +1144,55 @@ Future<Map<String, dynamic>> verifyMeter(
     String token, String disco, String meterNumber,
     {String? meterType}) async {
   try {
-    String url =
-        '$vtuBaseUrl/verify-meter?disco=$disco&meterNumber=$meterNumber';
-    if (meterType != null) {
-      url += '&meterType=$meterType';
-    }
+    final queryParameters = <String, String>{
+      'disco': disco,
+      'meterNumber': meterNumber,
+      if (meterType != null) 'meterType': meterType,
+    };
+    final uri = Uri.parse('$vtuBaseUrl/verify-meter')
+        .replace(queryParameters: queryParameters);
+    log('verifyMeter request: $uri', name: 'api_service');
     final response = await http.get(
-      Uri.parse(url),
+      uri,
       headers: _authorizedJsonHeaders(token),
     );
     final responseBody = response.body.isEmpty ? '{}' : response.body;
-    final decoded = jsonDecode(responseBody);
+    log(
+      'verifyMeter response: status=${response.statusCode}, body=$responseBody',
+      name: 'api_service',
+    );
+    Map<String, dynamic> decoded;
+    try {
+      final parsed = jsonDecode(responseBody);
+      decoded = parsed is Map<String, dynamic>
+          ? parsed
+          : <String, dynamic>{'data': parsed};
+    } catch (_) {
+      decoded = <String, dynamic>{
+        'error': _extractErrorMessage(responseBody, response.statusCode),
+      };
+    }
     if (response.statusCode >= 200 && response.statusCode < 300) {
-      return {'success': true, 'data': decoded['data'] ?? decoded};
+      return {
+        'success': true,
+        'data': decoded['data'] ?? decoded,
+        'debug': decoded['debug'],
+      };
     }
     // Include canProceed flag from API response (for postpaid meters)
     return {
       'error': decoded['error'] ??
           _extractErrorMessage(responseBody, response.statusCode),
       'canProceed': decoded['canProceed'] ?? false,
+      'debug': decoded['debug'],
       'status': response.statusCode,
     };
   } catch (e) {
     log('Verify meter failed: $e', name: 'api_service');
-    return {'error': 'Unable to verify meter. Please try again.'};
+    return {
+      'error': 'Unable to verify meter. Please try again.',
+      'exception': '$e',
+    };
   }
 }
 
@@ -1197,7 +1212,7 @@ Future<Map<String, dynamic>> fetchElectricityBill(
 
     final responseBody = response.body.isEmpty ? '{}' : response.body;
     final decoded = jsonDecode(responseBody);
-    
+
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return {'success': true, 'data': decoded['data'] ?? decoded};
     }
@@ -1285,8 +1300,9 @@ Future<Map<String, dynamic>> buyAirtime(
     // Convert amount to int if it's a whole number to match JavaScript JSON.stringify behavior
     // JavaScript: JSON.stringify({amount: 100.0}) => {"amount":100}
     // Dart: jsonEncode({amount: 100.0}) => {"amount":100.0}
-    final numAmount = amount == amount.truncateToDouble() ? amount.toInt() : amount;
-    
+    final numAmount =
+        amount == amount.truncateToDouble() ? amount.toInt() : amount;
+
     final requestBody = {
       'network': network,
       'phone': phone,
@@ -1298,7 +1314,7 @@ Future<Map<String, dynamic>> buyAirtime(
 
     // Ensure consistent JSON encoding
     final bodyJson = jsonEncode(requestBody);
-    
+
     final response = await http.post(
       Uri.parse('$vtuBaseUrl/buy/airtime'),
       headers: _signedAuthorizedHeaders(token, body: bodyJson),
@@ -1309,9 +1325,9 @@ Future<Map<String, dynamic>> buyAirtime(
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return {'success': true, 'data': decoded};
     }
-    
+
     // Special handling for ORDER_RECEIVED status - treat as success
-    if (decoded['error'] != null && 
+    if (decoded['error'] != null &&
         decoded['error'].toString().contains('ORDER_RECEIVED')) {
       return {
         'success': true,
@@ -1320,7 +1336,7 @@ Future<Map<String, dynamic>> buyAirtime(
         'reference': decoded['reference'] ?? 'Unknown'
       };
     }
-    
+
     return {
       'error': decoded['error'] ??
           _extractErrorMessage(responseBody, response.statusCode),
@@ -1344,18 +1360,19 @@ Future<Map<String, dynamic>> buyData(
 }) async {
   try {
     // Convert amount to int if whole number for JS compatibility
-    final numAmount = amount == amount.truncateToDouble() ? amount.toInt() : amount;
-    
+    final numAmount =
+        amount == amount.truncateToDouble() ? amount.toInt() : amount;
+
     final requestBody = {
       'network': network,
       'phone': phone,
       'planId': planId,
       'amount': numAmount,
     };
-    
+
     // Ensure consistent JSON encoding
     final bodyJson = jsonEncode(requestBody);
-    
+
     final response = await http.post(
       Uri.parse('$vtuBaseUrl/buy/data'),
       headers: _signedAuthorizedHeaders(token, body: bodyJson),
@@ -1366,9 +1383,9 @@ Future<Map<String, dynamic>> buyData(
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return {'success': true, 'data': decoded};
     }
-    
+
     // Special handling for ORDER_RECEIVED status - treat as success
-    if (decoded['error'] != null && 
+    if (decoded['error'] != null &&
         decoded['error'].toString().contains('ORDER_RECEIVED')) {
       return {
         'success': true,
@@ -1377,7 +1394,7 @@ Future<Map<String, dynamic>> buyData(
         'reference': decoded['reference'] ?? 'Unknown'
       };
     }
-    
+
     return {
       'error': decoded['error'] ??
           _extractErrorMessage(responseBody, response.statusCode),
@@ -1402,8 +1419,9 @@ Future<Map<String, dynamic>> buyElectricity(
 }) async {
   try {
     // Convert amount to int if whole number for JS compatibility
-    final numAmount = amount == amount.truncateToDouble() ? amount.toInt() : amount;
-    
+    final numAmount =
+        amount == amount.truncateToDouble() ? amount.toInt() : amount;
+
     final requestBody = {
       'disco': disco,
       'meterType': meterType,
@@ -1411,10 +1429,10 @@ Future<Map<String, dynamic>> buyElectricity(
       'amount': numAmount,
       'email': email ?? '',
     };
-    
+
     // Ensure consistent JSON encoding
     final bodyJson = jsonEncode(requestBody);
-    
+
     final response = await http.post(
       Uri.parse('$vtuBaseUrl/buy/electricity'),
       headers: _signedAuthorizedHeaders(token, body: bodyJson),
@@ -1425,12 +1443,12 @@ Future<Map<String, dynamic>> buyElectricity(
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return {'success': true, 'data': decoded};
     }
-    
+
     // Special handling for ORDER_RECEIVED status - treat as success
-    if (decoded['error'] != null && 
+    if (decoded['error'] != null &&
         decoded['error'].toString().contains('ORDER_RECEIVED')) {
       return {
-        'success': true, 
+        'success': true,
         'data': {
           'status': 'ORDER_RECEIVED',
           'message': 'Electricity order received and processing',
@@ -1440,11 +1458,14 @@ Future<Map<String, dynamic>> buyElectricity(
         }
       };
     }
-    
+
     return {
       'error': decoded['error'] ??
           _extractErrorMessage(responseBody, response.statusCode),
       'status': response.statusCode,
+      'reference': decoded['reference'],
+      'existingStatus': decoded['existingStatus'],
+      'orderId': decoded['orderId'] ?? decoded['existingOrderId'],
     };
   } catch (e) {
     log('Buy electricity failed: $e', name: 'api_service');
@@ -1482,12 +1503,12 @@ Future<Map<String, dynamic>> buyTVSubscription(
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return {'success': true, 'data': decoded};
     }
-    
+
     // Special handling for ORDER_RECEIVED status - treat as success
-    if (decoded['error'] != null && 
+    if (decoded['error'] != null &&
         decoded['error'].toString().contains('ORDER_RECEIVED')) {
       return {
-        'success': true, 
+        'success': true,
         'data': {
           'status': 'ORDER_RECEIVED',
           'message': 'TV subscription order received and processing',
@@ -1497,7 +1518,7 @@ Future<Map<String, dynamic>> buyTVSubscription(
         }
       };
     }
-    
+
     return {
       'error': decoded['error'] ??
           _extractErrorMessage(responseBody, response.statusCode),
@@ -1544,12 +1565,12 @@ Future<Map<String, dynamic>> buyEducationPin(
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return {'success': true, 'data': decoded};
     }
-    
+
     // Special handling for ORDER_RECEIVED status - treat as success
-    if (decoded['error'] != null && 
+    if (decoded['error'] != null &&
         decoded['error'].toString().contains('ORDER_RECEIVED')) {
       return {
-        'success': true, 
+        'success': true,
         'data': {
           'status': 'ORDER_RECEIVED',
           'message': 'Education PIN order received and processing',
@@ -1559,7 +1580,7 @@ Future<Map<String, dynamic>> buyEducationPin(
         }
       };
     }
-    
+
     return {
       'error': decoded['error'] ??
           _extractErrorMessage(responseBody, response.statusCode),

@@ -853,7 +853,7 @@ class WalletTransactionItem {
     final serviceType = metadata?['serviceType']?.toString() ?? '';
     final metadataDesc = metadata?['description']?.toString() ?? '';
     final metadataChannel = metadata?['channel']?.toString() ?? '';
-    
+
     // Check for description field from API (preferred for labels like "GoPayna Credit")
     final apiDescription = data['description']?.toString().trim();
 
@@ -1205,6 +1205,9 @@ class WalletTransactionItem {
         // Add meter number if email was primary recipient
         final email = metadata['email']?.toString();
         final meterNumber = metadata['meterNumber']?.toString();
+        if (email != null && email.isNotEmpty) {
+          extraDetails.add(ReceiptField(label: 'Delivery Email', value: email));
+        }
         if (email != null &&
             email.isNotEmpty &&
             meterNumber != null &&
@@ -1226,6 +1229,22 @@ class WalletTransactionItem {
           extraDetails.add(ReceiptField(
               label: 'Service Charge', value: '₦${serviceCharge.toString()}'));
         }
+
+        final token = metadata['token']?.toString();
+        final meterType = metadata['meterType']?.toString() ?? '01';
+        if (token != null && token.isNotEmpty && meterType == '01') {
+          extraDetails.add(ReceiptField(label: 'Token', value: token));
+          if (email != null && email.isNotEmpty) {
+            extraDetails.add(ReceiptField(
+                label: 'Delivery Receipt',
+                value: 'Token sent to $email and stored here.'));
+          }
+        } else if (meterType == '01' && email != null && email.isNotEmpty) {
+          extraDetails.add(ReceiptField(
+              label: 'Delivery Receipt',
+              value:
+                  'Token will appear here after completion and is queued for $email.'));
+        }
         break;
 
       case 'tv':
@@ -1234,6 +1253,14 @@ class WalletTransactionItem {
         if (customerName != null && customerName.isNotEmpty) {
           extraDetails
               .add(ReceiptField(label: 'Customer Name', value: customerName));
+        }
+
+        final email = metadata['email']?.toString();
+        if (email != null && email.isNotEmpty) {
+          extraDetails.add(ReceiptField(label: 'Delivery Email', value: email));
+          extraDetails.add(ReceiptField(
+              label: 'Delivery Receipt',
+              value: 'Subscription confirmation sent to $email.'));
         }
         break;
 
@@ -1246,6 +1273,9 @@ class WalletTransactionItem {
 
         // Add candidate details if email was primary
         final email = metadata['email']?.toString();
+        if (email != null && email.isNotEmpty) {
+          extraDetails.add(ReceiptField(label: 'Delivery Email', value: email));
+        }
         final candidateNumber = metadata['candidateNumber']?.toString();
         if (email != null &&
             email.isNotEmpty &&
@@ -1253,6 +1283,28 @@ class WalletTransactionItem {
             candidateNumber.isNotEmpty) {
           extraDetails.add(
               ReceiptField(label: 'Candidate Number', value: candidateNumber));
+        }
+
+        final pins = metadata['pins'];
+        final pin = metadata['pin'];
+        final resolvedPins = pins is List
+            ? pins
+                .map((entry) => entry.toString())
+                .where((entry) => entry.isNotEmpty)
+                .toList()
+            : (pin != null && pin.toString().isNotEmpty
+                ? [pin.toString()]
+                : <String>[]);
+        if (resolvedPins.isNotEmpty) {
+          extraDetails.add(ReceiptField(
+              label: resolvedPins.length > 1 ? 'PINs' : 'PIN',
+              value: resolvedPins.join('\n')));
+          if (email != null && email.isNotEmpty) {
+            extraDetails.add(ReceiptField(
+                label: 'Delivery Receipt',
+                value:
+                    'PIN${resolvedPins.length > 1 ? 's' : ''} sent to $email and stored here.'));
+          }
         }
         break;
     }

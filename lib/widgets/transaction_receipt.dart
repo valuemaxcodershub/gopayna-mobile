@@ -1,6 +1,20 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 
+String _formatReceiptToken(String value) {
+  final compact = value.replaceAll(RegExp(r'\s+'), '');
+  if (compact.isEmpty || compact.length < 8) {
+    return value;
+  }
+
+  final chunks = <String>[];
+  for (var index = 0; index < compact.length; index += 4) {
+    final end = (index + 4 < compact.length) ? index + 4 : compact.length;
+    chunks.add(compact.substring(index, end));
+  }
+  return chunks.join(' ');
+}
+
 class TransactionReceiptData {
   const TransactionReceiptData({
     required this.title,
@@ -41,7 +55,9 @@ class TransactionReceiptData {
       ..writeln('Reference: $referenceDisplay');
 
     for (final field in extraDetails) {
-      buffer.writeln('${field.label}: ${field.value}');
+      final fieldValue =
+          field.label.toLowerCase() == 'token' ? _formatReceiptToken(field.value) : field.value;
+      buffer.writeln('${field.label}: $fieldValue');
     }
 
     buffer.writeln('\nShared via GoPayna');
@@ -78,6 +94,19 @@ class _TransactionReceiptSheet extends StatelessWidget {
     final mediaQuery = MediaQuery.of(context);
     final bottomInset = mediaQuery.viewInsets.bottom;
     final isTablet = mediaQuery.size.width > 600;
+    final tokenField = _findField('Token');
+    final deliveryField = _findField('Delivery Receipt');
+    final deliveryEmailField =
+        tokenField != null ? _findField('Delivery Email') : null;
+    final detailFields = data.extraDetails.where((field) {
+      if (field.label == 'Token' || field.label == 'Delivery Receipt') {
+        return false;
+      }
+      if (tokenField != null && field.label == 'Delivery Email') {
+        return false;
+      }
+      return true;
+    }).toList();
 
     return Padding(
       padding: EdgeInsets.only(bottom: bottomInset),
@@ -126,15 +155,71 @@ class _TransactionReceiptSheet extends StatelessWidget {
                   fontWeight: FontWeight.w700,
                 ),
               ),
+              SizedBox(height: isTablet ? 6 : 4),
+              Text(
+                data.title,
+                style: TextStyle(
+                  fontSize: isTablet ? 15 : 14,
+                  color: Colors.grey.shade600,
+                ),
+              ),
               SizedBox(height: isTablet ? 20 : 16),
-              _buildDetailRow('Type', data.title),
-              _buildDetailRow('Amount', data.amountDisplay),
-              _buildDetailRow('Status', data.statusLabel, valueColor: data.statusColor),
-              _buildDetailRow('Date', data.dateLabel),
-              _buildDetailRow('Channel', data.channelDisplay),
-              _buildDetailRow('Reference', data.referenceDisplay),
-              for (final field in data.extraDetails)
-                _buildDetailRow(field.label, field.value),
+              _buildSectionTitle('Transaction Status'),
+              const SizedBox(height: 10),
+              _buildSectionCard(
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildStatusMetric(
+                          label: 'Amount',
+                          value: data.amountDisplay,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildStatusChip(data.statusLabel, data.statusColor),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  _buildDetailItem('Date', data.dateLabel),
+                  const SizedBox(height: 12),
+                  _buildDetailItem('Channel', data.channelDisplay),
+                  const SizedBox(height: 12),
+                  _buildDetailItem('Reference', data.referenceDisplay),
+                ],
+              ),
+              if (tokenField != null) ...[
+                SizedBox(height: isTablet ? 22 : 18),
+                _buildSectionTitle('Token'),
+                const SizedBox(height: 10),
+                _buildTokenCard(
+                  token: tokenField.value,
+                  deliveryEmail: deliveryEmailField?.value,
+                  deliveryMessage: deliveryField?.value,
+                ),
+              ],
+              if (detailFields.isNotEmpty) ...[
+                SizedBox(height: isTablet ? 22 : 18),
+                _buildSectionTitle('Details'),
+                const SizedBox(height: 10),
+                _buildSectionCard(
+                  children: [
+                    for (var index = 0; index < detailFields.length; index++) ...[
+                      _buildDetailItem(
+                        detailFields[index].label,
+                        detailFields[index].value,
+                      ),
+                      if (index != detailFields.length - 1) const SizedBox(height: 12),
+                    ],
+                    if (tokenField == null && deliveryField != null) ...[
+                      if (detailFields.isNotEmpty) const SizedBox(height: 12),
+                      _buildDetailItem(deliveryField.label, deliveryField.value),
+                    ],
+                  ],
+                ),
+              ],
               SizedBox(height: isTablet ? 28 : 24),
               Row(
                 children: [
@@ -177,32 +262,224 @@ class _TransactionReceiptSheet extends StatelessWidget {
     );
   }
 
-  Widget _buildDetailRow(String label, String value, {Color? valueColor}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  ReceiptField? _findField(String label) {
+    for (final field in data.extraDetails) {
+      if (field.label == label) {
+        return field;
+      }
+    }
+    return null;
+  }
+
+  Widget _buildSectionTitle(String title) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Text(
+        title,
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.2,
+          color: Colors.grey.shade700,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionCard({required List<Widget> children}) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7F8FA),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE8EAEE)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: children,
+      ),
+    );
+  }
+
+  Widget _buildStatusMetric({required String label, required String value}) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             label,
             style: TextStyle(
-              fontSize: 16,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
               color: Colors.grey.shade600,
             ),
           ),
-          Flexible(
-            child: Text(
-              value,
-              textAlign: TextAlign.right,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: valueColor ?? Colors.black87,
-              ),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: Colors.black87,
             ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildStatusChip(String value, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Status',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey.shade600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTokenCard({
+    required String token,
+    String? deliveryEmail,
+    String? deliveryMessage,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF0F8F43), Color(0xFF00CA44)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Electricity Token',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: Colors.white.withValues(alpha: 0.88),
+            ),
+          ),
+          const SizedBox(height: 12),
+          SelectableText(
+            _formatReceiptToken(token),
+            style: const TextStyle(
+              fontSize: 24,
+              height: 1.35,
+              letterSpacing: 1.1,
+              fontWeight: FontWeight.w800,
+              color: Colors.white,
+            ),
+          ),
+          if ((deliveryEmail != null && deliveryEmail.isNotEmpty) ||
+              (deliveryMessage != null && deliveryMessage.isNotEmpty)) ...[
+            const SizedBox(height: 16),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.14),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (deliveryEmail != null && deliveryEmail.isNotEmpty) ...[
+                    Text(
+                      'Delivery Email',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white.withValues(alpha: 0.84),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    SelectableText(
+                      deliveryEmail,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                  if (deliveryMessage != null && deliveryMessage.isNotEmpty) ...[
+                    if (deliveryEmail != null && deliveryEmail.isNotEmpty)
+                      const SizedBox(height: 12),
+                    Text(
+                      deliveryMessage,
+                      style: TextStyle(
+                        fontSize: 13,
+                        height: 1.45,
+                        color: Colors.white.withValues(alpha: 0.94),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailItem(String label, String value) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: Colors.grey.shade600,
+          ),
+        ),
+        const SizedBox(height: 4),
+        SelectableText(
+          value,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            height: 1.4,
+            color: Colors.black87,
+          ),
+        ),
+      ],
     );
   }
 
