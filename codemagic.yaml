@@ -56,10 +56,6 @@ workflows:
         script: |
           TEAM_ID="${APPLE_TEAM_ID:-TQWXNLXN3C}"
           PROFILE_PATH=$(ls "$HOME/Library/MobileDevice/Provisioning Profiles"/*.mobileprovision | head -n 1)
-          if [ -z "$PROFILE_PATH" ] || [ ! -f "$PROFILE_PATH" ]; then
-            echo "No provisioning profile found for ${BUNDLE_ID}"
-            exit 1
-          fi
           security cms -D -i "$PROFILE_PATH" > "$CM_BUILD_DIR/profile.plist"
           PROFILE_NAME=$(/usr/libexec/PlistBuddy -c "Print :Name" "$CM_BUILD_DIR/profile.plist")
           PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print :UUID" "$CM_BUILD_DIR/profile.plist")
@@ -71,12 +67,6 @@ workflows:
           <dict>
             <key>method</key>
             <string>app-store</string>
-            <key>uploadBitcode</key>
-            <false/>
-            <key>compileBitcode</key>
-            <false/>
-            <key>uploadSymbols</key>
-            <true/>
             <key>signingStyle</key>
             <string>manual</string>
             <key>teamID</key>
@@ -176,10 +166,6 @@ workflows:
         script: |
           TEAM_ID="${APPLE_TEAM_ID:-TQWXNLXN3C}"
           PROFILE_PATH=$(ls "$HOME/Library/MobileDevice/Provisioning Profiles"/*.mobileprovision | head -n 1)
-          if [ -z "$PROFILE_PATH" ] || [ ! -f "$PROFILE_PATH" ]; then
-            echo "No provisioning profile found for ${BUNDLE_ID}"
-            exit 1
-          fi
           security cms -D -i "$PROFILE_PATH" > "$CM_BUILD_DIR/profile.plist"
           PROFILE_NAME=$(/usr/libexec/PlistBuddy -c "Print :Name" "$CM_BUILD_DIR/profile.plist")
           PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print :UUID" "$CM_BUILD_DIR/profile.plist")
@@ -191,12 +177,6 @@ workflows:
           <dict>
             <key>method</key>
             <string>app-store</string>
-            <key>uploadBitcode</key>
-            <false/>
-            <key>compileBitcode</key>
-            <false/>
-            <key>uploadSymbols</key>
-            <true/>
             <key>signingStyle</key>
             <string>manual</string>
             <key>teamID</key>
