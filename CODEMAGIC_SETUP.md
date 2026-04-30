@@ -45,12 +45,16 @@ Update the following encrypted variables in `codemagic.yaml`:
 
 ```yaml
 vars:
-  BUNDLE_ID: "com.gopayna.app"  # Your app's bundle identifier
+   BUNDLE_ID: "com.gopayna.app3"  # GoPayna iOS bundle identifier
   APP_STORE_CONNECT_ISSUER_ID: Encrypted(...)  # From App Store Connect API key
   APP_STORE_CONNECT_KEY_IDENTIFIER: Encrypted(...)  # Key ID
   APP_STORE_CONNECT_PRIVATE_KEY: Encrypted(...)  # Private key content
   CERTIFICATE_PRIVATE_KEY: Encrypted(...)  # iOS certificate password
 ```
+
+For this workspace:
+- Use [codemagic.yaml](c:\xampp\htdocs\gopayna\codemagic.yaml) when Codemagic is connected to the monorepo.
+- Use [mobile/codemagic.yaml](c:\xampp\htdocs\gopayna\mobile\codemagic.yaml) when Codemagic is connected to the standalone mobile repo.
 
 ### 5. Build Configuration
 
