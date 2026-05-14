@@ -95,6 +95,7 @@ class _DashboardScreenState extends State<DashboardScreen>
           _recentTransactions = parsed;
         });
       }
+
     } catch (e) {
       log('Error loading recent transactions: $e',
           name: '_DashboardScreenState');
@@ -176,6 +177,17 @@ class _DashboardScreenState extends State<DashboardScreen>
     });
     // Also refresh recent transactions
     _loadRecentTransactions();
+  }
+
+  Future<void> _openTransactionHistory() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const TransactionHistoryScreen(),
+      ),
+    );
+    if (!mounted) return;
+    _refreshWalletBalance();
   }
 
   Future<void> _fetchUnreadNotificationCount({String? token}) async {
@@ -678,14 +690,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                         Flexible(
                           child: GestureDetector(
                             onTap: () async {
-                              await Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) =>
-                                      const TransactionHistoryScreen(),
-                                ),
-                              );
-                              _refreshWalletBalance();
+                              await _openTransactionHistory();
                             },
                             child: Container(
                               padding: EdgeInsets.symmetric(
@@ -923,15 +928,7 @@ class _DashboardScreenState extends State<DashboardScreen>
               ),
               if (_recentTransactions.isNotEmpty)
                 GestureDetector(
-                  onTap: () async {
-                    await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const TransactionHistoryScreen(),
-                      ),
-                    );
-                    if (mounted) _refreshWalletBalance();
-                  },
+                  onTap: _openTransactionHistory,
                   child: Text(
                     'View All',
                     style: TextStyle(
@@ -977,96 +974,110 @@ class _DashboardScreenState extends State<DashboardScreen>
     final statusColor = transaction.statusColor;
     const brandColor = Color(0xFF00CA44);
 
-    return Container(
-      padding: EdgeInsets.all(isTablet ? 16 : 12),
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
         borderRadius: BorderRadius.circular(isTablet ? 12 : 10),
-        border: Border.all(
-          color: colorScheme.outline.withValues(alpha: 0.1),
-          width: 1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.15 : 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: EdgeInsets.all(isTablet ? 10 : 8),
-            decoration: BoxDecoration(
-              color: brandColor.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(isTablet ? 10 : 8),
+        onTap: _openTransactionHistory,
+        child: Container(
+          padding: EdgeInsets.all(isTablet ? 16 : 12),
+          decoration: BoxDecoration(
+            color: colorScheme.surface,
+            borderRadius: BorderRadius.circular(isTablet ? 12 : 10),
+            border: Border.all(
+              color: colorScheme.outline.withValues(alpha: 0.1),
+              width: 1,
             ),
-            child: Icon(
-              transaction.icon,
-              color: brandColor,
-              size: isTablet ? 20 : 16,
-            ),
-          ),
-          SizedBox(width: isTablet ? 12 : 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  transaction.title,
-                  style: TextStyle(
-                    fontSize: isTablet ? 14 : 12,
-                    fontWeight: FontWeight.w600,
-                    color: colorScheme.onSurface,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                SizedBox(height: isTablet ? 4 : 2),
-                Text(
-                  transaction.date,
-                  style: TextStyle(
-                    fontSize: isTablet ? 11 : 9,
-                    color: colorScheme.onSurface.withValues(alpha: 0.6),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                '${isIncoming ? '+' : '-'}₦${transaction.amount.toStringAsFixed(2)}',
-                style: TextStyle(
-                  fontSize: isTablet ? 14 : 12,
-                  fontWeight: FontWeight.bold,
-                  color: isIncoming ? brandColor : colorScheme.onSurface,
-                ),
-              ),
-              SizedBox(height: isTablet ? 4 : 2),
-              Container(
-                padding: EdgeInsets.symmetric(
-                  horizontal: isTablet ? 8 : 6,
-                  vertical: isTablet ? 3 : 2,
-                ),
-                decoration: BoxDecoration(
-                  color: statusColor,
-                  borderRadius: BorderRadius.circular(isTablet ? 10 : 8),
-                ),
-                child: Text(
-                  transaction.status,
-                  style: TextStyle(
-                    fontSize: isTablet ? 9 : 8,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                  ),
-                ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: isDark ? 0.15 : 0.04),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
               ),
             ],
           ),
-        ],
+          child: Row(
+            children: [
+              Container(
+                padding: EdgeInsets.all(isTablet ? 10 : 8),
+                decoration: BoxDecoration(
+                  color: brandColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(isTablet ? 10 : 8),
+                ),
+                child: Icon(
+                  transaction.icon,
+                  color: brandColor,
+                  size: isTablet ? 20 : 16,
+                ),
+              ),
+              SizedBox(width: isTablet ? 12 : 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      transaction.title,
+                      style: TextStyle(
+                        fontSize: isTablet ? 14 : 12,
+                        fontWeight: FontWeight.w600,
+                        color: colorScheme.onSurface,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    SizedBox(height: isTablet ? 4 : 2),
+                    Text(
+                      transaction.date,
+                      style: TextStyle(
+                        fontSize: isTablet ? 11 : 9,
+                        color: colorScheme.onSurface.withValues(alpha: 0.6),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(width: isTablet ? 10 : 8),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    '${isIncoming ? '+' : '-'}₦${transaction.amount.toStringAsFixed(2)}',
+                    style: TextStyle(
+                      fontSize: isTablet ? 14 : 12,
+                      fontWeight: FontWeight.bold,
+                      color: isIncoming ? brandColor : colorScheme.onSurface,
+                    ),
+                  ),
+                  SizedBox(height: isTablet ? 4 : 2),
+                  Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isTablet ? 8 : 6,
+                      vertical: isTablet ? 3 : 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: statusColor,
+                      borderRadius: BorderRadius.circular(isTablet ? 10 : 8),
+                    ),
+                    child: Text(
+                      transaction.status,
+                      style: TextStyle(
+                        fontSize: isTablet ? 9 : 8,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(width: isTablet ? 8 : 6),
+              Icon(
+                Icons.chevron_right,
+                color: colorScheme.onSurface.withValues(alpha: 0.45),
+                size: isTablet ? 18 : 16,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -1360,12 +1371,37 @@ class Transaction {
     }
   }
 
-  bool get isDisplayable => statusKey == 'success' || statusKey == 'failed';
+  bool get isDisplayable =>
+      statusKey == 'success' ||
+      statusKey == 'failed' ||
+      statusKey == 'pending' ||
+      statusKey == 'processing';
+
+  bool get isPendingLike => statusKey == 'pending' || statusKey == 'processing';
+
+  bool get isServiceOrder {
+    final knownServiceType = metadata?['serviceType']?.toString().toLowerCase();
+    final normalizedChannel = channel.toLowerCase();
+    final candidate = (knownServiceType != null && knownServiceType.isNotEmpty)
+        ? knownServiceType
+        : normalizedChannel;
+    return !isIncoming &&
+        (candidate == 'airtime' ||
+            candidate == 'data' ||
+            candidate == 'electricity' ||
+            candidate == 'tv' ||
+            candidate == 'education');
+  }
+
+  bool get isUnresolvedOrder => isPendingLike && isServiceOrder;
 
   Color get statusColor {
     switch (statusKey) {
       case 'success':
         return const Color(0xFF00CA44);
+      case 'pending':
+      case 'processing':
+        return Colors.orange;
       case 'failed':
         return Colors.red;
       default:
@@ -1633,7 +1669,9 @@ class Transaction {
           extraDetails.add(ReceiptField(label: 'Delivery Email', value: email));
           extraDetails.add(ReceiptField(
               label: 'Delivery Receipt',
-              value: 'Subscription confirmation sent to $email.'));
+              value: statusKey == 'pending' || statusKey == 'processing'
+                  ? 'Subscription is still processing. Confirmation will be sent to $email once completed.'
+                  : 'Subscription confirmation sent to $email.'));
         }
         break;
 
@@ -1678,6 +1716,11 @@ class Transaction {
                 value:
                     'PIN${resolvedPins.length > 1 ? 's' : ''} sent to $email and stored here.'));
           }
+        } else if (email != null && email.isNotEmpty) {
+          extraDetails.add(ReceiptField(
+              label: 'Delivery Receipt',
+              value:
+                  'PIN will appear here after completion and is queued for $email.'));
         }
         break;
     }
@@ -1707,10 +1750,15 @@ class Transaction {
     switch (status.toLowerCase()) {
       case 'success':
         return 'Successful';
+      case 'successful':
+      case 'completed':
+        return 'Successful';
       case 'failed':
         return 'Failed';
       case 'pending':
-        return 'Pending';
+        return 'Pending Review';
+      case 'processing':
+        return 'Processing';
       case 'cancelled':
         return 'Cancelled';
       default:

@@ -7,6 +7,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 import 'package:intl/intl.dart';
 
+import 'all_transactions_history.dart';
 import 'api_service.dart';
 import 'widgets/wallet_visibility_builder.dart';
 import 'widgets/themed_screen_helpers.dart';
@@ -265,20 +266,34 @@ class _FundWalletScreenState extends State<FundWalletScreen>
   String _statusLabel(String status) {
     switch (status.toLowerCase()) {
       case 'success':
+      case 'successful':
+      case 'completed':
         return 'Successful';
       case 'failed':
+      case 'error':
         return 'Failed';
+      case 'processing':
+        return 'Processing';
+      case 'cancelled':
+        return 'Cancelled';
       default:
-        return 'Pending';
+        return 'Pending Review';
     }
   }
 
   Color _statusColor(String status) {
     switch (status.toLowerCase()) {
       case 'success':
+      case 'successful':
+      case 'completed':
         return _brandGreen;
       case 'failed':
+      case 'error':
+      case 'cancelled':
         return colorScheme.error;
+      case 'pending':
+      case 'processing':
+        return Colors.orange;
       default:
         return colorScheme.tertiary;
     }
@@ -287,12 +302,28 @@ class _FundWalletScreenState extends State<FundWalletScreen>
   IconData _statusIcon(String status) {
     switch (status.toLowerCase()) {
       case 'success':
+      case 'successful':
+      case 'completed':
         return Icons.check_circle;
       case 'failed':
+      case 'error':
+      case 'cancelled':
         return Icons.error;
+      case 'processing':
+        return Icons.hourglass_top_rounded;
       default:
         return Icons.schedule;
     }
+  }
+
+  Future<void> _openTransactionHistory() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const TransactionHistoryScreen(),
+      ),
+    );
+    if (!mounted) return;
+    await _loadWalletBalance();
   }
 
   Widget _buildTransactionTile(Map<String, dynamic> tx) {
@@ -321,80 +352,92 @@ class _FundWalletScreenState extends State<FundWalletScreen>
     final muted = mutedTextColor;
     final border = borderColor;
 
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
-      decoration: BoxDecoration(
-        color: card,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: border.withValues(alpha: 0.4)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: _statusColor(status).withValues(alpha: 0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              _statusIcon(status),
-              color: _statusColor(status),
-              size: 20,
-            ),
+        onTap: _openTransactionHistory,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+          decoration: BoxDecoration(
+            color: card,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: border.withValues(alpha: 0.4)),
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: _statusColor(status).withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  _statusIcon(status),
+                  color: _statusColor(status),
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      flex: 2,
-                      child: Text(
-                        _formatCurrency(amount),
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          flex: 2,
+                          child: Text(
+                            _formatCurrency(amount),
+                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            _formatTransactionDate(createdAt),
+                            style: TextStyle(fontSize: 12, color: muted),
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.end,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 8),
-                    Flexible(
-                      child: Text(
-                        _formatTransactionDate(createdAt),
-                        style: TextStyle(fontSize: 12, color: muted),
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.end,
-                      ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            '${_statusLabel(status)} - $displayLabel',
+                            style: TextStyle(fontSize: 13, color: _statusColor(status)),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            'Ref: ${reference.length > 12 ? reference.substring(reference.length - 12) : reference}',
+                            style: TextStyle(fontSize: 12, color: muted),
+                            textAlign: TextAlign.end,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        '${_statusLabel(status)} - $displayLabel',
-                        style:
-                            TextStyle(fontSize: 13, color: _statusColor(status)),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Flexible(
-                      child: Text(
-                        'Ref: ${reference.length > 12 ? reference.substring(reference.length - 12) : reference}',
-                        style: TextStyle(fontSize: 12, color: muted),
-                        textAlign: TextAlign.end,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+              ),
+              const SizedBox(width: 8),
+              Icon(
+                Icons.chevron_right,
+                color: muted,
+                size: 18,
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -523,10 +566,19 @@ class _FundWalletScreenState extends State<FundWalletScreen>
               'Recent Wallet Activity',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
             ),
-            IconButton(
-              tooltip: 'Refresh',
-              onPressed: _transactionsLoading ? null : () => _loadRecentTransactions(),
-              icon: const Icon(Icons.refresh),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextButton(
+                  onPressed: _recentTransactions.isEmpty ? null : _openTransactionHistory,
+                  child: const Text('View All'),
+                ),
+                IconButton(
+                  tooltip: 'Refresh',
+                  onPressed: _transactionsLoading ? null : () => _loadRecentTransactions(),
+                  icon: const Icon(Icons.refresh),
+                ),
+              ],
             ),
           ],
         ),

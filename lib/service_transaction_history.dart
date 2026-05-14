@@ -523,7 +523,12 @@ class ServiceTransaction {
   Color get statusColor {
     switch (statusKey) {
       case 'success':
+      case 'successful':
+      case 'completed':
         return const Color(0xFF00CA44);
+      case 'pending':
+      case 'processing':
+        return Colors.orange;
       case 'failed':
         return Colors.red;
       default:
@@ -567,9 +572,17 @@ class ServiceTransaction {
   static String _formatStatus(String status) {
     switch (status.toLowerCase()) {
       case 'success':
+      case 'successful':
+      case 'completed':
         return 'Successful';
       case 'failed':
         return 'Failed';
+      case 'pending':
+        return 'Pending Review';
+      case 'processing':
+        return 'Processing';
+      case 'cancelled':
+        return 'Cancelled';
       default:
         return status.isEmpty
             ? 'Pending'
@@ -687,7 +700,9 @@ class ServiceTransaction {
             .add(ReceiptField(label: 'Delivery Email', value: deliveryEmail));
         extraDetails.add(ReceiptField(
             label: 'Delivery Receipt',
-            value: 'Subscription confirmation sent to $deliveryEmail.'));
+          value: statusKey == 'pending' || statusKey == 'processing'
+            ? 'Subscription is still processing. Confirmation will be sent to $deliveryEmail once completed.'
+            : 'Subscription confirmation sent to $deliveryEmail.'));
       }
 
       final smartcardNumber = details!['smartcardNumber']?.toString();
@@ -735,6 +750,11 @@ class ServiceTransaction {
                 value:
                     'PIN${resolvedPins.length > 1 ? 's' : ''} sent to $deliveryEmail and stored here.'));
           }
+        } else if (deliveryEmail != null && deliveryEmail.isNotEmpty) {
+          extraDetails.add(ReceiptField(
+              label: 'Delivery Receipt',
+              value:
+                  'PIN will appear here after completion and is queued for $deliveryEmail.'));
         }
       }
     }
