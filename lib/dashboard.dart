@@ -21,6 +21,7 @@ import 'api_service.dart';
 import 'idle_timeout_service.dart';
 import 'app_settings.dart';
 import 'widgets/transaction_receipt.dart';
+import 'design/gopayna_design.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -530,6 +531,7 @@ class _DashboardScreenState extends State<DashboardScreen>
               // ...existing code...
               _buildCustomStatusBar(statusBarHeight, isTablet),
               _buildBalanceCard(isTablet),
+              _buildServicesHeader(isTablet),
               _buildServiceGrid(isTablet),
               _buildRecentTransactions(isTablet),
             ],
@@ -672,7 +674,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                                   SizedBox(width: isTablet ? 6 : 4),
                                   Flexible(
                                     child: Text(
-                                      'Add Money',
+                                      'Fund wallet',
                                       style: TextStyle(
                                         color: colorScheme.onPrimary,
                                         fontSize: isTablet ? 13 : 11,
@@ -741,6 +743,41 @@ class _DashboardScreenState extends State<DashboardScreen>
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildServicesHeader(bool isTablet) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        isTablet ? 32 : 20,
+        4,
+        isTablet ? 32 : 20,
+        0,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Services',
+            style: TextStyle(
+              fontSize: isTablet ? 20 : 18,
+              fontWeight: FontWeight.w800,
+              color: colorScheme.onSurface,
+              letterSpacing: -0.3,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Airtime, data, bills & more — tap a service to continue.',
+            style: TextStyle(
+              fontSize: isTablet ? 14 : 12,
+              color: colorScheme.onSurface.withValues(alpha: 0.55),
+              height: 1.35,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1445,6 +1482,24 @@ class Transaction {
       _addServiceSpecificDetails(serviceType, metadata!, extraDetails);
     }
 
+    final metaRefunded = metadata?['refunded'] == true;
+
+    ReceiptOutcome? outcome;
+    String? outcomeMessage;
+    if (metaRefunded && !isIncoming) {
+      outcome = ReceiptOutcome.refunded;
+      outcomeMessage = GoPaynaStrings.receiptBannerRefunded;
+    } else if (statusKey == 'pending' || statusKey == 'processing') {
+      outcome = ReceiptOutcome.pending;
+      outcomeMessage = GoPaynaStrings.receiptBannerPending;
+    } else if (statusKey == 'failed') {
+      outcome = ReceiptOutcome.failed;
+      outcomeMessage = GoPaynaStrings.receiptBannerFailed;
+    } else if (statusKey == 'success') {
+      outcome = ReceiptOutcome.success;
+      outcomeMessage = GoPaynaStrings.receiptBannerSuccess;
+    }
+
     return TransactionReceiptData(
       title: title,
       amountDisplay: '$amountPrefix₦${amount.toStringAsFixed(2)}',
@@ -1456,6 +1511,8 @@ class Transaction {
       reference: reference,
       icon: icon,
       extraDetails: extraDetails,
+      outcome: outcome,
+      outcomeMessage: outcomeMessage,
     );
   }
 

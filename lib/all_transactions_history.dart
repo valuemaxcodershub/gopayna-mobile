@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api_service.dart';
 import 'widgets/transaction_receipt.dart';
+import 'design/gopayna_design.dart';
 
 class TransactionHistoryScreen extends StatefulWidget {
   const TransactionHistoryScreen({super.key});
@@ -1040,6 +1041,24 @@ class WalletTransactionItem {
       }
     }
 
+    final metaRefunded = metadata?['refunded'] == true;
+    ReceiptOutcome? outcome;
+    String? outcomeMessage;
+    final sk = statusKey;
+    if (metaRefunded && !isIncoming) {
+      outcome = ReceiptOutcome.refunded;
+      outcomeMessage = GoPaynaStrings.receiptBannerRefunded;
+    } else if (sk == 'pending' || sk == 'processing') {
+      outcome = ReceiptOutcome.pending;
+      outcomeMessage = GoPaynaStrings.receiptBannerPending;
+    } else if (sk == 'failed' || sk == 'error' || sk == 'cancelled') {
+      outcome = ReceiptOutcome.failed;
+      outcomeMessage = GoPaynaStrings.receiptBannerFailed;
+    } else if (sk == 'success' || sk == 'successful' || sk == 'completed') {
+      outcome = ReceiptOutcome.success;
+      outcomeMessage = GoPaynaStrings.receiptBannerSuccess;
+    }
+
     return TransactionReceiptData(
       title: title,
       amountDisplay: '$amountPrefix₦${amount.toStringAsFixed(2)}',
@@ -1051,6 +1070,8 @@ class WalletTransactionItem {
       reference: reference,
       icon: icon,
       extraDetails: extraDetails,
+      outcome: outcome,
+      outcomeMessage: outcomeMessage,
     );
   }
 

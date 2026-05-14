@@ -6,6 +6,8 @@ import 'api_service.dart' as api;
 import 'service_transaction_history.dart';
 import 'widgets/wallet_visibility_builder.dart';
 import 'widgets/themed_screen_helpers.dart';
+import 'widgets/pending_order_screen.dart';
+import 'design/gopayna_design.dart';
 
 class DataTransaction {
   final String network;
@@ -638,7 +640,39 @@ class _BuyDataScreenState extends State<BuyDataScreen>
     if (result['success'] == true) {
       _loadWalletData();
       _loadRecentTransactions();
-      _showSuccessDialog();
+      final payload = result['data'] as Map<String, dynamic>? ?? {};
+      final transactionData = payload['data'] as Map<String, dynamic>? ?? payload;
+      final isPending = result['pending'] == true ||
+          payload['pending'] == true ||
+          transactionData['isPending'] == true;
+      if (!mounted) return;
+      if (isPending) {
+        final selectedNetworkData =
+            _networks.firstWhere((n) => n['id'] == _selectedNetwork);
+        final selectedPlan = _currentDataPlans.firstWhere(
+          (plan) => '${plan['bundle']} - ₦${plan['price']}' == _selectedDataPlan,
+        );
+        final ref = (transactionData['reference'] ??
+                result['reference'] ??
+                'Unknown')
+            .toString();
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => PendingOrderScreen(
+              reference: ref,
+              serviceTitle: 'Data',
+              summaryLine:
+                  '${selectedPlan['bundle']} · ${selectedNetworkData['name']} · ${_phoneController.text}',
+              orderId: transactionData['orderId']?.toString() ??
+                  transactionData['orderid']?.toString(),
+              requestId: transactionData['requestId']?.toString() ??
+                  transactionData['requestid']?.toString(),
+            ),
+          ),
+        );
+      } else {
+        _showSuccessDialog();
+      }
     } else {
       // Reload wallet data in case of refund
       if (result['refunded'] == true) {
@@ -648,9 +682,9 @@ class _BuyDataScreenState extends State<BuyDataScreen>
           result['error'] ?? 'Transaction failed. Please try again.';
       // Add refund notice if applicable
       if (result['refunded'] == true) {
-        errorMessage += '\n\nYour wallet has been refunded.';
+        errorMessage += '\n\n${GoPaynaStrings.refundHint}';
       }
-      _showErrorDialog(errorMessage);
+      _showErrorDialog(GoPaynaUxHelpers.augmentProviderError(errorMessage));
     }
   }
 

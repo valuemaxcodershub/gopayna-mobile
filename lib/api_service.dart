@@ -495,6 +495,7 @@ String _generateRequestSignature({
 Map<String, String> _signedAuthorizedHeaders(
   String token, {
   String? body,
+  String? idempotencyKey,
 }) {
   final timestamp = DateTime.now().millisecondsSinceEpoch.toString();
   final signature = _generateRequestSignature(
@@ -511,7 +512,21 @@ Map<String, String> _signedAuthorizedHeaders(
     'X-App-Id': _appId,
     'X-Request-Timestamp': timestamp,
     'X-Request-Signature': signatureHeader,
+    if (idempotencyKey != null && idempotencyKey.isNotEmpty)
+      'X-Idempotency-Key': idempotencyKey,
   };
+}
+
+String _purchaseIdempotencyKey(String service, Map<String, dynamic> body) {
+  final minuteBucket = DateTime.now().millisecondsSinceEpoch ~/ 60000;
+  final normalizedBody = jsonEncode(Map.fromEntries(
+    body.entries.toList()..sort((a, b) => a.key.compareTo(b.key)),
+  ));
+  final digest = sha256
+      .convert(utf8.encode('$service:$minuteBucket:$normalizedBody'))
+      .toString()
+      .substring(0, 32);
+  return '$service-$digest';
 }
 
 Future<Map<String, dynamic>> initializePaystackPayment({
@@ -573,10 +588,18 @@ Future<Map<String, dynamic>> verifyPaystackPayment({
 Future<Map<String, dynamic>> fetchWalletTransactions({
   required String token,
   int limit = 10,
+  String? reference,
 }) async {
   try {
+    final qp = <String, String>{'limit': '$limit'};
+    final ref = reference?.trim() ?? '';
+    if (ref.isNotEmpty) {
+      qp['reference'] = ref;
+    }
+    final uri =
+        Uri.parse('$paystackBaseUrl/transactions').replace(queryParameters: qp);
     final response = await http.get(
-      Uri.parse('$paystackBaseUrl/transactions?limit=$limit'),
+      uri,
       headers: _authorizedJsonHeaders(token),
     );
     final decoded = jsonDecode(response.body);
@@ -1341,7 +1364,11 @@ Future<Map<String, dynamic>> buyAirtime(
 
     final response = await http.post(
       Uri.parse('$vtuBaseUrl/buy/airtime'),
-      headers: _signedAuthorizedHeaders(token, body: bodyJson),
+      headers: _signedAuthorizedHeaders(
+        token,
+        body: bodyJson,
+        idempotencyKey: _purchaseIdempotencyKey('airtime', requestBody),
+      ),
       body: bodyJson,
     );
     final responseBody = response.body.isEmpty ? '{}' : response.body;
@@ -1399,7 +1426,11 @@ Future<Map<String, dynamic>> buyData(
 
     final response = await http.post(
       Uri.parse('$vtuBaseUrl/buy/data'),
-      headers: _signedAuthorizedHeaders(token, body: bodyJson),
+      headers: _signedAuthorizedHeaders(
+        token,
+        body: bodyJson,
+        idempotencyKey: _purchaseIdempotencyKey('data', requestBody),
+      ),
       body: bodyJson,
     );
     final responseBody = response.body.isEmpty ? '{}' : response.body;
@@ -1459,7 +1490,11 @@ Future<Map<String, dynamic>> buyElectricity(
 
     final response = await http.post(
       Uri.parse('$vtuBaseUrl/buy/electricity'),
-      headers: _signedAuthorizedHeaders(token, body: bodyJson),
+      headers: _signedAuthorizedHeaders(
+        token,
+        body: bodyJson,
+        idempotencyKey: _purchaseIdempotencyKey('electricity', requestBody),
+      ),
       body: bodyJson,
     );
     final responseBody = response.body.isEmpty ? '{}' : response.body;
@@ -1509,17 +1544,22 @@ Future<Map<String, dynamic>> buyTVSubscription(
   String? email,
 }) async {
   try {
-    final bodyJson = jsonEncode({
+    final requestBody = {
       'provider': provider,
       'smartcardNumber':
           smartCardNumber, // Note: lowercase 'c' to match backend
       'packageCode': packageCode,
       'amount': amount,
       'email': email ?? '',
-    });
+    };
+    final bodyJson = jsonEncode(requestBody);
     final response = await http.post(
       Uri.parse('$vtuBaseUrl/buy/tv'),
-      headers: _signedAuthorizedHeaders(token, body: bodyJson),
+      headers: _signedAuthorizedHeaders(
+        token,
+        body: bodyJson,
+        idempotencyKey: _purchaseIdempotencyKey('tv', requestBody),
+      ),
       body: bodyJson,
     );
     final responseBody = response.body.isEmpty ? '{}' : response.body;
@@ -1581,7 +1621,11 @@ Future<Map<String, dynamic>> buyEducationPin(
     final bodyJson = jsonEncode(body);
     final response = await http.post(
       Uri.parse('$vtuBaseUrl/buy/education'),
-      headers: _signedAuthorizedHeaders(token, body: bodyJson),
+      headers: _signedAuthorizedHeaders(
+        token,
+        body: bodyJson,
+        idempotencyKey: _purchaseIdempotencyKey('education', body),
+      ),
       body: bodyJson,
     );
     final responseBody = response.body.isEmpty ? '{}' : response.body;
