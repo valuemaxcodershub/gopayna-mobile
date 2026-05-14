@@ -596,6 +596,30 @@ Future<Map<String, dynamic>> fetchWalletTransactions({
   }
 }
 
+Future<Map<String, dynamic>> fetchWalletTransactionSummary({
+  required String token,
+}) async {
+  try {
+    final response = await http.get(
+      Uri.parse('$paystackBaseUrl/transactions/summary'),
+      headers: _authorizedJsonHeaders(token),
+    );
+    final body = response.body.isEmpty ? '{}' : response.body;
+    final decoded = jsonDecode(body);
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      final data = decoded['data'] as Map<String, dynamic>? ?? {};
+      return {'success': true, 'data': data};
+    }
+    return {
+      'error': decoded['error'] ?? _extractErrorMessage(body, response.statusCode),
+      'status': response.statusCode,
+    };
+  } catch (e) {
+    log('Fetch wallet transaction summary failed: $e', name: 'api_service');
+    return {'error': 'Unable to fetch transaction summary. Please try again.'};
+  }
+}
+
 Future<Map<String, dynamic>> fetchPaystackBanks({
   required String token,
 }) async {

@@ -967,11 +967,15 @@ class WalletTransactionItem {
   static String _formatStatusStatic(String status) {
     switch (status.toLowerCase()) {
       case 'success':
+      case 'successful':
+      case 'completed':
         return 'Successful';
       case 'failed':
         return 'Failed';
       case 'pending':
-        return 'Pending';
+        return 'Pending Review';
+      case 'processing':
+        return 'Processing';
       case 'cancelled':
         return 'Cancelled';
       default:
@@ -1260,7 +1264,9 @@ class WalletTransactionItem {
           extraDetails.add(ReceiptField(label: 'Delivery Email', value: email));
           extraDetails.add(ReceiptField(
               label: 'Delivery Receipt',
-              value: 'Subscription confirmation sent to $email.'));
+              value: statusKey == 'pending' || statusKey == 'processing'
+                  ? 'Subscription is still processing. Confirmation will be sent to $email once completed.'
+                  : 'Subscription confirmation sent to $email.'));
         }
         break;
 
@@ -1305,6 +1311,11 @@ class WalletTransactionItem {
                 value:
                     'PIN${resolvedPins.length > 1 ? 's' : ''} sent to $email and stored here.'));
           }
+        } else if (email != null && email.isNotEmpty) {
+          extraDetails.add(ReceiptField(
+              label: 'Delivery Receipt',
+              value:
+                  'PIN will appear here after completion and is queued for $email.'));
         }
         break;
     }
