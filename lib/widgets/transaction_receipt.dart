@@ -1,6 +1,8 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 
+import 'design/gopayna_design.dart';
+
 String _formatReceiptToken(String value) {
   final compact = value.replaceAll(RegExp(r'\s+'), '');
   if (compact.isEmpty || compact.length < 8) {
@@ -15,6 +17,9 @@ String _formatReceiptToken(String value) {
   return chunks.join(' ');
 }
 
+/// Receipt state for user-visible messaging (pending, delivered, failed, refund).
+enum ReceiptOutcome { pending, success, failed, refunded }
+
 class TransactionReceiptData {
   const TransactionReceiptData({
     required this.title,
@@ -27,6 +32,8 @@ class TransactionReceiptData {
     required this.reference,
     required this.icon,
     this.extraDetails = const <ReceiptField>[],
+    this.outcome,
+    this.outcomeMessage,
   });
 
   final String title;
@@ -39,6 +46,8 @@ class TransactionReceiptData {
   final String reference;
   final IconData icon;
   final List<ReceiptField> extraDetails;
+  final ReceiptOutcome? outcome;
+  final String? outcomeMessage;
 
   String get channelDisplay => channel.isEmpty ? 'Wallet transaction' : channel;
 
@@ -135,15 +144,24 @@ class _TransactionReceiptSheet extends StatelessWidget {
                 ),
               ),
               SizedBox(height: isTablet ? 24 : 20),
+              if (data.outcome != null &&
+                  (data.outcomeMessage != null &&
+                      data.outcomeMessage!.trim().isNotEmpty)) ...[
+                _OutcomeBanner(
+                  outcome: data.outcome!,
+                  message: data.outcomeMessage!,
+                ),
+                SizedBox(height: isTablet ? 18 : 14),
+              ],
               Container(
                 padding: EdgeInsets.all(isTablet ? 20 : 16),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF00CA44).withValues(alpha: 0.1),
+                  color: GoPaynaColors.primary.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
                   data.icon,
-                  color: const Color(0xFF00CA44),
+                  color: GoPaynaColors.primary,
                   size: isTablet ? 36 : 32,
                 ),
               ),
@@ -488,6 +506,74 @@ class _TransactionReceiptSheet extends StatelessWidget {
       ShareParams(
         text: data.buildShareMessage(),
         subject: 'GoPayna Receipt',
+      ),
+    );
+  }
+}
+
+class _OutcomeBanner extends StatelessWidget {
+  const _OutcomeBanner({required this.outcome, required this.message});
+
+  final ReceiptOutcome outcome;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    late Color bg;
+    late Color border;
+    late Color fg;
+    late IconData icon;
+    switch (outcome) {
+      case ReceiptOutcome.pending:
+        bg = GoPaynaColors.statusPending.withValues(alpha: 0.1);
+        border = GoPaynaColors.statusPending.withValues(alpha: 0.35);
+        fg = const Color(0xFF8A5300);
+        icon = Icons.schedule_rounded;
+        break;
+      case ReceiptOutcome.success:
+        bg = GoPaynaColors.statusSuccess.withValues(alpha: 0.1);
+        border = GoPaynaColors.statusSuccess.withValues(alpha: 0.35);
+        fg = GoPaynaColors.primaryDark;
+        icon = Icons.check_circle_outline_rounded;
+        break;
+      case ReceiptOutcome.failed:
+        bg = GoPaynaColors.statusFailed.withValues(alpha: 0.08);
+        border = GoPaynaColors.statusFailed.withValues(alpha: 0.3);
+        fg = GoPaynaColors.statusFailed;
+        icon = Icons.error_outline_rounded;
+        break;
+      case ReceiptOutcome.refunded:
+        bg = GoPaynaColors.statusRefunded.withValues(alpha: 0.1);
+        border = GoPaynaColors.statusRefunded.withValues(alpha: 0.3);
+        fg = GoPaynaColors.statusRefunded;
+        icon = Icons.currency_exchange_rounded;
+        break;
+    }
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: border),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: fg, size: 22),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(
+                fontSize: 13,
+                height: 1.45,
+                fontWeight: FontWeight.w600,
+                color: fg,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

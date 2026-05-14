@@ -6,6 +6,8 @@ import 'api_service.dart' as api;
 import 'service_transaction_history.dart';
 import 'widgets/wallet_visibility_builder.dart';
 import 'widgets/themed_screen_helpers.dart';
+import 'widgets/pending_order_screen.dart';
+import 'design/gopayna_design.dart';
 
 class TVTransaction {
   final String id;
@@ -466,13 +468,29 @@ class _BuyTVSubscriptionScreenState extends State<BuyTVSubscriptionScreen>
       final transactionData = payload['data'] as Map<String, dynamic>? ?? payload;
       final isPending = payload['pending'] == true || transactionData['isPending'] == true;
       if (isPending) {
-        _showPendingDialog(transactionData['reference']?.toString() ?? 'Unknown');
+        final selectedProviderData =
+            _providers.firstWhere((p) => p['id'] == _selectedProvider);
+        final ref = transactionData['reference']?.toString() ?? 'Unknown';
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => PendingOrderScreen(
+              reference: ref,
+              serviceTitle: 'TV subscription',
+              summaryLine:
+                  '${selectedProviderData['name']} · Card ${_smartCardController.text}',
+              orderId: transactionData['orderId']?.toString() ??
+                  transactionData['orderid']?.toString(),
+              requestId: transactionData['requestId']?.toString() ??
+                  transactionData['requestid']?.toString(),
+            ),
+          ),
+        );
       } else {
         _showSuccessDialog();
       }
     } else {
-      _showErrorDialog(
-          result['error'] ?? 'Transaction failed. Please try again.');
+      _showErrorDialog(GoPaynaUxHelpers.augmentProviderError(
+          result['error'] ?? 'Transaction failed. Please try again.'));
     }
   }
 
@@ -616,97 +634,6 @@ class _BuyTVSubscriptionScreenState extends State<BuyTVSubscriptionScreen>
               ],
             ),
           ),
-        );
-      },
-    );
-  }
-
-  void _showPendingDialog(String reference) {
-    final isTablet = MediaQuery.of(context).size.width > 600;
-    final cs = colorScheme;
-    final selectedProviderData =
-        _providers.firstWhere((p) => p['id'] == _selectedProvider);
-
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(isTablet ? 20 : 16),
-          ),
-          title: Row(
-            children: [
-              Icon(Icons.hourglass_empty,
-                  color: Colors.orange, size: isTablet ? 32 : 24),
-              SizedBox(width: isTablet ? 12 : 8),
-              Text(
-                'Order Processing',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: isTablet ? 22 : 18,
-                  color: cs.onSurface,
-                ),
-              ),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Your ${selectedProviderData['name']} subscription order has been received and is still being processed.',
-                style: TextStyle(
-                  fontSize: isTablet ? 16 : 14,
-                  color: cs.onSurface,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.orange.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                  border:
-                      Border.all(color: Colors.orange.withValues(alpha: 0.3)),
-                ),
-                child: Text(
-                  'Your wallet has been charged. Activation confirmation will show in history and your delivery email once completed.',
-                  style: TextStyle(
-                    fontSize: isTablet ? 14 : 12,
-                    color: cs.onSurface,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'Reference: $reference',
-                style: TextStyle(
-                  fontSize: isTablet ? 12 : 10,
-                  color: cs.onSurface.withValues(alpha: 0.7),
-                  fontFamily: 'monospace',
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Clipboard.setData(ClipboardData(text: reference));
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Reference copied to clipboard')),
-                );
-              },
-              child: const Text('Copy Reference'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.of(context).pop(),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: cs.primary,
-                foregroundColor: cs.onPrimary,
-              ),
-              child: const Text('OK'),
-            ),
-          ],
         );
       },
     );

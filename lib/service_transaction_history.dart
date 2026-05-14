@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api_service.dart';
 import 'widgets/transaction_receipt.dart';
+import 'design/gopayna_design.dart';
 
 /// Enum for service types to filter transactions
 enum ServiceType {
@@ -759,6 +760,24 @@ class ServiceTransaction {
       }
     }
 
+    final metaRefunded = details?['refunded'] == true;
+    ReceiptOutcome? outcome;
+    String? outcomeMessage;
+    final sk = statusKey;
+    if (metaRefunded) {
+      outcome = ReceiptOutcome.refunded;
+      outcomeMessage = GoPaynaStrings.receiptBannerRefunded;
+    } else if (sk == 'pending' || sk == 'processing') {
+      outcome = ReceiptOutcome.pending;
+      outcomeMessage = GoPaynaStrings.receiptBannerPending;
+    } else if (sk == 'failed' || sk == 'cancelled') {
+      outcome = ReceiptOutcome.failed;
+      outcomeMessage = GoPaynaStrings.receiptBannerFailed;
+    } else if (sk == 'success' || sk == 'successful' || sk == 'completed') {
+      outcome = ReceiptOutcome.success;
+      outcomeMessage = GoPaynaStrings.receiptBannerSuccess;
+    }
+
     return TransactionReceiptData(
       title: title,
       amountDisplay: '-₦${amount.toStringAsFixed(2)}',
@@ -770,6 +789,8 @@ class ServiceTransaction {
       reference: reference,
       icon: icon,
       extraDetails: extraDetails,
+      outcome: outcome,
+      outcomeMessage: outcomeMessage,
     );
   }
 }
