@@ -430,11 +430,12 @@ class _BuyElectricityScreenState extends State<BuyElectricityScreen>
             amount: (tx['amount'] as num?)?.toDouble() ?? 0,
             date: DateTime.tryParse(tx['createdAt']?.toString() ?? '') ??
                 DateTime.now(),
-            status: tx['status'] == 'success'
-                ? 'Successful'
-                : tx['status'] == 'pending'
-                    ? 'Pending'
-                    : 'Failed',
+            status: () {
+              final s = tx['status']?.toString().toLowerCase() ?? '';
+              if (s == 'success') return 'Successful';
+              if (s == 'pending' || s == 'processing') return 'Pending';
+              return 'Failed';
+            }(),
             providerColor: const Color(0xFF0066CC),
           );
         }).toList();
@@ -2598,12 +2599,13 @@ class _BuyElectricityScreenState extends State<BuyElectricityScreen>
                                           vertical: 2,
                                         ),
                                         decoration: BoxDecoration(
-                                          color:
-                                              transaction.status == 'Successful'
-                                                  ? const Color(0xFF00CA44)
-                                                      .withValues(alpha: 0.15)
-                                                  : Colors.red
-                                                      .withValues(alpha: 0.15),
+                                          color: (transaction.status ==
+                                                  'Successful'
+                                              ? const Color(0xFF00CA44)
+                                              : transaction.status == 'Pending'
+                                                  ? GoPaynaColors.statusPending
+                                                  : Colors.red)
+                                              .withValues(alpha: 0.15),
                                           borderRadius:
                                               BorderRadius.circular(4),
                                         ),
@@ -2613,7 +2615,11 @@ class _BuyElectricityScreenState extends State<BuyElectricityScreen>
                                             color: transaction.status ==
                                                     'Successful'
                                                 ? const Color(0xFF00CA44)
-                                                : Colors.red.shade700,
+                                                : transaction.status ==
+                                                        'Pending'
+                                                    ? GoPaynaColors
+                                                        .statusPending
+                                                    : Colors.red.shade700,
                                             fontSize: 10,
                                             fontWeight: FontWeight.w500,
                                           ),

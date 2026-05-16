@@ -32,15 +32,20 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   // ...existing code...
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final primary = cs.primary;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF00CA44),
+        backgroundColor: cs.primary,
+        foregroundColor: cs.onPrimary,
         elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
-        title: const Text(
+        iconTheme: IconThemeData(color: cs.onPrimary),
+        title: Text(
           'Forgot Password',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          style: TextStyle(color: cs.onPrimary, fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
       ),
@@ -52,11 +57,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               child: Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: cs.surface,
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color.fromRGBO(0, 0, 0, 0.05),
+                    color: Colors.black.withValues(alpha: 0.05),
                     blurRadius: 16,
                     offset: const Offset(0, 8),
                   ),
@@ -65,38 +70,46 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Icon(Icons.lock_outline, color: Color(0xFF00CA44), size: 48),
+                  Icon(Icons.lock_outline, color: primary, size: 48),
                   const SizedBox(height: 16),
-                  const Text(
+                  Text(
                     'Reset Your Password',
                     style: TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF00CA44),
+                      color: primary,
                     ),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 8),
-                  const Text(
+                  Text(
                     'Enter your email or phone number to receive a secure OTP.',
-                    style: TextStyle(fontSize: 15, color: Colors.black87),
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: cs.onSurface.withValues(alpha: 0.87),
+                    ),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 24),
                   TextField(
                     controller: _userController,
                     keyboardType: TextInputType.text,
+                    style: TextStyle(color: cs.onSurface),
                     decoration: InputDecoration(
                       labelText: 'Email or Phone',
-                      labelStyle: const TextStyle(color: Color(0xFF00CA44)),
-                      prefixIcon: const Icon(Icons.person_outline, color: Color(0xFF00CA44)),
+                      labelStyle: TextStyle(color: primary),
+                      prefixIcon: Icon(Icons.person_outline, color: primary),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Color(0xFF00CA44)),
+                        borderSide: BorderSide(color: primary.withValues(alpha: 0.5)),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Color(0xFF00CA44)),
+                        borderSide: BorderSide(color: primary, width: 2),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: cs.outline.withValues(alpha: 0.4)),
                       ),
                     ),
                   ),
@@ -110,15 +123,16 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     child: ElevatedButton(
                       onPressed: _isLoading ? null : _sendOtp,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF00CA44),
+                        backgroundColor: primary,
+                        foregroundColor: cs.onPrimary,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
                         padding: const EdgeInsets.symmetric(vertical: 16),
                       ),
                       child: _isLoading
-                          ? const SizedBox(height: 22, width: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                          : const Text('Send OTP', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                          ? SizedBox(height: 22, width: 22, child: CircularProgressIndicator(color: cs.onPrimary, strokeWidth: 2))
+                          : Text('Send OTP', style: TextStyle(color: cs.onPrimary, fontWeight: FontWeight.bold, fontSize: 16)),
                     ),
                   ),
                 ],

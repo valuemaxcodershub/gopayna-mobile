@@ -15,6 +15,7 @@ class AirtimeTransaction {
   final String amount;
   final DateTime date;
   final bool isSuccessful;
+  final bool isPending;
   final Color networkColor;
 
   AirtimeTransaction({
@@ -23,6 +24,7 @@ class AirtimeTransaction {
     required this.amount,
     required this.date,
     required this.isSuccessful,
+    this.isPending = false,
     required this.networkColor,
   });
 }
@@ -223,13 +225,15 @@ class _BuyAirtimeScreenState extends State<BuyAirtimeScreen>
       setState(() {
         _recentTransactions = data.map((tx) {
           final details = tx['details'] as Map<String, dynamic>? ?? {};
+          final status = tx['status']?.toString() ?? '';
           return AirtimeTransaction(
             network: details['network']?.toString().toUpperCase() ?? 'Unknown',
             phoneNumber: details['phone']?.toString() ?? '',
             amount: tx['amount']?.toString() ?? '0',
             date: DateTime.tryParse(tx['createdAt']?.toString() ?? '') ??
                 DateTime.now(),
-            isSuccessful: tx['status'] == 'success',
+            isSuccessful: status == 'success',
+            isPending: status == 'pending' || status == 'processing',
             networkColor:
                 _getNetworkColor(details['network']?.toString() ?? ''),
           );
@@ -1336,21 +1340,32 @@ class _BuyAirtimeScreenState extends State<BuyAirtimeScreen>
                                               color: transaction.isSuccessful
                                                   ? cs.primary
                                                       .withValues(alpha: 0.1)
-                                                  : cs.error
-                                                      .withValues(alpha: 0.1),
+                                                  : transaction.isPending
+                                                      ? GoPaynaColors
+                                                          .statusPending
+                                                          .withValues(
+                                                              alpha: 0.12)
+                                                      : cs.error
+                                                          .withValues(
+                                                              alpha: 0.1),
                                               borderRadius:
                                                   BorderRadius.circular(12),
                                             ),
                                             child: Text(
                                               transaction.isSuccessful
                                                   ? 'Success'
-                                                  : 'Failed',
+                                                  : transaction.isPending
+                                                      ? 'Pending'
+                                                      : 'Failed',
                                               style: TextStyle(
                                                 fontSize: 10,
                                                 fontWeight: FontWeight.w500,
                                                 color: transaction.isSuccessful
                                                     ? cs.primary
-                                                    : cs.error,
+                                                    : transaction.isPending
+                                                        ? GoPaynaColors
+                                                            .statusPending
+                                                        : cs.error,
                                               ),
                                             ),
                                           ),

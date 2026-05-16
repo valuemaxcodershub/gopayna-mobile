@@ -94,6 +94,11 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
     String? Function(String?)? validator,
     List<TextInputFormatter>? inputFormatters,
   }) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final labelColor = cs.onSurface.withValues(alpha: 0.87);
+    final fieldStyle =
+        TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: labelColor);
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
       child: Column(
@@ -101,7 +106,11 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
         children: [
           Text(
             label,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: Colors.black87, letterSpacing: 0.2),
+            style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+                color: labelColor,
+                letterSpacing: 0.2),
           ),
           const SizedBox(height: 8),
           Container(
@@ -117,10 +126,13 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
               obscureText: obscureText,
               validator: validator,
               inputFormatters: inputFormatters,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: Colors.black87),
+              style: fieldStyle,
               decoration: InputDecoration(
                 filled: true,
-                fillColor: Colors.white,
+                fillColor: theme.inputDecorationTheme.fillColor ??
+                    (theme.brightness == Brightness.dark
+                        ? cs.surfaceContainerHighest
+                        : Colors.white),
                 prefixIcon: prefixIcon,
                 suffixIcon: suffixIcon,
                 border: OutlineInputBorder(
@@ -134,6 +146,14 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide(color: _brandColor, width: 2),
+                ),
+                errorBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Colors.red, width: 1.5),
+                ),
+                focusedErrorBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Colors.red, width: 2),
                 ),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
               ),
@@ -175,9 +195,11 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
   Widget build(BuildContext context) {
     final screenSize = MediaQuery.of(context).size;
     final isTablet = screenSize.width > 600;
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
         child: Column(
           children: [
@@ -188,14 +210,14 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
                 children: [
                   Container(
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: cs.surface,
                       borderRadius: BorderRadius.circular(12),
                       boxShadow: [
                         BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 8, offset: const Offset(0, 2)),
                       ],
                     ),
                     child: IconButton(
-                      icon: Icon(Icons.arrow_back, color: Colors.black87),
+                      icon: Icon(Icons.arrow_back, color: cs.onSurface),
                       onPressed: () => Navigator.pop(context),
                     ),
                   ),
@@ -279,7 +301,7 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
                             controller: _passwordController,
                             obscureText: _obscurePassword,
                             suffixIcon: IconButton(
-                              icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility, color: Colors.grey[600]),
+                              icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility, color: theme.iconTheme.color?.withValues(alpha: 0.65)),
                               onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                             ),
                             validator: (value) {
@@ -299,7 +321,7 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
                             controller: _confirmPasswordController,
                             obscureText: _obscureConfirmPassword,
                             suffixIcon: IconButton(
-                              icon: Icon(_obscureConfirmPassword ? Icons.visibility_off : Icons.visibility, color: Colors.grey[600]),
+                              icon: Icon(_obscureConfirmPassword ? Icons.visibility_off : Icons.visibility, color: theme.iconTheme.color?.withValues(alpha: 0.65)),
                               onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
                             ),
                             validator: (value) {
@@ -348,9 +370,9 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
                                   child: RichText(
                                     text: TextSpan(
                                       text: 'I agree to the ',
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontSize: 14,
-                                        color: Colors.black87,
+                                        color: cs.onSurface.withValues(alpha: 0.87),
                                       ),
                                       children: [
                                         TextSpan(
@@ -495,7 +517,7 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
                                 child: RichText(
                                   text: TextSpan(
                                     text: 'Already have an Account? ',
-                                    style: TextStyle(fontSize: 14, color: Colors.black87, fontWeight: FontWeight.w400),
+                                    style: TextStyle(fontSize: 14, color: cs.onSurface.withValues(alpha: 0.87), fontWeight: FontWeight.w400),
                                     children: [
                                       TextSpan(text: 'Log in', style: TextStyle(color: _brandColor, fontWeight: FontWeight.w600)),
                                     ],

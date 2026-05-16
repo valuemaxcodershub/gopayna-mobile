@@ -10,7 +10,7 @@ mixin ThemedScreenHelpers<T extends StatefulWidget> on State<T> {
       colorScheme.onSurface.withValues(alpha: isDarkMode ? 0.65 : 0.6);
   Color get shadowColor => isDarkMode
       ? Colors.black.withValues(alpha: 0.4)
-      : const Color.fromARGB(255, 42, 224, 5).withValues(alpha: 0.08);
+      : Colors.black.withValues(alpha: 0.08);
   SystemUiOverlayStyle get statusBarStyle =>
       isDarkMode ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark;
 }

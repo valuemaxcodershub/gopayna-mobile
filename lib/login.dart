@@ -102,36 +102,56 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     Widget? prefixIcon,
     String? Function(String?)? validator,
   }) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final labelColor = cs.onSurface.withValues(alpha: 0.87);
+    final fieldStyle =
+        TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: labelColor);
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: Colors.black87, letterSpacing: 0.2)),
+          Text(label,
+              style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                  color: labelColor,
+                  letterSpacing: 0.2)),
           const SizedBox(height: 8),
           Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
-              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 2))],
+              boxShadow: [
+                BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2)),
+              ],
             ),
             child: TextFormField(
               controller: controller,
               keyboardType: keyboardType,
               obscureText: obscureText,
               validator: validator,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: Colors.black87),
+              style: fieldStyle,
               decoration: InputDecoration(
                 filled: true,
-                fillColor: Colors.white,
+                fillColor: theme.inputDecorationTheme.fillColor ??
+                    (theme.brightness == Brightness.dark
+                        ? cs.surfaceContainerHighest
+                        : Colors.white),
                 prefixIcon: prefixIcon,
                 suffixIcon: suffixIcon,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Color.fromRGBO(((_brandColor.r * 255.0).round() & 0xff), ((_brandColor.g * 255.0).round() & 0xff), ((_brandColor.b * 255.0).round() & 0xff), 0.3), width: 1.5),
+                  borderSide:
+                      BorderSide(color: _brandColor.withValues(alpha: 0.3), width: 1.5),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Color.fromRGBO(((_brandColor.r * 255.0).round() & 0xff), ((_brandColor.g * 255.0).round() & 0xff), ((_brandColor.b * 255.0).round() & 0xff), 0.3), width: 1.5),
+                  borderSide:
+                      BorderSide(color: _brandColor.withValues(alpha: 0.3), width: 1.5),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -145,7 +165,8 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                   borderRadius: BorderRadius.circular(12),
                   borderSide: const BorderSide(color: Colors.red, width: 2),
                 ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
               ),
             ),
           ),
@@ -292,6 +313,8 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
   Widget build(BuildContext context) {
     final screenSize = MediaQuery.of(context).size;
     final isTablet = screenSize.width > 600;
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
 
     return PopScope(
       canPop: !widget.redirectToIntroOnExit,
@@ -302,7 +325,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
         _handleBackNavigation();
       },
       child: Scaffold(
-        backgroundColor: const Color(0xFFF8F9FA),
+        backgroundColor: theme.scaffoldBackgroundColor,
         body: SafeArea(
           child: Column(
             children: [
@@ -313,12 +336,12 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                 children: [
                   Container(
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: cs.surface,
                       borderRadius: BorderRadius.circular(12),
                       boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 8, offset: const Offset(0, 2))],
                     ),
                     child: IconButton(
-                      icon: Icon(Icons.arrow_back, color: Colors.black87),
+                      icon: Icon(Icons.arrow_back, color: cs.onSurface),
                       onPressed: () {
                         if (_handleBackNavigation() && Navigator.of(context).canPop()) {
                           Navigator.pop(context);
@@ -375,7 +398,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                               controller: _passwordController,
                               obscureText: _obscurePassword,
                               suffixIcon: IconButton(
-                                icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility, color: Colors.grey[600]),
+                                icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility, color: theme.iconTheme.color?.withValues(alpha: 0.65)),
                                 onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                               ),
                               validator: (value) {
@@ -461,9 +484,9 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                                   child: RichText(
                                     text: TextSpan(
                                       text: "Don't have an Account? ",
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontSize: 14,
-                                        color: Colors.black87,
+                                        color: cs.onSurface.withValues(alpha: 0.87),
                                         fontWeight: FontWeight.w400,
                                       ),
                                       children: [

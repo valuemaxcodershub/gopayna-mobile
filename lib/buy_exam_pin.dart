@@ -9,6 +9,13 @@ import 'widgets/themed_screen_helpers.dart';
 import 'widgets/pending_order_screen.dart';
 import 'design/gopayna_design.dart';
 
+String _educationRecentListStatusLabel(dynamic status) {
+  final s = status?.toString().toLowerCase() ?? '';
+  if (s == 'success') return 'Successful';
+  if (s == 'pending' || s == 'processing') return 'Pending';
+  return 'Failed';
+}
+
 class EducationTransaction {
   final String id;
   final String provider;
@@ -191,7 +198,7 @@ class _BuyEducationPinScreenState extends State<BuyEducationPinScreen>
             amount: (tx['amount'] as num?)?.toDouble() ?? 0,
             date: DateTime.tryParse(tx['createdAt']?.toString() ?? '') ??
                 DateTime.now(),
-            status: tx['status'] == 'success' ? 'Successful' : 'Failed',
+            status: _educationRecentListStatusLabel(tx['status']),
             providerColor: providerName == 'JAMB'
                 ? const Color(0xFF006400)
                 : const Color(0xFF0066CC),
@@ -1641,8 +1648,10 @@ class _BuyEducationPinScreenState extends State<BuyEducationPinScreen>
                                         ),
                                         decoration: BoxDecoration(
                                           color: (transaction.status ==
-                                                      'Successful'
-                                                  ? colorScheme.primary
+                                                  'Successful'
+                                              ? colorScheme.primary
+                                              : transaction.status == 'Pending'
+                                                  ? GoPaynaColors.statusPending
                                                   : colorScheme.error)
                                               .withValues(alpha: 0.15),
                                           borderRadius:
@@ -1654,7 +1663,11 @@ class _BuyEducationPinScreenState extends State<BuyEducationPinScreen>
                                             color: transaction.status ==
                                                     'Successful'
                                                 ? colorScheme.primary
-                                                : colorScheme.error,
+                                                : transaction.status ==
+                                                        'Pending'
+                                                    ? GoPaynaColors
+                                                        .statusPending
+                                                    : colorScheme.error,
                                             fontSize: 10,
                                             fontWeight: FontWeight.w500,
                                           ),
