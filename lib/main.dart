@@ -7,6 +7,7 @@ import 'app_settings.dart';
 import 'login.dart';
 import 'otp_verification.dart';
 import 'dashboard.dart';
+import 'services/auth_token_storage.dart';
 import 'services/inactivity_service.dart';
 import 'api_service.dart';
 
@@ -69,19 +70,19 @@ class _MyAppState extends State<MyApp> {
 
   Future<_StartDestination> _determineStartDestination() async {
     final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('jwt');
+    final token = await AuthTokenStorage.readJwt();
     final lastActivityMs = prefs.getInt(_lastActivityKey);
 
     if (token != null && token.isNotEmpty) {
       if (lastActivityMs == null) {
-        await prefs.remove('jwt');
+        await AuthTokenStorage.clearJwt();
         return _StartDestination.onboarding;
       }
 
       final lastActivity = DateTime.fromMillisecondsSinceEpoch(lastActivityMs);
       final idleTime = DateTime.now().difference(lastActivity);
       if (idleTime >= _sessionReauthDuration) {
-        await prefs.remove('jwt');
+        await AuthTokenStorage.clearJwt();
         await prefs.remove(_lastActivityKey);
         return _StartDestination.onboarding;
       }
@@ -98,12 +99,12 @@ class _MyAppState extends State<MyApp> {
 
   void _handleInactivityTimeout() async {
     // Clear stored session data
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('jwt');
+    final token = await AuthTokenStorage.readJwt();
     if (token != null && token.isNotEmpty) {
       await logoutUser(token);
     }
-    await prefs.remove('jwt');
+    await AuthTokenStorage.clearJwt();
+    final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_lastActivityKey);
 
     // Show session expired message

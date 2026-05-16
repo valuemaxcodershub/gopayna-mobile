@@ -4,11 +4,11 @@ import 'dart:developer';
 import 'register.dart';
 import 'api_service.dart';
 import 'otp_verification.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'dashboard.dart';
 import 'forgot_password.dart';
 import 'intro_screen.dart';
 import 'services/credentials_service.dart';
+import 'services/auth_token_storage.dart';
 import 'services/inactivity_service.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -251,8 +251,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
             return;
           }
 
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('jwt', retryResult['token']);
+          await AuthTokenStorage.writeJwt(retryResult['token']);
           await CredentialsService.saveUsername(_usernameController.text.trim());
           InactivityService().resetTimer();
           if (!mounted) return;
@@ -289,8 +288,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
         }
       } else {
         // Save JWT token
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('jwt', result['token']);
+        await AuthTokenStorage.writeJwt(result['token']);
         
         // Save username for future logins
         await CredentialsService.saveUsername(_usernameController.text.trim());

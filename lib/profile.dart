@@ -3,9 +3,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api_service.dart';
+import 'services/auth_token_storage.dart';
 import 'widgets/wallet_visibility_builder.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -71,8 +71,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   Future<void> _loadProfile() async {
     setState(() => _loadingProfile = true);
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('jwt');
+      final token = await AuthTokenStorage.readJwt();
       if (token == null) {
         setState(() {
           _fullName = 'Guest';
@@ -208,8 +207,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   Future<void> _uploadProfileImage(File file) async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('jwt');
+    final token = await AuthTokenStorage.readJwt();
     if (token == null) {
       _showMessage('Please log in again to update your photo.', isError: true);
       return;

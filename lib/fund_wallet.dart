@@ -1,7 +1,6 @@
 ﻿import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'dart:math';
 import 'package:webview_flutter/webview_flutter.dart';
@@ -10,6 +9,7 @@ import 'package:intl/intl.dart';
 
 import 'all_transactions_history.dart';
 import 'api_service.dart';
+import 'services/auth_token_storage.dart';
 import 'widgets/wallet_visibility_builder.dart';
 import 'widgets/themed_screen_helpers.dart';
 import 'design/gopayna_design.dart';
@@ -59,8 +59,7 @@ class _FundWalletScreenState extends State<FundWalletScreen>
   }
 
   Future<void> _loadWalletBalance() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('jwt');
+    final token = await AuthTokenStorage.readJwt();
     if (token == null) return;
     final balance = await fetchWalletBalance(token);
     await _loadRecentTransactions(token: token);
@@ -94,8 +93,7 @@ class _FundWalletScreenState extends State<FundWalletScreen>
   }
 
   Future<String?> _getAuthToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('jwt');
+    final token = await AuthTokenStorage.readJwt();
     if (token == null) {
       if (!mounted) return null;
       _showSnack('Please log in again to continue.', isError: true);

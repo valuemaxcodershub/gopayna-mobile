@@ -2,11 +2,9 @@
 import 'package:flutter/services.dart';
 import 'dart:async';
 import 'api_service.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'services/auth_token_storage.dart';
 
 enum OtpPurpose { registration, login, passwordReset }
-
-
 class OtpVerificationScreen extends StatefulWidget {
   final String email;
   final OtpPurpose purpose;
@@ -186,8 +184,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
 
       // Save token and user info from OTP verification response
       if (result['token'] != null) {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('jwt', result['token']);
+        await AuthTokenStorage.writeJwt(result['token']);
         if (!mounted) return;
         Navigator.pushReplacementNamed(context, '/dashboard');
       } else {

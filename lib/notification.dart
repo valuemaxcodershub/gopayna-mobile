@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'api_service.dart' as api_service;
+import 'services/auth_token_storage.dart';
 
 class NotificationScreen extends StatefulWidget {
   const NotificationScreen({super.key});
@@ -66,8 +66,7 @@ class _NotificationScreenState extends State<NotificationScreen>
     });
 
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('jwt');
+      final token = await AuthTokenStorage.readJwt();
 
       if (token == null) {
         setState(() {
@@ -129,8 +128,7 @@ class _NotificationScreenState extends State<NotificationScreen>
     if (_notifications[index].isRead) return;
 
     final notification = _notifications[index];
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('jwt');
+    final token = await AuthTokenStorage.readJwt();
 
     if (token != null) {
       await api_service.markNotificationAsRead(token, notification.id);
@@ -143,8 +141,7 @@ class _NotificationScreenState extends State<NotificationScreen>
   }
 
   Future<void> _markAllAsRead() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('jwt');
+    final token = await AuthTokenStorage.readJwt();
 
     if (token != null) {
       final result = await api_service.markAllNotificationsAsRead(token);

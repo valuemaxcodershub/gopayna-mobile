@@ -1,10 +1,10 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:share_plus/share_plus.dart';
 
 import 'api_service.dart';
+import 'services/auth_token_storage.dart';
 
 class ReferrerPage extends StatefulWidget {
   const ReferrerPage({super.key});
@@ -94,8 +94,7 @@ class _ReferrerPageState extends State<ReferrerPage>
     if (_authToken != null && _authToken!.isNotEmpty) {
       return _authToken;
     }
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('jwt');
+    final token = await AuthTokenStorage.readJwt();
     if (token != null && token.isNotEmpty) {
       _authToken = token;
     }
