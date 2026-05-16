@@ -1,7 +1,6 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'login.dart';
 import 'dart:convert';
 import 'setting.dart';
@@ -21,6 +20,7 @@ import 'api_service.dart';
 import 'app_settings.dart';
 import 'widgets/transaction_receipt.dart';
 import 'design/gopayna_design.dart';
+import 'services/auth_token_storage.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -74,8 +74,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     });
 
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('jwt');
+      final token = await AuthTokenStorage.readJwt();
       if (token == null || token.isEmpty) return;
 
       final response = await fetchWalletTransactions(token: token, limit: 7);
@@ -149,8 +148,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   // Removed lifecycle observer method
 
   Future<void> _checkAuthentication() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('jwt');
+    final token = await AuthTokenStorage.readJwt();
     if (token == null || token.isEmpty) {
       if (!mounted) return;
       Navigator.pushAndRemoveUntil(
@@ -168,7 +166,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   Future<void> _refreshWalletBalance({String? token}) async {
-    token ??= (await SharedPreferences.getInstance()).getString('jwt');
+    token ??= await AuthTokenStorage.readJwt();
     if (token == null || token.isEmpty) return;
     final balance = await fetchWalletBalance(token);
     if (!mounted) return;
@@ -191,7 +189,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   Future<void> _fetchUnreadNotificationCount({String? token}) async {
-    token ??= (await SharedPreferences.getInstance()).getString('jwt');
+    token ??= await AuthTokenStorage.readJwt();
     if (token == null || token.isEmpty) return;
     final result = await getUnreadNotificationCount(token);
     if (!mounted) return;

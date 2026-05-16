@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'auth_token_storage.dart';
 
 /// Service to handle user inactivity and auto-logout
 class InactivityService {
@@ -37,7 +38,7 @@ class InactivityService {
   void _handleInactivityTimeout() async {
     // Clear stored session data
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('jwt');
+    await AuthTokenStorage.clearJwt();
     await prefs.remove(_lastActivityKey);
     
     // Call the logout callback

@@ -1,8 +1,8 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api_service.dart' as api;
+import 'services/auth_token_storage.dart';
 import 'service_transaction_history.dart';
 import 'widgets/wallet_visibility_builder.dart';
 import 'widgets/themed_screen_helpers.dart';
@@ -157,8 +157,7 @@ class _BuyTVSubscriptionScreenState extends State<BuyTVSubscriptionScreen>
   }
 
   Future<void> _loadRecentTransactions() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('jwt');
+    final token = await AuthTokenStorage.readJwt();
     if (token == null) return;
 
     final result = await api.fetchVTUHistory(token, type: 'tv', limit: 8);
@@ -186,8 +185,7 @@ class _BuyTVSubscriptionScreenState extends State<BuyTVSubscriptionScreen>
   }
 
   Future<void> _loadWalletData() async {
-    final prefs = await SharedPreferences.getInstance();
-    _token = prefs.getString('jwt');
+    _token = await AuthTokenStorage.readJwt();
     if (_token != null) {
       final balance = await api.fetchWalletBalance(_token!);
       if (mounted && balance != null) {

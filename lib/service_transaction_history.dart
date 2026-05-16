@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api_service.dart';
+import 'services/auth_token_storage.dart';
 import 'widgets/transaction_receipt.dart';
 import 'design/gopayna_design.dart';
 
@@ -67,8 +67,7 @@ class _ServiceTransactionHistoryScreenState
       _error = null;
     });
 
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('jwt');
+    final token = await AuthTokenStorage.readJwt();
     if (token == null || token.isEmpty) {
       if (!mounted) return;
       setState(() {

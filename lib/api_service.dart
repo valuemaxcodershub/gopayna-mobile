@@ -4,7 +4,7 @@ import 'dart:io';
 import 'dart:math' show Random;
 
 import 'package:crypto/crypto.dart';
-import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode;
+import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode, kReleaseMode;
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import 'package:path/path.dart' as p;
@@ -457,12 +457,8 @@ Map<String, String> _authorizedJsonHeaders(String token) => {
 ///   flutter run --dart-define=APP_SIGNING_SECRET=your_secret_here
 ///   flutter build apk --dart-define=APP_SIGNING_SECRET=your_secret_here
 ///
-/// IMPORTANT: Never commit the production secret to version control!
-const String _appSigningKey = String.fromEnvironment(
-  'APP_SIGNING_SECRET',
-  defaultValue:
-      'GPN_VTU_8f3K9mL2pR7xQ4wN1vB6jH0tY5sA3dE8cU2iO9gF4zX7nM1kJ6bW0qP5rT',
-);
+/// No default: release builds must pass `--dart-define=APP_SIGNING_SECRET=...`
+const String _appSigningSecret = String.fromEnvironment('APP_SIGNING_SECRET');
 
 /// App identifier for the mobile app
 const String _appId = 'gopayna_mobile_v1';
@@ -471,6 +467,7 @@ const String _appId = 'gopayna_mobile_v1';
 /// Uses HMAC-SHA256 with timestamp to prevent replay attacks
 /// Algorithm matches backend's verifyRequestSignature middleware
 String _generateRequestSignature({
+  required String secret,
   required String timestamp,
   String? body,
 }) {
@@ -485,7 +482,7 @@ String _generateRequestSignature({
   final dataToSign = '$timestamp$bodyHash';
 
   // Generate HMAC-SHA256 signature
-  final hmac = Hmac(sha256, utf8.encode(_appSigningKey));
+  final hmac = Hmac(sha256, utf8.encode(secret));
   final digest = hmac.convert(utf8.encode(dataToSign));
 
   return digest.toString();
@@ -498,8 +495,25 @@ Map<String, String> _signedAuthorizedHeaders(
   String? body,
   String? idempotencyKey,
 }) {
+  if (_appSigningSecret.isEmpty) {
+    if (kReleaseMode) {
+      throw StateError(
+        'APP_SIGNING_SECRET is required for release builds. '
+        'Rebuild with: flutter build apk --dart-define=APP_SIGNING_SECRET=YOUR_SECRET',
+      );
+    }
+    if (kDebugMode) {
+      log(
+        'APP_SIGNING_SECRET missing; signed requests will fail until set via --dart-define.',
+        name: 'api_service',
+      );
+    }
+    return _authorizedJsonHeaders(token);
+  }
+
   final timestamp = DateTime.now().millisecondsSinceEpoch.toString();
   final signature = _generateRequestSignature(
+    secret: _appSigningSecret,
     timestamp: timestamp,
     body: body,
   );

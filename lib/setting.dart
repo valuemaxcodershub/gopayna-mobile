@@ -13,6 +13,7 @@ import 'legal.dart';
 import 'app_settings.dart';
 import 'api_service.dart';
 import 'idle_timeout_service.dart';
+import 'services/auth_token_storage.dart';
 
 class SettingScreen extends StatefulWidget {
   final bool launchWithdrawalPinSection;
@@ -110,8 +111,7 @@ class _SettingScreenState extends State<SettingScreen>
   Future<void> _loadStoredUserContact({bool force = false}) async {
     if (!force && (_userEmail != null || _userPhone != null)) return;
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('jwt');
+      final token = await AuthTokenStorage.readJwt();
       if (token == null || token.isEmpty) return;
       final parts = token.split('.');
       if (parts.length != 3) return;
@@ -144,8 +144,7 @@ class _SettingScreenState extends State<SettingScreen>
 
   Future<void> _loadProfileSummary() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('jwt');
+      final token = await AuthTokenStorage.readJwt();
       if (token == null) return;
       if (mounted) {
         setState(() {
@@ -837,12 +836,12 @@ class _SettingScreenState extends State<SettingScreen>
               IdleTimeoutService().dispose();
               
               // Clear JWT token
-              final prefs = await SharedPreferences.getInstance();
-              final token = prefs.getString('jwt');
+              final token = await AuthTokenStorage.readJwt();
               if (token != null && token.isNotEmpty) {
                 await logoutUser(token);
               }
-              await prefs.remove('jwt');
+              await AuthTokenStorage.clearJwt();
+              final prefs = await SharedPreferences.getInstance();
               await prefs.remove('last_activity_at');
               
               if (!context.mounted) return;
@@ -1318,8 +1317,7 @@ class _SettingScreenState extends State<SettingScreen>
   }
 
   void _showWithdrawalPinModal() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('jwt');
+    final token = await AuthTokenStorage.readJwt();
     if (token == null || token.isEmpty) {
       _showSnack('Please log in again to continue.', isError: true);
       return;
@@ -1754,8 +1752,7 @@ class _SettingScreenState extends State<SettingScreen>
     if (_submittingDeactivation || !mounted) return;
     setState(() => _submittingDeactivation = true);
 
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('jwt');
+    final token = await AuthTokenStorage.readJwt();
     if (token == null || token.isEmpty) {
       if (mounted) {
         setState(() => _submittingDeactivation = false);

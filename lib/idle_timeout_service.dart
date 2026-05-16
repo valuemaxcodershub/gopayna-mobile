@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'services/auth_token_storage.dart';
 
 /// Service to handle automatic logout after idle timeout.
 /// Tracks user activity and logs out after specified duration of inactivity.
@@ -85,8 +85,7 @@ class IdleDetector extends StatelessWidget {
 mixin IdleTimeoutMixin<T extends StatefulWidget> on State<T> {
   /// Override this to handle logout
   Future<void> handleIdleLogout() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('jwt');
+    await AuthTokenStorage.clearJwt();
     // Navigate to login - override this in your implementation
   }
 

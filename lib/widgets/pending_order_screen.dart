@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../api_service.dart';
 import '../design/gopayna_design.dart';
+import '../services/auth_token_storage.dart';
 import '../support.dart';
 import 'transaction_receipt.dart';
 
@@ -34,8 +34,7 @@ class _PendingOrderScreenState extends State<PendingOrderScreen> {
   Map<String, dynamic>? _lastTx;
 
   Future<void> _refreshWalletRow() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('jwt');
+    final token = await AuthTokenStorage.readJwt();
     if (token == null || token.isEmpty) return;
     setState(() => _loading = true);
     try {
@@ -81,8 +80,7 @@ class _PendingOrderScreenState extends State<PendingOrderScreen> {
       );
       return;
     }
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('jwt');
+    final token = await AuthTokenStorage.readJwt();
     if (token == null || token.isEmpty) return;
     setState(() => _loading = true);
     try {

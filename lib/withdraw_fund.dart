@@ -1,12 +1,12 @@
 import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api_service.dart';
 import 'setting.dart';
 import 'widgets/themed_screen_helpers.dart';
 import 'widgets/wallet_visibility_builder.dart';
+import 'services/auth_token_storage.dart';
 
 const _brandGreen = Color(0xFF00CA44);
 const _brandGreenDeep = Color(0xFF00CA44);
@@ -77,8 +77,7 @@ class _WithdrawFundScreenState extends State<WithdrawFundScreen>
   }
 
   Future<void> _bootstrap() async {
-    final prefs = await SharedPreferences.getInstance();
-    final storedToken = prefs.getString('jwt');
+    final storedToken = await AuthTokenStorage.readJwt();
     if (!mounted) return;
 
     if (storedToken == null || storedToken.isEmpty) {
@@ -106,8 +105,7 @@ class _WithdrawFundScreenState extends State<WithdrawFundScreen>
     if (_token != null && _token!.isNotEmpty) {
       return _token;
     }
-    final prefs = await SharedPreferences.getInstance();
-    final storedToken = prefs.getString('jwt');
+    final storedToken = await AuthTokenStorage.readJwt();
     if (storedToken == null || storedToken.isEmpty) {
       if (mounted) {
         setState(() {

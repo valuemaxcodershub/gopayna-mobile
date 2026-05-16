@@ -1,6 +1,6 @@
 ﻿import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'idle_timeout_service.dart';
+import 'services/auth_token_storage.dart';
 
 class LegalScreen extends StatefulWidget {
   const LegalScreen({super.key, this.showLogout = true});
@@ -93,8 +93,7 @@ class _LegalScreenState extends State<LegalScreen>
               IdleTimeoutService().dispose();
               
               // Clear JWT token
-              final prefs = await SharedPreferences.getInstance();
-              await prefs.remove('jwt');
+              await AuthTokenStorage.clearJwt();
               
               if (!context.mounted) return;
               Navigator.pop(context); // Close dialog
