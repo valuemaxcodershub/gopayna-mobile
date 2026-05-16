@@ -1,6 +1,7 @@
 ﻿import 'dart:convert';
 import 'dart:developer';
 import 'dart:io';
+import 'dart:math' show Random;
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode;
@@ -527,6 +528,13 @@ String _purchaseIdempotencyKey(String service, Map<String, dynamic> body) {
       .toString()
       .substring(0, 32);
   return '$service-$digest';
+}
+
+/// One key per electricity **attempt**. ClubKonnect `RequestID` is derived from this;
+/// the old minute+body hash made retries reuse the same ID and look like duplicates.
+String _electricityPurchaseIdempotencyKey() {
+  final r = Random.secure().nextInt(0x7fffffff);
+  return 'electricity-${DateTime.now().microsecondsSinceEpoch}-$r';
 }
 
 Future<Map<String, dynamic>> initializePaystackPayment({
@@ -1493,7 +1501,7 @@ Future<Map<String, dynamic>> buyElectricity(
       headers: _signedAuthorizedHeaders(
         token,
         body: bodyJson,
-        idempotencyKey: _purchaseIdempotencyKey('electricity', requestBody),
+        idempotencyKey: _electricityPurchaseIdempotencyKey(),
       ),
       body: bodyJson,
     );
@@ -1769,15 +1777,28 @@ Future<Map<String, dynamic>> fetchNotifications(String token,
     final responseBody = response.body.isEmpty ? '{}' : response.body;
     final decoded = jsonDecode(responseBody);
     if (response.statusCode >= 200 && response.statusCode < 300) {
+      if (decoded is! Map) {
+        return {'error': 'Unexpected notifications response format'};
+      }
+      final root = Map<String, dynamic>.from(decoded);
+      final nested = root['data'];
+      final listRaw = root['notifications'] ??
+          (nested is Map ? Map<String, dynamic>.from(nested)['notifications'] : null);
+      final unreadRaw = root['unreadCount'] ??
+          (nested is Map ? Map<String, dynamic>.from(nested)['unreadCount'] : null);
+      final totalRaw = root['total'] ??
+          (nested is Map ? Map<String, dynamic>.from(nested)['total'] : null);
       return {
         'success': true,
-        'notifications': decoded['notifications'] ?? [],
-        'unreadCount': decoded['unreadCount'] ?? 0,
-        'total': decoded['total'] ?? 0,
+        'notifications': listRaw is List ? listRaw : <dynamic>[],
+        'unreadCount': unreadRaw is num ? unreadRaw.toInt() : int.tryParse('$unreadRaw') ?? 0,
+        'total': totalRaw is num ? totalRaw.toInt() : int.tryParse('$totalRaw') ?? 0,
       };
     }
+    final errRoot =
+        decoded is Map ? Map<String, dynamic>.from(decoded) : null;
     return {
-      'error': decoded['error'] ??
+      'error': errRoot?['error'] ??
           _extractErrorMessage(responseBody, response.statusCode),
       'status': response.statusCode,
     };

@@ -1,7 +1,7 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 
-import 'design/gopayna_design.dart';
+import '../design/gopayna_design.dart';
 
 String _formatReceiptToken(String value) {
   final compact = value.replaceAll(RegExp(r'\s+'), '');

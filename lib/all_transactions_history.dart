@@ -1048,6 +1048,11 @@ class WalletTransactionItem {
     if (metaRefunded && !isIncoming) {
       outcome = ReceiptOutcome.refunded;
       outcomeMessage = GoPaynaStrings.receiptBannerRefunded;
+      final rr = metadata?['refundReference']?.toString();
+      if (rr != null && rr.isNotEmpty) {
+        extraDetails.insert(
+            0, ReceiptField(label: 'Refund reference', value: rr));
+      }
     } else if (sk == 'pending' || sk == 'processing') {
       outcome = ReceiptOutcome.pending;
       outcomeMessage = GoPaynaStrings.receiptBannerPending;

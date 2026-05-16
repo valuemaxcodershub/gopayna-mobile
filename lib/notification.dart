@@ -81,16 +81,31 @@ class _NotificationScreenState extends State<NotificationScreen>
 
       if (result.containsKey('error')) {
         setState(() {
-          _error = result['error'];
+          _error = result['error']?.toString();
           _isLoading = false;
         });
       } else {
-        final notificationsList = result['notifications'] as List? ?? [];
+        final notificationsList = result['notifications'];
+        final parsed = <NotificationItem>[];
+        if (notificationsList is List) {
+          for (final raw in notificationsList) {
+            if (raw is Map<String, dynamic>) {
+              final item = NotificationItem.tryFromJson(raw);
+              if (item != null) parsed.add(item);
+            } else if (raw is Map) {
+              final item = NotificationItem.tryFromJson(
+                Map<String, dynamic>.from(raw),
+              );
+              if (item != null) parsed.add(item);
+            }
+          }
+        }
+        final unread = result['unreadCount'];
+        final unreadInt =
+            unread is num ? unread.toInt() : int.tryParse('$unread') ?? 0;
         setState(() {
-          _notifications = notificationsList
-              .map((n) => NotificationItem.fromJson(n))
-              .toList();
-          _unreadCount = result['unreadCount'] ?? 0;
+          _notifications = parsed;
+          _unreadCount = unreadInt;
           _isLoading = false;
         });
         _startAnimations();
@@ -577,17 +592,78 @@ class NotificationItem {
     this.isRead = false,
   });
 
+  static int _parseId(dynamic v) {
+    if (v is int) return v;
+    if (v is num) return v.toInt();
+    return int.tryParse('$v') ?? 0;
+  }
+
+  static DateTime _parseCreatedAt(dynamic v) {
+    if (v == null) return DateTime.now();
+    if (v is DateTime) return v;
+    final s = v.toString().trim();
+    if (s.isEmpty) return DateTime.now();
+    try {
+      return DateTime.parse(s);
+    } catch (_) {
+      try {
+        final ms = int.tryParse(s);
+        if (ms != null) {
+          return DateTime.fromMillisecondsSinceEpoch(ms, isUtc: false);
+        }
+      } catch (_) {}
+      return DateTime.now();
+    }
+  }
+
+  static bool _parseBool(dynamic v) {
+    if (v is bool) return v;
+    if (v is num) return v != 0;
+    final s = '$v'.toLowerCase();
+    return s == 'true' || s == '1';
+  }
+
+  /// Returns null if required fields cannot be parsed (skip bad rows instead of failing the whole list).
+  static NotificationItem? tryFromJson(Map<String, dynamic> json) {
+    try {
+      final id = _parseId(json['id']);
+      final title = json['title'] ?? json['subject'];
+      if (title == null || '$title'.trim().isEmpty) {
+        return null;
+      }
+      final message = json['message'] ?? json['body'] ?? '';
+      final type =
+          (json['type'] ?? 'info').toString().trim().toLowerCase().isEmpty
+              ? 'info'
+              : (json['type'] ?? 'info').toString().trim().toLowerCase();
+      final createdAt = _parseCreatedAt(
+          json['createdAt'] ?? json['created_at'] ?? json['created']);
+      final isRead =
+          _parseBool(json['isRead'] ?? json['is_read'] ?? json['read']);
+      return NotificationItem(
+        id: id,
+        title: '$title',
+        message: '$message',
+        type: type,
+        createdAt: createdAt,
+        isRead: isRead,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
   factory NotificationItem.fromJson(Map<String, dynamic> json) {
-    return NotificationItem(
-      id: json['id'] ?? 0,
-      title: json['title'] ?? 'Notification',
-      message: json['message'] ?? '',
-      type: json['type'] ?? 'info',
-      createdAt: json['createdAt'] != null
-          ? DateTime.parse(json['createdAt'])
-          : DateTime.now(),
-      isRead: json['isRead'] ?? false,
-    );
+    return tryFromJson(json) ??
+        NotificationItem(
+          id: _parseId(json['id']),
+          title: (json['title'] ?? 'Notification').toString(),
+          message: (json['message'] ?? '').toString(),
+          type: (json['type'] ?? 'info').toString(),
+          createdAt: _parseCreatedAt(
+              json['createdAt'] ?? json['created_at'] ?? json['created']),
+          isRead: _parseBool(json['isRead'] ?? json['is_read'] ?? json['read']),
+        );
   }
 
   IconData get icon {

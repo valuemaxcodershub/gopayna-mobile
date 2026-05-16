@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 import 'dart:math';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:url_launcher/url_launcher_string.dart';
@@ -11,6 +12,7 @@ import 'all_transactions_history.dart';
 import 'api_service.dart';
 import 'widgets/wallet_visibility_builder.dart';
 import 'widgets/themed_screen_helpers.dart';
+import 'design/gopayna_design.dart';
 
 const _brandGreen = Color(0xFF00CA44);
 const _brandGreenDeep = Color(0xFF00CA44);
@@ -263,6 +265,33 @@ class _FundWalletScreenState extends State<FundWalletScreen>
     }
   }
 
+  String _effectiveWalletTxStatus(Map<String, dynamic> tx) {
+    final raw = (tx['status'] ?? 'pending').toString();
+    Map<String, dynamic>? meta;
+    final rm = tx['metadata'];
+    if (rm is Map<String, dynamic>) {
+      meta = rm;
+    } else if (rm is String && rm.trim().isNotEmpty) {
+      try {
+        final decoded = jsonDecode(rm);
+        if (decoded is Map<String, dynamic>) meta = decoded;
+      } catch (_) {}
+    }
+    final direction = (tx['type'] ??
+            tx['transaction_type'] ??
+            tx['direction'] ??
+            '')
+        .toString()
+        .toLowerCase();
+    final amount = double.tryParse(tx['amount']?.toString() ?? '') ?? 0;
+    final isDebit =
+        direction == 'debit' || (direction.isEmpty && amount < 0);
+    if (isDebit && meta != null && meta['refunded'] == true) {
+      return 'refunded';
+    }
+    return raw;
+  }
+
   String _statusLabel(String status) {
     switch (status.toLowerCase()) {
       case 'success':
@@ -272,6 +301,8 @@ class _FundWalletScreenState extends State<FundWalletScreen>
       case 'failed':
       case 'error':
         return 'Failed';
+      case 'refunded':
+        return 'Refunded';
       case 'processing':
         return 'Processing';
       case 'cancelled':
@@ -291,6 +322,8 @@ class _FundWalletScreenState extends State<FundWalletScreen>
       case 'error':
       case 'cancelled':
         return colorScheme.error;
+      case 'refunded':
+        return GoPaynaColors.statusRefunded;
       case 'pending':
       case 'processing':
         return Colors.orange;
@@ -309,6 +342,8 @@ class _FundWalletScreenState extends State<FundWalletScreen>
       case 'error':
       case 'cancelled':
         return Icons.error;
+      case 'refunded':
+        return Icons.replay_circle_filled_outlined;
       case 'processing':
         return Icons.hourglass_top_rounded;
       default:
@@ -327,7 +362,7 @@ class _FundWalletScreenState extends State<FundWalletScreen>
   }
 
   Widget _buildTransactionTile(Map<String, dynamic> tx) {
-    final status = (tx['status'] ?? 'pending').toString();
+    final status = _effectiveWalletTxStatus(tx);
     final amount = double.tryParse(tx['amount']?.toString() ?? '') ?? 0;
     final reference = (tx['reference'] ?? '--').toString();
     final createdAt = tx['created_at']?.toString();

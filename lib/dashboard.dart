@@ -18,7 +18,6 @@ import 'buy_exam_pin.dart';
 import 'notification.dart';
 import 'dart:developer';
 import 'api_service.dart';
-import 'idle_timeout_service.dart';
 import 'app_settings.dart';
 import 'widgets/transaction_receipt.dart';
 import 'design/gopayna_design.dart';
@@ -300,27 +299,6 @@ class _DashboardScreenState extends State<DashboardScreen>
     return 'there';
   }
 
-  Future<void> _logout() async {
-    // Stop idle timeout tracking
-    IdleTimeoutService().dispose();
-
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('jwt');
-    if (token != null && token.isNotEmpty) {
-      await logoutUser(token);
-    }
-    await prefs.remove('jwt');
-    await prefs.remove('last_activity_at');
-    if (!mounted) return;
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(
-        builder: (_) => const LoginScreen(redirectToIntroOnExit: true),
-      ),
-      (route) => false,
-    );
-  }
-
   void _initializeAnimations() {
     _slideController = AnimationController(
       duration: const Duration(milliseconds: 1200),
@@ -511,14 +489,6 @@ class _DashboardScreenState extends State<DashboardScreen>
                       ),
                     ),
                 ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: IconButton(
-                icon: Icon(Icons.logout, color: colorScheme.onPrimary),
-                onPressed: _logout,
-                tooltip: 'Logout',
               ),
             ),
           ],
@@ -791,20 +761,23 @@ class _DashboardScreenState extends State<DashboardScreen>
       ServiceItem(
           icon: Icons.airplanemode_active,
           title: 'Airtime',
-          color: const Color(0xFF00CA44)),
+          color: const Color(0xFF1565C0)),
       ServiceItem(
           icon: Icons.electrical_services,
           title: 'Electricity',
-          color: const Color(0xFF00CA44)),
-      ServiceItem(icon: Icons.tv, title: 'TV', color: const Color(0xFF00CA44)),
+          color: const Color(0xFFF57C00)),
+      ServiceItem(
+          icon: Icons.tv,
+          title: 'TV',
+          color: const Color(0xFF7B1FA2)),
       ServiceItem(
           icon: Icons.school,
           title: 'Education',
-          color: const Color(0xFF00CA44)),
+          color: const Color(0xFF3949AB)),
       ServiceItem(
           icon: Icons.card_giftcard,
           title: 'Earn',
-          color: const Color(0xFF00CA44)),
+          color: const Color(0xFF00897B)),
     ];
 
     return ScaleTransition(
@@ -1171,7 +1144,10 @@ class _DashboardScreenState extends State<DashboardScreen>
               builder: (context) => const SettingScreen(),
             ),
           );
-          if (mounted) _refreshWalletBalance();
+          if (mounted) {
+            setState(() => _selectedTab = 0);
+            _refreshWalletBalance();
+          }
         }
 
         // Navigate to Referrer page when Refer tab is tapped
@@ -1182,7 +1158,10 @@ class _DashboardScreenState extends State<DashboardScreen>
               builder: (context) => const ReferrerPage(),
             ),
           );
-          if (mounted) _refreshWalletBalance();
+          if (mounted) {
+            setState(() => _selectedTab = 0);
+            _refreshWalletBalance();
+          }
         }
 
         // Navigate to Support page when Help tab is tapped
@@ -1193,7 +1172,10 @@ class _DashboardScreenState extends State<DashboardScreen>
               builder: (context) => const SupportScreen(),
             ),
           );
-          if (mounted) _refreshWalletBalance();
+          if (mounted) {
+            setState(() => _selectedTab = 0);
+            _refreshWalletBalance();
+          }
         }
       },
       child: AnimatedContainer(
@@ -1489,6 +1471,11 @@ class Transaction {
     if (metaRefunded && !isIncoming) {
       outcome = ReceiptOutcome.refunded;
       outcomeMessage = GoPaynaStrings.receiptBannerRefunded;
+      final rr = metadata?['refundReference']?.toString();
+      if (rr != null && rr.isNotEmpty) {
+        extraDetails.insert(
+            0, ReceiptField(label: 'Refund reference', value: rr));
+      }
     } else if (statusKey == 'pending' || statusKey == 'processing') {
       outcome = ReceiptOutcome.pending;
       outcomeMessage = GoPaynaStrings.receiptBannerPending;

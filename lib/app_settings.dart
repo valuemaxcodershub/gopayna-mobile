@@ -50,16 +50,16 @@ class AppSettings extends ChangeNotifier {
         elevation: 0,
       ),
       cardTheme: CardThemeData(
-        color: const Color.fromARGB(255, 5, 211, 67),
+        color: Colors.white,
         elevation: 0,
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        surfaceTintColor: const Color.fromARGB(255, 4, 221, 51),
+        surfaceTintColor: Colors.transparent,
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: const Color.fromARGB(255, 6, 231, 81),
-          foregroundColor: const Color.fromARGB(255, 6, 230, 62),
+          backgroundColor: _brandColorLight,
+          foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         ),
