@@ -1,4 +1,5 @@
 ﻿import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'idle_timeout_service.dart';
 import 'services/auth_token_storage.dart';
 
@@ -8,6 +9,12 @@ class LegalScreen extends StatefulWidget {
   /// Whether to show the logout button in the header.
   /// Set to false when accessed from registration flow.
   final bool showLogout;
+
+  static const String privacyPolicyUrl = 'https://gopayna.com/legal/privacy-policy/';
+  static const String termsUrl = 'https://gopayna.com/legal/terms-conditions/';
+  static const String refundPolicyUrl = 'https://gopayna.com/legal/refund-policy/';
+  static const String legalOverviewUrl = 'https://gopayna.com/legal/';
+  static const String accountDeletionUrl = 'https://api.gopayna.com/account-deletion';
 
   @override
   State<LegalScreen> createState() => _LegalScreenState();
@@ -111,6 +118,136 @@ class _LegalScreenState extends State<LegalScreen>
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Future<void> _openPolicyUrl(String url) async {
+    final uri = Uri.parse(url);
+    try {
+      final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!launched && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not open $url')),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not open $url')),
+        );
+      }
+    }
+  }
+
+  Widget _buildOnlinePoliciesCard(bool isTablet) {
+    return Container(
+      padding: EdgeInsets.all(isTablet ? 24 : 20),
+      decoration: BoxDecoration(
+        color: _cardColor,
+        borderRadius: BorderRadius.circular(isTablet ? 16 : 12),
+        boxShadow: [
+          BoxShadow(
+            color: _shadowColor,
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Full policies online',
+            style: TextStyle(
+              fontSize: isTablet ? 20 : 18,
+              fontWeight: FontWeight.bold,
+              color: _colorScheme.primary,
+            ),
+          ),
+          SizedBox(height: isTablet ? 12 : 10),
+          Text(
+            'The summaries below are provided in the app. You can also open the full published policies on our website.',
+            style: TextStyle(
+              fontSize: isTablet ? 14 : 12,
+              color: _mutedText,
+              height: 1.5,
+            ),
+          ),
+          SizedBox(height: isTablet ? 16 : 12),
+          _buildPolicyLink(
+            isTablet: isTablet,
+            icon: Icons.folder_open_outlined,
+            label: 'All legal documents',
+            url: LegalScreen.legalOverviewUrl,
+          ),
+          _buildPolicyLink(
+            isTablet: isTablet,
+            icon: Icons.privacy_tip_outlined,
+            label: 'Privacy Policy',
+            url: LegalScreen.privacyPolicyUrl,
+          ),
+          _buildPolicyLink(
+            isTablet: isTablet,
+            icon: Icons.description_outlined,
+            label: 'Terms & Conditions',
+            url: LegalScreen.termsUrl,
+          ),
+          _buildPolicyLink(
+            isTablet: isTablet,
+            icon: Icons.receipt_long_outlined,
+            label: 'Refund Policy',
+            url: LegalScreen.refundPolicyUrl,
+          ),
+          _buildPolicyLink(
+            isTablet: isTablet,
+            icon: Icons.delete_outline,
+            label: 'Account & Data Deletion',
+            url: LegalScreen.accountDeletionUrl,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPolicyLink({
+    required bool isTablet,
+    required IconData icon,
+    required String label,
+    required String url,
+  }) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: isTablet ? 10 : 8),
+      child: InkWell(
+        onTap: () => _openPolicyUrl(url),
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: isTablet ? 12 : 8,
+            vertical: isTablet ? 12 : 10,
+          ),
+          child: Row(
+            children: [
+              Icon(icon, color: _colorScheme.primary, size: isTablet ? 22 : 20),
+              SizedBox(width: isTablet ? 12 : 10),
+              Expanded(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: isTablet ? 15 : 14,
+                    fontWeight: FontWeight.w600,
+                    color: _colorScheme.onSurface,
+                  ),
+                ),
+              ),
+              Icon(
+                Icons.open_in_new,
+                size: isTablet ? 18 : 16,
+                color: _colorScheme.primary,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -252,21 +389,27 @@ class _LegalScreenState extends State<LegalScreen>
         ),
         child: Column(
           children: [
+            _buildOnlinePoliciesCard(isTablet),
+            SizedBox(height: isTablet ? 32 : 24),
             _buildLegalSection(
-              'Terms of Service',
+              'Terms of Service (summary)',
               _getTermsOfService(),
               isTablet,
+              onlineUrl: LegalScreen.termsUrl,
+              onlineLabel: 'View full Terms & Conditions',
             ),
             SizedBox(height: isTablet ? 32 : 24),
             _buildLegalSection(
-              'Privacy Policy',
+              'Privacy Policy (summary)',
               _getPrivacyPolicy(),
               isTablet,
+              onlineUrl: LegalScreen.privacyPolicyUrl,
+              onlineLabel: 'View full Privacy Policy',
             ),
             SizedBox(height: isTablet ? 32 : 24),
             _buildLegalSection(
-              'Cookie Policy',
-              _getCookiePolicy(),
+              'App Storage Policy',
+              _getAppStoragePolicy(),
               isTablet,
             ),
             SizedBox(height: isTablet ? 32 : 24),
@@ -282,7 +425,13 @@ class _LegalScreenState extends State<LegalScreen>
     );
   }
 
-  Widget _buildLegalSection(String title, String content, bool isTablet) {
+  Widget _buildLegalSection(
+    String title,
+    String content,
+    bool isTablet, {
+    String? onlineUrl,
+    String? onlineLabel,
+  }) {
     return Container(
       padding: EdgeInsets.all(isTablet ? 24 : 20),
       decoration: BoxDecoration(
@@ -316,19 +465,29 @@ class _LegalScreenState extends State<LegalScreen>
               height: 1.6,
             ),
           ),
+          if (onlineUrl != null && onlineLabel != null) ...[
+            SizedBox(height: isTablet ? 16 : 12),
+            TextButton.icon(
+              onPressed: () => _openPolicyUrl(onlineUrl),
+              icon: const Icon(Icons.open_in_new, size: 16),
+              label: Text(onlineLabel),
+            ),
+          ],
         ],
       ),
     );
   }
 
   String _getTermsOfService() {
-    return '''Welcome to Gopayna. By using our mobile application, you agree to be bound by these Terms of Service.
+    return '''Welcome to GopayNow. By using our mobile application, you agree to be bound by these Terms of Service.
+
+GopayNow is operated by GOPAYNA TECHNOLOGIES LIMITED.
 
 1. ACCEPTANCE OF TERMS
-By accessing and using Gopayna, you accept and agree to be bound by the terms and provision of this agreement.
+By accessing and using GopayNow, you accept and agree to be bound by the terms and provision of this agreement.
 
 2. SERVICE DESCRIPTION
-Gopayna is a mobile payment platform that allows users to purchase airtime, data, pay electricity bills, TV subscriptions, and education pins.
+GopayNow is a mobile payment platform that allows users to fund a wallet and purchase airtime, data, electricity bills, TV subscriptions, and education pins.
 
 3. USER RESPONSIBILITIES
 - You must provide accurate and complete information
@@ -337,12 +496,12 @@ Gopayna is a mobile payment platform that allows users to purchase airtime, data
 - You agree to pay all charges incurred by your account
 
 4. PAYMENT TERMS
-- All payments are processed securely
+- Payments are processed through our payment partners using industry-standard security measures
 - Refunds are subject to our refund policy
 - Service charges may apply to certain transactions
 
 5. LIMITATION OF LIABILITY
-Gopayna shall not be liable for any indirect, incidental, special, or consequential damages.
+GOPAYNA TECHNOLOGIES LIMITED shall not be liable for any indirect, incidental, special, or consequential damages.
 
 6. TERMINATION
 We reserve the right to terminate or suspend your account at any time for violation of these terms.
@@ -350,19 +509,21 @@ We reserve the right to terminate or suspend your account at any time for violat
 7. GOVERNING LAW
 These terms shall be governed by the laws of the Federal Republic of Nigeria.
 
-For questions about these Terms of Service, please contact our support team.
+For questions about these Terms of Service, contact support@gopayna.com.
 
-Last updated: November 2025''';
+Last updated: May 2026''';
   }
 
   String _getPrivacyPolicy() {
-    return '''Gopayna is committed to protecting your privacy. This Privacy Policy explains how we collect, use, and protect your information.
+    return '''GopayNow is committed to protecting your privacy. This Privacy Policy explains how we collect, use, and protect your information.
+
+GopayNow is operated by GOPAYNA TECHNOLOGIES LIMITED.
 
 1. INFORMATION WE COLLECT
 - Personal information (name, phone number, email)
 - Transaction data and payment information
 - Device information and usage data
-- Location information (with your permission)
+- Profile photo if you choose to upload one
 
 2. HOW WE USE YOUR INFORMATION
 - To process your transactions
@@ -378,21 +539,17 @@ We do not sell, trade, or rent your personal information to third parties. We ma
 - To protect our rights and prevent fraud
 
 4. DATA SECURITY
-We implement industry-standard security measures to protect your personal information:
-- Encryption of sensitive data
-- Secure payment processing
-- Regular security audits
-- Access controls and monitoring
+We implement industry-standard security measures to protect your personal information, including encryption of sensitive data, secure payment processing through partners, and access controls.
 
 5. YOUR RIGHTS
 You have the right to:
 - Access your personal information
 - Update or correct your data
-- Delete your account and data
-- Opt-out of marketing communications
+- Request account and data deletion (Settings → Request Account Deletion, or https://gopayna.com/legal/ and https://api.gopayna.com/account-deletion)
+- Opt out of marketing communications
 
-6. COOKIES AND TRACKING
-We use cookies and similar technologies to enhance your experience and analyze usage patterns.
+6. LOCAL STORAGE
+The app stores session tokens and preferences on your device using secure storage and local app storage to keep you signed in and remember your settings.
 
 7. DATA RETENTION
 We retain your information only as long as necessary to provide our services and comply with legal obligations.
@@ -400,50 +557,43 @@ We retain your information only as long as necessary to provide our services and
 8. CONTACT US
 For privacy-related questions, contact us at privacy@gopayna.com
 
-Last updated: November 2025''';
+Last updated: May 2026''';
   }
 
-  String _getCookiePolicy() {
-    return '''This Cookie Policy explains how Gopayna uses cookies and similar technologies.
+  String _getAppStoragePolicy() {
+    return '''This App Storage Policy explains how GopayNow stores data on your device.
 
-1. WHAT ARE COOKIES
-Cookies are small text files stored on your device that help us provide and improve our services.
+1. WHAT WE STORE ON YOUR DEVICE
+- Authentication session data (stored in secure storage where supported)
+- App preferences such as theme and wallet visibility settings
+- Cached data needed for app performance
 
-2. TYPES OF COOKIES WE USE
-- Essential Cookies: Necessary for the app to function properly
-- Performance Cookies: Help us understand how you use our app
-- Functional Cookies: Remember your preferences and settings
-- Analytics Cookies: Help us analyze usage and improve our services
-
-3. HOW WE USE COOKIES
-- To keep you logged in
+2. WHY WE STORE THIS DATA
+- To keep you signed in between sessions
 - To remember your preferences
-- To improve app performance
-- To analyze usage patterns
-- To enhance security
+- To support core app functionality
 
-4. MANAGING COOKIES
-You can control cookies through your device settings. However, disabling cookies may affect app functionality.
+3. MANAGING STORED DATA
+You can clear stored session data by logging out. You can request account deletion from Settings → Request Account Deletion, or read https://gopayna.com/legal/
 
-5. THIRD-PARTY COOKIES
-We may use third-party services that set cookies:
-- Analytics providers
-- Payment processors
-- Customer support tools
+4. THIRD-PARTY SERVICES
+Payment and service partners may process transaction data according to their own policies when you complete a purchase.
 
-6. UPDATES TO THIS POLICY
-We may update this Cookie Policy from time to time. Check this page for the latest version.
+5. UPDATES TO THIS POLICY
+We may update this policy from time to time. Check this page in the app for the latest version.
 
-For questions about cookies, contact our support team.
+For questions, contact support@gopayna.com.
 
-Last updated: November 2025''';
+Last updated: May 2026''';
   }
 
   String _getDisclaimer() {
     return '''IMPORTANT DISCLAIMER - PLEASE READ CAREFULLY
 
+GopayNow is operated by GOPAYNA TECHNOLOGIES LIMITED.
+
 1. GENERAL DISCLAIMER
-The information and services provided by Gopayna are on an "as is" basis. We make no warranties or guarantees about the accuracy, reliability, or availability of our services.
+The information and services provided by GopayNow are on an "as is" basis. We make no warranties or guarantees about the accuracy, reliability, or availability of our services.
 
 2. SERVICE AVAILABILITY
 - Services may be temporarily unavailable due to maintenance or technical issues
@@ -461,7 +611,7 @@ The information and services provided by Gopayna are on an "as is" basis. We mak
 - Issues with third-party services should be directed to the respective providers
 
 5. SECURITY
-- While we implement security measures, no system is 100% secure
+- While we implement security measures, no system is completely secure
 - Users are responsible for protecting their account credentials
 - Report any suspicious activity immediately
 
@@ -471,13 +621,13 @@ The information and services provided by Gopayna are on an "as is" basis. We mak
 - Regular app updates may be required
 
 7. LIMITATION OF LIABILITY
-In no event shall Gopayna be liable for any direct, indirect, incidental, special, or consequential damages arising from the use of our services.
+In no event shall GOPAYNA TECHNOLOGIES LIMITED be liable for any direct, indirect, incidental, special, or consequential damages arising from the use of our services.
 
 8. INDEMNIFICATION
-Users agree to indemnify and hold Gopayna harmless from any claims arising from their use of our services.
+Users agree to indemnify and hold GOPAYNA TECHNOLOGIES LIMITED harmless from any claims arising from their use of our services.
 
-By using Gopayna, you acknowledge that you have read, understood, and agree to this disclaimer.
+By using GopayNow, you acknowledge that you have read, understood, and agree to this disclaimer.
 
-Last updated: November 2025''';
+Last updated: May 2026''';
   }
 }

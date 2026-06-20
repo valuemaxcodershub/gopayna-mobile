@@ -83,7 +83,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Enter your email or phone number to receive a secure OTP.',
+                    'Enter your email or phone number to receive a one-time password (OTP).',
                     style: TextStyle(
                       fontSize: 15,
                       color: cs.onSurface.withValues(alpha: 0.87),
@@ -152,8 +152,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       _errorText = null;
     });
     final input = _userController.text.trim();
-    final isEmail = input.contains('@');
-    final result = await sendPasswordResetOtp(isEmail ? input : null, isEmail ? null : input);
+    final contact = input.contains('@') ? input.toLowerCase() : input;
+    final isEmail = contact.contains('@');
+    final result = await sendPasswordResetOtp(isEmail ? contact : null, isEmail ? null : contact);
     if (!mounted) return;
     setState(() {
       _isLoading = false;
@@ -182,7 +183,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         context,
         MaterialPageRoute(
           builder: (context) => OtpVerificationScreen(
-            email: _userController.text.trim(),
+            email: contact,
             purpose: OtpPurpose.passwordReset,
           ),
         ),

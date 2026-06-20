@@ -1,4 +1,4 @@
-package com.gopayna.app
+package ng.gopaynow.app
 
 import io.flutter.embedding.android.FlutterActivity
 

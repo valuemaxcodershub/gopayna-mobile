@@ -6,7 +6,7 @@ import 'services/auth_token_storage.dart';
 import 'service_transaction_history.dart';
 import 'widgets/wallet_visibility_builder.dart';
 import 'widgets/themed_screen_helpers.dart';
-import 'widgets/pending_order_screen.dart';
+import 'widgets/purchase_navigation.dart';
 import 'design/gopayna_design.dart';
 
 class AirtimeTransaction {
@@ -457,28 +457,19 @@ class _BuyAirtimeScreenState extends State<BuyAirtimeScreen>
       final payload = result['data'] as Map<String, dynamic>? ?? {};
       final transactionData = payload['data'] as Map<String, dynamic>? ?? payload;
       final isPending = payload['pending'] == true || transactionData['isPending'] == true;
-      if (isPending) {
-        if (!mounted) return;
-        final selectedNetworkData =
-            _networks.firstWhere((n) => n['id'] == _selectedNetwork);
-        final ref = transactionData['reference']?.toString() ?? 'Unknown';
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => PendingOrderScreen(
-              reference: ref,
-              serviceTitle: 'Airtime',
-              summaryLine:
-                  '${selectedNetworkData['name']} · ${_phoneController.text}',
-              orderId: transactionData['orderId']?.toString() ??
-                  transactionData['orderid']?.toString(),
-              requestId: transactionData['requestId']?.toString() ??
-                  transactionData['requestid']?.toString(),
-            ),
-          ),
-        );
-      } else {
-        _showSuccessDialog();
-      }
+      if (!mounted) return;
+      final selectedNetworkData =
+          _networks.firstWhere((n) => n['id'] == _selectedNetwork);
+      final ref = transactionData['reference']?.toString() ?? 'Unknown';
+      openPurchaseOutcome(
+        context,
+        reference: ref,
+        isPending: isPending,
+        summaryLine: '${selectedNetworkData['name']} · ${_phoneController.text}',
+        successMessage: isPending
+            ? null
+            : 'Your airtime purchase was successful. Open your receipt below.',
+      );
     } else {
       // Reload wallet data in case of refund
       if (result['refunded'] == true) {
@@ -540,100 +531,6 @@ class _BuyAirtimeScreenState extends State<BuyAirtimeScreen>
               child: const Text('OK'),
             ),
           ],
-        );
-      },
-    );
-  }
-
-  void _showSuccessDialog() {
-    final isTablet = MediaQuery.of(context).size.width > 600;
-    final selectedNetworkData =
-        _networks.firstWhere((n) => n['id'] == _selectedNetwork);
-    final cs = colorScheme;
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        return Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(isTablet ? 24 : 20),
-          ),
-          child: Container(
-            padding: EdgeInsets.all(isTablet ? 32 : 24),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(isTablet ? 24 : 20),
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [cs.primary, cs.primary.withValues(alpha: 0.85)],
-              ),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: isTablet ? 100 : 80,
-                  height: isTablet ? 100 : 80,
-                  decoration: BoxDecoration(
-                    color: cs.onPrimary.withValues(alpha: 0.2),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.check_circle,
-                    color: cs.onPrimary,
-                    size: isTablet ? 60 : 50,
-                  ),
-                ),
-                SizedBox(height: isTablet ? 28 : 20),
-                Text(
-                  'Airtime Purchase Successful!',
-                  style: TextStyle(
-                    fontSize: isTablet ? 26 : 20,
-                    fontWeight: FontWeight.bold,
-                    color: cs.onPrimary,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                SizedBox(height: isTablet ? 16 : 12),
-                Text(
-                  'You successfully purchased ₦${_amountController.text} ${selectedNetworkData['name']} airtime for ${_phoneController.text}',
-                  style: TextStyle(
-                    fontSize: isTablet ? 16 : 14,
-                    color: cs.onPrimary,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                SizedBox(height: isTablet ? 32 : 24),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                      Navigator.of(context).pop();
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: cs.onPrimary,
-                      foregroundColor: cs.primary,
-                      padding:
-                          EdgeInsets.symmetric(vertical: isTablet ? 16 : 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(isTablet ? 16 : 12),
-                      ),
-                    ),
-                    child: Text(
-                      'Done',
-                      style: TextStyle(
-                        fontSize: isTablet ? 20 : 16,
-                        fontWeight: FontWeight.w600,
-                        color: cs.primary,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
         );
       },
     );

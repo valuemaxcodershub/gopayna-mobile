@@ -912,19 +912,9 @@ class _ReferrerPageState extends State<ReferrerPage>
       scale: _scaleAnimation,
       child: Column(
         children: [
-          // Text(
-          //   'Refer friends and earn ₦6\ninstantly',
-          //   textAlign: TextAlign.center,
-          //   style: TextStyle(
-          //     fontSize: isTablet ? 28 : 24,
-          //     fontWeight: FontWeight.bold,
-          //     color: _onSurface,
-          //     height: 1.3,
-          //   ),
-          // ),
           SizedBox(height: isTablet ? 20 : 16),
           Text(
-            'Invite friends to Gopayna and earn ₦6 on every 3 friends you referred.',
+            'Referral program: earn ₦6 for every 3 successful sign-ups.',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: isTablet ? 18 : 16,
@@ -1183,14 +1173,14 @@ class _ReferrerPageState extends State<ReferrerPage>
 
     final normalizedCode = code.toUpperCase();
     final message =
-        'Join me on Gopayna and we both earn ₦6! Use my referral code: $normalizedCode when you register.';
+        'GopayNow referral: earn ₦6 per 3 sign-ups. Use code $normalizedCode when you register.';
 
     HapticFeedback.lightImpact();
     try {
       await SharePlus.instance.share(
         ShareParams(
           text: message,
-          subject: 'Join me on Gopayna',
+          subject: 'GopayNow referral code',
         ),
       );
     } catch (_) {

@@ -6,7 +6,7 @@ import 'services/auth_token_storage.dart';
 import 'service_transaction_history.dart';
 import 'widgets/wallet_visibility_builder.dart';
 import 'widgets/themed_screen_helpers.dart';
-import 'widgets/pending_order_screen.dart';
+import 'widgets/purchase_navigation.dart';
 import 'design/gopayna_design.dart';
 
 String _vtuRecentListStatusLabel(dynamic status) {
@@ -472,27 +472,19 @@ class _BuyTVSubscriptionScreenState extends State<BuyTVSubscriptionScreen>
       final payload = result['data'] as Map<String, dynamic>? ?? {};
       final transactionData = payload['data'] as Map<String, dynamic>? ?? payload;
       final isPending = payload['pending'] == true || transactionData['isPending'] == true;
-      if (isPending) {
-        final selectedProviderData =
-            _providers.firstWhere((p) => p['id'] == _selectedProvider);
-        final ref = transactionData['reference']?.toString() ?? 'Unknown';
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => PendingOrderScreen(
-              reference: ref,
-              serviceTitle: 'TV subscription',
-              summaryLine:
-                  '${selectedProviderData['name']} · Card ${_smartCardController.text}',
-              orderId: transactionData['orderId']?.toString() ??
-                  transactionData['orderid']?.toString(),
-              requestId: transactionData['requestId']?.toString() ??
-                  transactionData['requestid']?.toString(),
-            ),
-          ),
-        );
-      } else {
-        _showSuccessDialog();
-      }
+      final selectedProviderData =
+          _providers.firstWhere((p) => p['id'] == _selectedProvider);
+      final ref = transactionData['reference']?.toString() ?? 'Unknown';
+      openPurchaseOutcome(
+        context,
+        reference: ref,
+        isPending: isPending,
+        summaryLine:
+            '${selectedProviderData['name']} · Card ${_smartCardController.text}',
+        successMessage: isPending
+            ? null
+            : 'Your TV subscription was successful. Open your receipt below.',
+      );
     } else {
       _showErrorDialog(GoPaynaUxHelpers.augmentProviderError(
           result['error'] ?? 'Transaction failed. Please try again.'));
@@ -545,100 +537,6 @@ class _BuyTVSubscriptionScreenState extends State<BuyTVSubscriptionScreen>
               child: const Text('OK'),
             ),
           ],
-        );
-      },
-    );
-  }
-
-  void _showSuccessDialog() {
-    final selectedProviderData =
-        _providers.firstWhere((p) => p['id'] == _selectedProvider);
-    final selectedPackage = _currentPackages.firstWhere(
-      (package) =>
-          '${package['bundle']} - ${package['duration']}' == _selectedPackage,
-    );
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        return Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [colorScheme.primary, colorScheme.primaryContainer],
-              ),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    color: colorScheme.onPrimary.withValues(alpha: 0.2),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.check_circle,
-                    color: Colors.white,
-                    size: 50,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                const Text(
-                  'TV Subscription Successful!',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'You successfully purchased ${selectedPackage['bundle']} ${selectedProviderData['name']} subscription for ${_smartCardController.text}. Confirmation details will be sent to your delivery email.',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Colors.white,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 24),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                      Navigator.of(context).pop();
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: colorScheme.onPrimary,
-                      foregroundColor: colorScheme.primary,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: const Text(
-                      'Done',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
         );
       },
     );
@@ -1077,7 +975,7 @@ class _BuyTVSubscriptionScreenState extends State<BuyTVSubscriptionScreen>
                     decoration: InputDecoration(
                       labelText: 'Delivery Email (required)',
                       hintText:
-                          'GoPayna sends subscription confirmation to this email',
+                          'GopayNow sends subscription confirmation to this email',
                       prefixIcon: Icon(
                         Icons.email,
                         color: colorScheme.primary,

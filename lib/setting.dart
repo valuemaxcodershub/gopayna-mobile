@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'notification.dart';
 import 'profile.dart';
@@ -623,14 +624,26 @@ class _SettingScreenState extends State<SettingScreen>
           ),
           _buildSettingsCard(
             SettingsItem(
+              icon: Icons.link_outlined,
+              title: 'Account Deletion Information',
+              hasSwitch: false,
+              onTap: _openAccountDeletionInfo,
+            ),
+            isTablet,
+            9,
+            colorScheme,
+            isDark,
+          ),
+          _buildSettingsCard(
+            SettingsItem(
               icon: Icons.delete_outline,
-              title: 'Deactivate/Delete Account',
+              title: 'Request Account Deletion',
               hasSwitch: false,
               isDestructive: true,
               onTap: _handleDeactivateAccount,
             ),
             isTablet,
-            9,
+            10,
             colorScheme,
             isDark,
           ),
@@ -1782,7 +1795,9 @@ class _SettingScreenState extends State<SettingScreen>
       if (response['error'] != null) {
         _showSnack(response['error'].toString(), isError: true);
       } else {
-        _showSnack('Support (support@gopayna.com) has been notified.');
+        _showSnack(
+          'Your account deletion request was received. Support will verify your details and process deletion within 30 days where permitted by law.',
+        );
       }
     } catch (e) {
       navigator.pop();
@@ -1799,6 +1814,22 @@ class _SettingScreenState extends State<SettingScreen>
     }
   }
 
+  Future<void> _openAccountDeletionInfo() async {
+    final uri = Uri.parse('https://api.gopayna.com/account-deletion');
+    try {
+      final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!launched && mounted) {
+        _showSnack('Could not open account deletion page. Visit api.gopayna.com/account-deletion',
+            isError: true);
+      }
+    } catch (_) {
+      if (mounted) {
+        _showSnack('Could not open account deletion page. Visit api.gopayna.com/account-deletion',
+            isError: true);
+      }
+    }
+  }
+
   void _handleDeactivateAccount() {
     showDialog(
       context: context,
@@ -1806,9 +1837,9 @@ class _SettingScreenState extends State<SettingScreen>
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
         ),
-        title: const Text('Deactivate Account'),
+        title: const Text('Request Account Deletion'),
         content: const Text(
-          'Are you sure you want to deactivate your account? This action cannot be undone.',
+          'This submits a deletion request for your GopayNow account. Support will verify your registered email or phone and process deletion within 30 days where permitted by law. Some transaction records may be retained as described at api.gopayna.com/account-deletion.',
         ),
         actions: [
           TextButton(
@@ -1829,7 +1860,7 @@ class _SettingScreenState extends State<SettingScreen>
               _submitDeactivationRequest();
             },
             child: Text(
-              'Deactivate',
+              'Submit Request',
               style: TextStyle(
                 color: Theme.of(context).colorScheme.error,
                 fontWeight: FontWeight.w600,

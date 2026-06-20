@@ -31,6 +31,16 @@ class GoPaynaStrings {
   static const String providerDelayHint =
       'Providers occasionally experience delays. Pull to refresh in History, or contact support with your reference if nothing changes after several minutes.';
 
+  static const String orderPendingShortMessage =
+      'Your order has been received and is being processed. If you do not receive your token after one minute, use the Requery order button on the receipt for this transaction in History.';
+
+  static const String receiptRequeryHint =
+      'Token still pending? Tap Requery order below to check with the provider.';
+
+  static const String receiptRequeryButton = 'Requery order';
+
+  static const String viewReceiptButton = 'View receipt';
+
   static const String refundHint =
       'Your wallet was not charged for this order, or it has been refunded. You can try again in a few minutes.';
 
@@ -55,6 +65,13 @@ class GoPaynaUxHelpers {
 
   static String augmentProviderError(String message) {
     final m = message.toLowerCase();
+    if (m.contains('amount limits') ||
+        m.contains('purchase amount') ||
+        m.contains('electricity company') ||
+        m.contains('meter owner') ||
+        m.contains('account holder')) {
+      return message;
+    }
     if (m.contains('provider') ||
         m.contains('unavailable') ||
         m.contains('try again soon') ||

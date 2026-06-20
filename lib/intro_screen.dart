@@ -65,7 +65,7 @@ class _LoadingPageState extends State<LoadingPage>
               Align(
                 alignment: Alignment.centerRight,
                 child: Text(
-                  'GoPayna',
+                  'GopayNow',
                   style: TextStyle(
                     color: Colors.grey.shade600,
                     fontWeight: FontWeight.w600,
@@ -221,7 +221,7 @@ class _LoadingPageState extends State<LoadingPage>
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        'Setting up your dashboard experience',
+                        'Loading app services',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: Colors.grey.shade600,
@@ -424,9 +424,9 @@ class _IntroScreenOneState extends State<IntroScreenOne>
                                   borderRadius: BorderRadius.circular(16),
                                 ),
                               ),
-                              icon: const Icon(Icons.flash_on),
+                              icon: const Icon(Icons.arrow_forward),
                               label: Text(
-                                'Fast Start',
+                                'Login Now',
                                 style: TextStyle(
                                   fontSize: isTablet ? 16 : 14,
                                   fontWeight: FontWeight.w600,
@@ -461,7 +461,7 @@ class _IntroScreenOneState extends State<IntroScreenOne>
                             child: FadeTransition(
                               opacity: _titleFade,
                               child: Text(
-                                'Get Fast Data',
+                                'Get Mobile Data',
                                 style: TextStyle(
                                   fontSize: isTablet ? 32 : 28,
                                   fontWeight: FontWeight.w800,
@@ -485,7 +485,7 @@ class _IntroScreenOneState extends State<IntroScreenOne>
                                   maxWidth: isTablet ? 350 : 300,
                                 ),
                                 child: Text(
-                                  'Running low on data? Recharge instantly with GoPayna. Whether it\'s MTN, Airtel, Glo, or 9mobile, you\'ll get connected in seconds without stress or delay.',
+                                  'Purchase mobile data for MTN, Airtel, Glo, and 9mobile from your wallet.',
                                   style: TextStyle(
                                     fontSize: isTablet ? 16 : 15,
                                     fontWeight: FontWeight.w400,
@@ -831,7 +831,7 @@ class _IntroScreenTwoState extends State<IntroScreenTwo>
                             child: FadeTransition(
                               opacity: _titleFade,
                               child: Text(
-                                'Payments Made Easy',
+                                'Digital services',
                                 style: TextStyle(
                                   fontSize: isTablet ? 32 : 28,
                                   fontWeight: FontWeight.w800,
@@ -855,7 +855,7 @@ class _IntroScreenTwoState extends State<IntroScreenTwo>
                                   maxWidth: isTablet ? 350 : 300,
                                 ),
                                 child: Text(
-                                  'Enjoy stress-free transactions with GoPayna. Fast, secure, and designed to make every payment effortless.',
+                                  'Browse and purchase digital services from your wallet.',
                                   style: TextStyle(
                                     fontSize: isTablet ? 16 : 15,
                                     fontWeight: FontWeight.w400,
