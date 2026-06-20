@@ -45,7 +45,7 @@ Update the following encrypted variables in `codemagic.yaml`:
 
 ```yaml
 vars:
-   BUNDLE_ID: "com.gopayna.app3"  # GoPayna iOS bundle identifier
+   BUNDLE_ID: "ng.gopaynow.app"  # GopayNow iOS bundle identifier
   APP_STORE_CONNECT_ISSUER_ID: Encrypted(...)  # From App Store Connect API key
   APP_STORE_CONNECT_KEY_IDENTIFIER: Encrypted(...)  # Key ID
   APP_STORE_CONNECT_PRIVATE_KEY: Encrypted(...)  # Private key content

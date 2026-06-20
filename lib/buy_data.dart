@@ -6,7 +6,7 @@ import 'services/auth_token_storage.dart';
 import 'service_transaction_history.dart';
 import 'widgets/wallet_visibility_builder.dart';
 import 'widgets/themed_screen_helpers.dart';
-import 'widgets/pending_order_screen.dart';
+import 'widgets/purchase_navigation.dart';
 import 'design/gopayna_design.dart';
 
 class DataTransaction {
@@ -648,33 +648,20 @@ class _BuyDataScreenState extends State<BuyDataScreen>
           payload['pending'] == true ||
           transactionData['isPending'] == true;
       if (!mounted) return;
-      if (isPending) {
-        final selectedNetworkData =
-            _networks.firstWhere((n) => n['id'] == _selectedNetwork);
-        final selectedPlan = _currentDataPlans.firstWhere(
-          (plan) => '${plan['bundle']} - ₦${plan['price']}' == _selectedDataPlan,
-        );
-        final ref = (transactionData['reference'] ??
-                result['reference'] ??
-                'Unknown')
-            .toString();
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => PendingOrderScreen(
-              reference: ref,
-              serviceTitle: 'Data',
-              summaryLine:
-                  '${selectedPlan['bundle']} · ${selectedNetworkData['name']} · ${_phoneController.text}',
-              orderId: transactionData['orderId']?.toString() ??
-                  transactionData['orderid']?.toString(),
-              requestId: transactionData['requestId']?.toString() ??
-                  transactionData['requestid']?.toString(),
-            ),
-          ),
-        );
-      } else {
-        _showSuccessDialog();
-      }
+      final ref = (transactionData['reference'] ??
+              result['reference'] ??
+              'Unknown')
+          .toString();
+      openPurchaseOutcome(
+        context,
+        reference: ref,
+        isPending: isPending,
+        summaryLine:
+            '${selectedPlan['bundle']} · ${_selectedNetworkData['name']} · ${_phoneController.text}',
+        successMessage: isPending
+            ? null
+            : 'Your data purchase was successful. Open your receipt below.',
+      );
     } else {
       // Reload wallet data in case of refund
       if (result['refunded'] == true) {
@@ -736,102 +723,6 @@ class _BuyDataScreenState extends State<BuyDataScreen>
               child: const Text('OK'),
             ),
           ],
-        );
-      },
-    );
-  }
-
-  void _showSuccessDialog() {
-    final isTablet = MediaQuery.of(context).size.width > 600;
-    final selectedNetworkData =
-        _networks.firstWhere((n) => n['id'] == _selectedNetwork);
-    final selectedPlan = _currentDataPlans.firstWhere(
-      (plan) => '${plan['bundle']} - ₦${plan['price']}' == _selectedDataPlan,
-    );
-    final cs = colorScheme;
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        return Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(isTablet ? 24 : 20),
-          ),
-          child: Container(
-            padding: EdgeInsets.all(isTablet ? 32 : 24),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(isTablet ? 24 : 20),
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [cs.primary, cs.primary.withValues(alpha: 0.85)],
-              ),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: isTablet ? 100 : 80,
-                  height: isTablet ? 100 : 80,
-                  decoration: BoxDecoration(
-                    color: cs.onPrimary.withValues(alpha: 0.2),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.check_circle,
-                    color: cs.onPrimary,
-                    size: isTablet ? 60 : 50,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Text(
-                  'Data Purchase Successful!',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: cs.onPrimary,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'You successfully purchased ${selectedPlan['bundle']} ${selectedNetworkData['name']} data for ${_phoneController.text}',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: cs.onPrimary,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 24),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                      Navigator.of(context).pop();
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: cs.onPrimary,
-                      foregroundColor: cs.primary,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: Text(
-                      'Done',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: cs.primary,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
         );
       },
     );

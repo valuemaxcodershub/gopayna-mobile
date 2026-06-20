@@ -43,17 +43,49 @@ String get paystackBaseUrl => '$apiOrigin/api/paystack';
 
 Future<Map<String, dynamic>> sendVerificationOtp(String email) async {
   try {
-    // If input contains '@', treat as email, else as phone
-    final isEmail = email.contains('@');
+    final trimmedContact = email.trim();
+    final isEmail = trimmedContact.contains('@');
+    final payloadContact =
+        isEmail ? trimmedContact.toLowerCase() : trimmedContact;
+
     final response = await http.post(
       Uri.parse('$baseUrl/send-otp'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode(isEmail ? {'email': email} : {'phone': email}),
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: jsonEncode(isEmail
+          ? {
+              'email': payloadContact,
+              'identifier': payloadContact,
+            }
+          : {
+              'phone': payloadContact,
+              'identifier': payloadContact,
+            }),
     );
     if (response.statusCode == 200) {
-      return json.decode(response.body);
+      final decoded = json.decode(response.body);
+      if (decoded is Map && decoded['otpHashTruncated'] == true) {
+        log(
+          'send-otp: otpHashTruncated=true — widen DB column users.otp (needs ~67 chars for h1:+sha256)',
+          name: 'api_service',
+        );
+      }
+      if (decoded is Map<String, dynamic>) return decoded;
+      if (decoded is Map) return Map<String, dynamic>.from(decoded);
+      return {'raw': decoded};
     } else {
-      return {'error': 'Failed to send OTP'};
+      try {
+        final decoded = json.decode(response.body);
+        return {
+          'error': decoded['error']?.toString() ?? 'Failed to send OTP',
+          'code': decoded['code']?.toString(),
+          'status': response.statusCode,
+        };
+      } catch (_) {
+        return {'error': 'Failed to send OTP', 'status': response.statusCode};
+      }
     }
   } catch (e) {
     return {'error': 'An error occurred while sending OTP'};
@@ -67,12 +99,12 @@ Future<Map<String, dynamic>> registerUser(String firstName, String lastName,
       Uri.parse('$baseUrl/register'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
-        'firstName': firstName,
-        'lastName': lastName,
-        'phone': phone,
-        'email': email,
+        'firstName': firstName.trim(),
+        'lastName': lastName.trim(),
+        'phone': phone.trim(),
+        'email': email.trim(),
         'password': password,
-        'referralCode': referralCode,
+        'referralCode': referralCode.trim(),
       }),
     );
 
@@ -96,8 +128,12 @@ Future<Map<String, dynamic>> registerUser(String firstName, String lastName,
 Future<Map<String, dynamic>> loginUser(String usernameOrEmail, String password,
     {String? deviceId, bool forceLogin = false}) async {
   try {
+    final trimmed = usernameOrEmail.trim();
+    final identifier =
+        trimmed.contains('@') ? trimmed.toLowerCase() : trimmed;
+
     final Map<String, dynamic> requestBody = {
-      'identifier': usernameOrEmail, // <-- use 'identifier'
+      'identifier': identifier,
       'password': password,
     };
 
@@ -171,6 +207,33 @@ String _extractErrorMessage(String body, int statusCode) {
     }
   } catch (e) {
     return 'HTTP $statusCode: $body';
+  }
+}
+
+/// Decode JSON API bodies without throwing (HTML/gateway pages break [jsonDecode]).
+Map<String, dynamic> _decodeJsonMapLenient(String responseBody, int statusCode) {
+  final trimmed = responseBody.trim();
+  if (trimmed.isEmpty) return {};
+  try {
+    final v = jsonDecode(trimmed);
+    if (v is Map<String, dynamic>) return v;
+    if (v is Map) return Map<String, dynamic>.from(v);
+    return {
+      'error':
+          'Unexpected response from server (HTTP $statusCode). Please try again.',
+    };
+  } catch (_) {
+    final lower = trimmed.toLowerCase();
+    final looksHtml = lower.startsWith('<!doctype') ||
+        lower.startsWith('<html') ||
+        trimmed.startsWith('<?xml');
+    final preview =
+        trimmed.length > 120 ? '${trimmed.substring(0, 120)}…' : trimmed;
+    return {
+      'error': looksHtml
+          ? 'Server error (HTTP $statusCode). The API may be unavailable — please try again shortly.'
+          : 'Bad response from server (HTTP $statusCode): $preview',
+    };
   }
 }
 
@@ -265,31 +328,84 @@ Future<Map<String, dynamic>> forgotPassword(String email) async {
 
 Future<Map<String, dynamic>> verifyOtp(String email, String otp) async {
   try {
-    // If input contains '@', treat as email, else as phone
-    final isEmail = email.contains('@');
+    // If input contains '@', treat as email, else as phone (matches server normalization).
+    final trimmedContact = email.trim();
+    final isEmail = trimmedContact.contains('@');
+    final otpDigits = otp.replaceAll(RegExp(r'[^0-9]'), '');
+    final payloadContact =
+        isEmail ? trimmedContact.toLowerCase() : trimmedContact;
+
+    log(
+      'verifyOtp → POST verify-otp channel=${isEmail ? 'email' : 'phone'} idLen=${payloadContact.length} otpDigits=${otpDigits.length}',
+      name: 'api_service',
+    );
+
+    if (otpDigits.length != 6) {
+      log(
+        'verifyOtp aborted locally: expected 6 OTP digits, got ${otpDigits.length}',
+        name: 'api_service',
+      );
+      return {'error': 'Please enter the complete 6-digit OTP', 'code': 'OTP_PAYLOAD_INVALID'};
+    }
+
     final response = await http.post(
       Uri.parse('$baseUrl/verify-otp'),
-      headers: {'Content-Type': 'application/json'},
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
       body: jsonEncode(isEmail
-          ? {'email': email, 'otp': otp}
-          : {'phone': email, 'otp': otp}),
+          ? {
+              'email': payloadContact,
+              'identifier': payloadContact,
+              'otp': otpDigits,
+            }
+          : {
+              'phone': payloadContact,
+              'identifier': payloadContact,
+              'otp': otpDigits,
+            }),
     );
 
     if (response.statusCode == 200) {
       return json.decode(response.body);
     } else {
-      // Parse response to extract error and code
+      Map<String, dynamic>? decoded;
       try {
-        final decoded = json.decode(response.body);
+        final raw = json.decode(response.body);
+        if (raw is Map<String, dynamic>) {
+          decoded = raw;
+        } else if (raw is Map) {
+          decoded = Map<String, dynamic>.from(raw);
+        }
+      } catch (_) {}
+
+      final code = decoded?['code']?.toString();
+      final debugRef = decoded?['debugRef']?.toString();
+      final err = decoded?['error']?.toString();
+
+      log(
+        'verifyOtp ← HTTP ${response.statusCode} code=$code debugRef=$debugRef error=$err',
+        name: 'api_service',
+      );
+      log('verifyOtp ← raw body: ${response.body}', name: 'api_service');
+
+      if (decoded != null) {
         return {
-          'error': decoded['error']?.toString() ?? 'Failed to verify OTP',
-          'code': decoded['code'],
+          'error': err ?? 'Failed to verify OTP',
+          'code': code,
+          'debugRef': debugRef,
+          'status': response.statusCode,
         };
-      } catch (e) {
-        return {'error': 'Failed to verify OTP'};
       }
+
+      return {
+        'error': 'Failed to verify OTP',
+        'status': response.statusCode,
+      };
     }
   } catch (e) {
+    log('verifyOtp request failed: $e', name: 'api_service');
     return {'error': 'An error occurred while verifying OTP'};
   }
 }
@@ -297,16 +413,36 @@ Future<Map<String, dynamic>> verifyOtp(String email, String otp) async {
 Future<Map<String, dynamic>> sendPasswordResetOtp(
     String? email, String? phone) async {
   try {
+    final Map<String, String> payload = {};
+    if (email != null && email.trim().isNotEmpty) {
+      final e = email.trim().toLowerCase();
+      payload['email'] = e;
+      payload['identifier'] = e;
+    } else if (phone != null && phone.trim().isNotEmpty) {
+      final p = phone.trim();
+      payload['phone'] = p;
+      payload['identifier'] = p;
+    }
+
     final response = await http.post(
       Uri.parse('$baseUrl/send-password-reset-otp'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        if (email != null) 'email': email,
-        if (phone != null) 'phone': phone,
-      }),
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: jsonEncode(payload),
     );
     if (response.statusCode == 200) {
-      return json.decode(response.body);
+      final decoded = json.decode(response.body);
+      if (decoded is Map && decoded['otpHashTruncated'] == true) {
+        log(
+          'send-password-reset-otp: otpHashTruncated=true — widen users.otp',
+          name: 'api_service',
+        );
+      }
+      if (decoded is Map<String, dynamic>) return decoded;
+      if (decoded is Map) return Map<String, dynamic>.from(decoded);
+      return {'raw': decoded};
     } else {
       // Parse response to extract error and code
       try {
@@ -325,16 +461,33 @@ Future<Map<String, dynamic>> sendPasswordResetOtp(
 }
 
 Future<Map<String, dynamic>> resetPassword(
-    String email, String otp, String newPassword) async {
+    String contact, String otp, String newPassword) async {
   try {
+    final trimmedContact = contact.trim();
+    final isEmail = trimmedContact.contains('@');
+    final payloadContact =
+        isEmail ? trimmedContact.toLowerCase() : trimmedContact;
+    final otpDigits = otp.replaceAll(RegExp(r'[^0-9]'), '');
+
     final response = await http.post(
       Uri.parse('$baseUrl/reset-password'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'email': email,
-        'otp': otp,
-        'newPassword': newPassword,
-      }),
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: jsonEncode(isEmail
+          ? {
+              'email': payloadContact,
+              'identifier': payloadContact,
+              'otp': otpDigits,
+              'newPassword': newPassword,
+            }
+          : {
+              'phone': payloadContact,
+              'identifier': payloadContact,
+              'otp': otpDigits,
+              'newPassword': newPassword,
+            }),
     );
 
     if (response.statusCode == 200) {
@@ -456,6 +609,8 @@ Map<String, String> _authorizedJsonHeaders(String token) => {
 /// Build-time configuration via --dart-define:
 ///   flutter run --dart-define=APP_SIGNING_SECRET=your_secret_here
 ///   flutter build apk --dart-define=APP_SIGNING_SECRET=your_secret_here
+/// Flutter web: same flag is required for purchases, e.g.
+///   flutter run -d chrome --dart-define=APP_SIGNING_SECRET=your_secret_here
 ///
 /// No default: release builds must pass `--dart-define=APP_SIGNING_SECRET=...`
 const String _appSigningSecret = String.fromEnvironment('APP_SIGNING_SECRET');
@@ -500,6 +655,14 @@ Map<String, String> _signedAuthorizedHeaders(
       throw StateError(
         'APP_SIGNING_SECRET is required for release builds. '
         'Rebuild with: flutter build apk --dart-define=APP_SIGNING_SECRET=YOUR_SECRET',
+      );
+    }
+    // Web always hits the browser CORS layer; unsigned POSTs fail signature middleware with 401.
+    if (kIsWeb) {
+      throw StateError(
+        'APP_SIGNING_SECRET is required on Flutter web for purchases and signed APIs. '
+        'Run: flutter run -d chrome --dart-define=APP_SIGNING_SECRET=YOUR_SECRET '
+        '(same value as server APP_SIGNING_SECRET).',
       );
     }
     if (kDebugMode) {
@@ -1394,7 +1557,8 @@ Future<Map<String, dynamic>> buyAirtime(
       body: bodyJson,
     );
     final responseBody = response.body.isEmpty ? '{}' : response.body;
-    final decoded = jsonDecode(responseBody);
+    final decoded =
+        _decodeJsonMapLenient(responseBody, response.statusCode);
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return {'success': true, 'data': decoded};
     }
@@ -1415,6 +1579,9 @@ Future<Map<String, dynamic>> buyAirtime(
           _extractErrorMessage(responseBody, response.statusCode),
       'status': response.statusCode,
     };
+  } on StateError catch (e) {
+    log('Buy airtime failed (config): $e', name: 'api_service');
+    return {'error': e.message};
   } catch (e) {
     log('Buy airtime failed: $e', name: 'api_service');
     return {'error': 'Unable to purchase airtime. Please try again.'};
@@ -1456,7 +1623,8 @@ Future<Map<String, dynamic>> buyData(
       body: bodyJson,
     );
     final responseBody = response.body.isEmpty ? '{}' : response.body;
-    final decoded = jsonDecode(responseBody);
+    final decoded =
+        _decodeJsonMapLenient(responseBody, response.statusCode);
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return {'success': true, 'data': decoded};
     }
@@ -1477,6 +1645,9 @@ Future<Map<String, dynamic>> buyData(
           _extractErrorMessage(responseBody, response.statusCode),
       'status': response.statusCode,
     };
+  } on StateError catch (e) {
+    log('Buy data failed (config): $e', name: 'api_service');
+    return {'error': e.message};
   } catch (e) {
     log('Buy data failed: $e', name: 'api_service');
     return {'error': 'Unable to purchase data. Please try again.'};
@@ -1585,7 +1756,8 @@ Future<Map<String, dynamic>> buyTVSubscription(
       body: bodyJson,
     );
     final responseBody = response.body.isEmpty ? '{}' : response.body;
-    final decoded = jsonDecode(responseBody);
+    final decoded =
+        _decodeJsonMapLenient(responseBody, response.statusCode);
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return {'success': true, 'data': decoded};
     }
@@ -1610,6 +1782,9 @@ Future<Map<String, dynamic>> buyTVSubscription(
           _extractErrorMessage(responseBody, response.statusCode),
       'status': response.statusCode,
     };
+  } on StateError catch (e) {
+    log('Buy TV subscription failed (config): $e', name: 'api_service');
+    return {'error': e.message};
   } catch (e) {
     log('Buy TV subscription failed: $e', name: 'api_service');
     return {'error': 'Unable to purchase TV subscription. Please try again.'};
@@ -1651,7 +1826,8 @@ Future<Map<String, dynamic>> buyEducationPin(
       body: bodyJson,
     );
     final responseBody = response.body.isEmpty ? '{}' : response.body;
-    final decoded = jsonDecode(responseBody);
+    final decoded =
+        _decodeJsonMapLenient(responseBody, response.statusCode);
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return {'success': true, 'data': decoded};
     }
@@ -1676,6 +1852,9 @@ Future<Map<String, dynamic>> buyEducationPin(
           _extractErrorMessage(responseBody, response.statusCode),
       'status': response.statusCode,
     };
+  } on StateError catch (e) {
+    log('Buy education pin failed (config): $e', name: 'api_service');
+    return {'error': e.message};
   } catch (e) {
     log('Buy education pin failed: $e', name: 'api_service');
     return {'error': 'Unable to purchase education pin. Please try again.'};
@@ -1684,11 +1863,16 @@ Future<Map<String, dynamic>> buyEducationPin(
 
 /// Query transaction status
 Future<Map<String, dynamic>> queryTransaction(String token,
-    {String? orderId, String? requestId}) async {
+    {String? orderId, String? requestId, String? walletReference}) async {
   try {
     final queryParams = <String, String>{};
-    if (orderId != null) queryParams['orderId'] = orderId;
-    if (requestId != null) queryParams['requestId'] = requestId;
+    if (orderId != null && orderId.isNotEmpty) queryParams['orderId'] = orderId;
+    if (requestId != null && requestId.isNotEmpty) {
+      queryParams['requestId'] = requestId;
+    }
+    if (walletReference != null && walletReference.isNotEmpty) {
+      queryParams['walletReference'] = walletReference;
+    }
 
     final uri =
         Uri.parse('$vtuBaseUrl/query').replace(queryParameters: queryParams);

@@ -534,9 +534,9 @@ class _SupportScreenState extends State<SupportScreen>
   Future<void> _openWhatsAppChat() async {
     HapticFeedback.lightImpact();
     
-    // GoPayna support WhatsApp number (include country code without +)
+    // GopayNow support WhatsApp number (include country code without +)
     const String supportNumber = '2348080624171';
-    const String message = 'Hello GoPayna Support, I need assistance with...';
+    const String message = 'Hello GopayNow Support, I need assistance with...';
     
     final Uri whatsappUri = Uri.parse(
       'https://wa.me/$supportNumber?text=${Uri.encodeComponent(message)}',

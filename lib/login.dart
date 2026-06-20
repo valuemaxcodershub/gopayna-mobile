@@ -184,7 +184,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
       final deviceInfo = await CredentialsService.getDeviceIdInfo();
       
       final result = await loginUser(
-        _usernameController.text,
+        _usernameController.text.trim(),
         _passwordController.text,
         deviceId: deviceInfo.deviceId,
         forceLogin: deviceInfo.isNew,
@@ -236,7 +236,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
 
           setState(() => _isLoading = true);
           final retryResult = await loginUser(
-            _usernameController.text,
+            _usernameController.text.trim(),
             _passwordController.text,
             deviceId: deviceInfo.deviceId,
             forceLogin: true,
@@ -255,15 +255,17 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
           await CredentialsService.saveUsername(_usernameController.text.trim());
           InactivityService().resetTimer();
           if (!mounted) return;
-          Navigator.pushReplacement(
-            context,
+          Navigator.of(context).pushAndRemoveUntil(
             MaterialPageRoute(builder: (_) => const DashboardScreen()),
+            (route) => false,
           );
           return;
         }
         
         // If error is for email verification, redirect to OTP page
-        if (errorMsg.contains('verify your email with OTP') || errorMsg.contains('verify your email')) {
+        if (errorCode == 'EMAIL_NOT_VERIFIED' ||
+            errorMsg.contains('verify your email with OTP') ||
+            errorMsg.contains('verify your email')) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Please verify your email.'), backgroundColor: Colors.orange),
           );
@@ -272,11 +274,19 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-              builder: (context) => OtpVerificationScreen(
-                email: result['email'] ?? _usernameController.text.trim(),
-                purpose: OtpPurpose.login,
-                password: _passwordController.text,
-              ),
+              builder: (context) {
+                final fallback = _usernameController.text.trim();
+                final fromApi = result['email']?.toString();
+                final resolved =
+                    (fromApi != null && fromApi.isNotEmpty) ? fromApi : fallback;
+                final contact =
+                    resolved.contains('@') ? resolved.toLowerCase() : resolved;
+                return OtpVerificationScreen(
+                  email: contact,
+                  purpose: OtpPurpose.login,
+                  password: _passwordController.text,
+                );
+              },
             ),
           );
         } else {
@@ -302,7 +312,10 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
         );
         await Future.delayed(const Duration(seconds: 1));
         if (!mounted) return;
-        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const DashboardScreen()));
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const DashboardScreen()),
+          (route) => false,
+        );
       }
     }
   }

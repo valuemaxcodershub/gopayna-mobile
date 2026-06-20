@@ -8,7 +8,7 @@ import 'service_transaction_history.dart';
 import 'fund_wallet.dart';
 import 'widgets/wallet_visibility_builder.dart';
 import 'widgets/themed_screen_helpers.dart';
-import 'widgets/pending_order_screen.dart';
+import 'widgets/purchase_navigation.dart';
 import 'design/gopayna_design.dart';
 
 class ElectricityTransaction {
@@ -454,6 +454,34 @@ class _BuyElectricityScreenState extends State<BuyElectricityScreen>
     }
   }
 
+  bool _isRealElectricityCustomerName(String name) {
+    final normalized = name.trim().replaceAll(RegExp(r'\s+'), ' ');
+    if (normalized.isEmpty || normalized.length < 3) {
+      return false;
+    }
+    final upper = normalized.toUpperCase();
+    const blocked = {
+      'N/A',
+      'NA',
+      'NOT AVAILABLE',
+      'UNKNOWN',
+      'PREPAID CUSTOMER',
+      'POSTPAID CUSTOMER',
+      'PREPAID',
+      'POSTPAID',
+      'CUSTOMER',
+      'METER CUSTOMER',
+      'METER OWNER',
+      'INVALID_METERNO',
+    };
+    if (blocked.contains(upper)) return false;
+    if (upper.contains('INVALID')) return false;
+    if (RegExp(r'^(PREPAID|POSTPAID)(\s+CUSTOMER)?$').hasMatch(upper)) {
+      return false;
+    }
+    return RegExp(r'[A-Za-z]').hasMatch(normalized);
+  }
+
   /// Verify meter number with NelloByte API
   Future<void> _verifyMeterNumber() async {
     final meterNumber = _meterNumberController.text.trim();
@@ -501,7 +529,7 @@ class _BuyElectricityScreenState extends State<BuyElectricityScreen>
 
       if (result['success'] == true && result['data'] != null) {
         final customerName = result['data']['customerName']?.toString() ?? '';
-        if (customerName.isNotEmpty && customerName != 'INVALID_METERNO') {
+        if (_isRealElectricityCustomerName(customerName)) {
             final verifiedMinAmount =
               _parsePositiveAmountValue(result['data']['minAmount']);
             final verifiedMaxAmount =
@@ -527,34 +555,16 @@ class _BuyElectricityScreenState extends State<BuyElectricityScreen>
           HapticFeedback.mediumImpact();
         } else {
           _showErrorSnackBar(
-              'Invalid meter number. Please check and try again.');
+            'Could not confirm the meter owner name. Check the meter number and selected electricity provider, then verify again.',
+          );
         }
       } else {
-        final canProceed = result['canProceed'] == true;
         final providerName =
             _selectedProviderData['name']?.toString() ?? 'Selected provider';
         final providerCode = _getDiscoCode(_selectedProvider);
         final errorMessage = result['error']?.toString() ??
-            'Failed to verify meter. Please try again.';
-
-        if (canProceed) {
-          setState(() {
-            _isMeterVerified = true;
-            _verifiedCustomerName = _selectedMeterType == 'prepaid'
-                ? 'Prepaid Customer'
-                : 'Postpaid Customer';
-          });
-
-          // For postpaid meters, fetch outstanding bill
-          if (_selectedMeterType == 'postpaid') {
-            await _fetchOutstandingBill(discoCode, meterNumber);
-          }
-
-          HapticFeedback.lightImpact();
-        } else {
-          _showErrorSnackBar(
-              '$errorMessage ($providerName, code $providerCode)');
-        }
+            'Could not verify this meter. Check the meter number and selected electricity provider.';
+        _showErrorSnackBar('$errorMessage ($providerName, code $providerCode)');
       }
     }
   }
@@ -685,6 +695,18 @@ class _BuyElectricityScreenState extends State<BuyElectricityScreen>
       }
       if (upperValue.contains('JOS') || upperValue.contains('JED')) {
         return 'JEDC';
+      }
+      if (upperValue.contains('IBADAN') || upperValue.contains('IBEDC')) {
+        return '07';
+      }
+      if (upperValue.contains('IKEJA') || upperValue.contains('IKEDC')) {
+        return '02';
+      }
+      if (upperValue.contains('EKO') || upperValue.contains('EKEDC')) {
+        return '01';
+      }
+      if (RegExp(r'^\d{1,2}$').hasMatch(upperValue)) {
+        return upperValue.padLeft(2, '0');
       }
     }
 
@@ -818,6 +840,18 @@ class _BuyElectricityScreenState extends State<BuyElectricityScreen>
 
   void _buyElectricity() {
     if (_formKey.currentState!.validate()) {
+      if (!_isMeterVerified ||
+          !_isRealElectricityCustomerName(_verifiedCustomerName ?? '')) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text(
+              'Verify the meter first. A real account holder name is required before you can pay.',
+            ),
+            backgroundColor: colorScheme.error,
+          ),
+        );
+        return;
+      }
       if (_providers.isEmpty || _selectedProvider.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -1050,6 +1084,14 @@ class _BuyElectricityScreenState extends State<BuyElectricityScreen>
       return;
     }
 
+    if (!_isMeterVerified ||
+        !_isRealElectricityCustomerName(_verifiedCustomerName ?? '')) {
+      _showErrorDialog(
+        'Verify the meter and confirm the account holder name before paying.',
+      );
+      return;
+    }
+
     final amount = _parseAmount(_amountController.text);
     final totalToPay = amount + _serviceCharge;
     if (!_hasProviderAmountSupport(_selectedProvider)) {
@@ -1125,30 +1167,24 @@ class _BuyElectricityScreenState extends State<BuyElectricityScreen>
         }
       }
       final isPending = result['pending'] == true || data?['isPending'] == true;
-
-      if (isPending) {
-        final ref = (data?['reference'] ?? 'Unknown').toString();
-        if (!mounted) return;
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => PendingOrderScreen(
-              reference: ref,
-              serviceTitle: 'Electricity',
-              summaryLine:
-                  '${_selectedMeterType == 'prepaid' ? 'Prepaid' : 'Postpaid'} · Meter ${_meterNumberController.text}',
-              orderId: data?['orderId']?.toString() ?? data?['orderid']?.toString(),
-              requestId: data?['requestId']?.toString() ??
-                  data?['requestid']?.toString(),
-            ),
-          ),
-        );
-      } else if (data != null && data['token'] != null) {
-        // Token received immediately
-        _showSuccessDialogWithToken(data['token']);
-      } else {
-        // Success without immediate token
-        _showSuccessDialog();
-      }
+      if (!mounted) return;
+      final ref = (data?['reference'] ?? 'Unknown').toString();
+      final customerName = (data?['customerName']?.toString().trim().isNotEmpty == true)
+          ? data!['customerName'].toString().trim()
+          : _verifiedCustomerName?.trim();
+      openPurchaseOutcome(
+        context,
+        reference: ref,
+        isPending: isPending,
+        summaryLine:
+            '${_selectedMeterType == 'prepaid' ? 'Prepaid' : 'Postpaid'} · ${_formatProviderLabel(_selectedProviderData)} · Meter ${_meterNumberController.text}',
+        customerName: customerName,
+        successMessage: isPending
+            ? null
+            : (data != null && data['token'] != null
+                ? 'Your electricity token is ready. Open your receipt below.'
+                : 'Your electricity purchase was successful. Open your receipt below.'),
+      );
     } else {
       // Handle different error types
       final isRefunded = result['refunded'] == true;
@@ -1167,99 +1203,6 @@ class _BuyElectricityScreenState extends State<BuyElectricityScreen>
             result['error'] ?? 'Transaction failed. Please try again.'));
       }
     }
-  }
-
-  void _showSuccessDialogWithToken(String token) {
-    final isTablet = MediaQuery.of(context).size.width > 600;
-    final cs = colorScheme;
-
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(isTablet ? 20 : 16),
-          ),
-          title: Row(
-            children: [
-              Icon(Icons.check_circle,
-                  color: Colors.green, size: isTablet ? 32 : 24),
-              SizedBox(width: isTablet ? 12 : 8),
-              Text(
-                'Success',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: isTablet ? 22 : 18,
-                  color: cs.onSurface,
-                ),
-              ),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Electricity purchase successful. Your token is also sent to your delivery email.',
-                style: TextStyle(
-                    fontSize: isTablet ? 16 : 14, color: cs.onSurface),
-              ),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.green.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                  border:
-                      Border.all(color: Colors.green.withValues(alpha: 0.3)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Your Token:',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: cs.onSurface,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    SelectableText(
-                      token,
-                      style: TextStyle(
-                        fontSize: isTablet ? 18 : 16,
-                        fontWeight: FontWeight.bold,
-                        fontFamily: 'monospace',
-                        color: Colors.green.shade700,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Clipboard.setData(ClipboardData(text: token));
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Token copied to clipboard')),
-                );
-              },
-              child: const Text('Copy Token'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.of(context).pop(),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: cs.primary,
-                foregroundColor: cs.onPrimary,
-              ),
-              child: const Text('Done'),
-            ),
-          ],
-        );
-      },
-    );
   }
 
   void _showErrorDialog(String message, [String? reference]) {
@@ -1427,99 +1370,6 @@ class _BuyElectricityScreenState extends State<BuyElectricityScreen>
               child: const Text('OK'),
             ),
           ],
-        );
-      },
-    );
-  }
-
-  void _showSuccessDialog() {
-    final selectedProviderData =
-        _providers.firstWhere((p) => p['id'] == _selectedProvider);
-    final amount = _parseAmount(_amountController.text);
-
-    final cs = colorScheme;
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        return Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [cs.primary, cs.primary.withValues(alpha: 0.85)],
-              ),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.check_circle,
-                    color: Colors.white,
-                    size: 50,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                const Text(
-                  'Electricity Purchase Successful!',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'You successfully purchased ₦${amount.toStringAsFixed(0)} ${selectedProviderData['name']} electricity for meter ${_meterNumberController.text}',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Colors.white,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 24),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                      Navigator.of(context).pop();
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: cs.primary,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: const Text(
-                      'Done',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
         );
       },
     );
@@ -2104,7 +1954,7 @@ class _BuyElectricityScreenState extends State<BuyElectricityScreen>
                     decoration: InputDecoration(
                       labelText: 'Delivery Email (required)',
                       hintText:
-                          'GoPayna sends your token receipt to this email',
+                          'GopayNow sends your token receipt to this email',
                       labelStyle: TextStyle(color: muted),
                       prefixIcon: Icon(
                         Icons.email,

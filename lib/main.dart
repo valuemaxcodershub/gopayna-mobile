@@ -129,7 +129,7 @@ class _MyAppState extends State<MyApp> {
     return InactivityDetector(
       child: MaterialApp(
         navigatorKey: navigatorKey,
-        title: 'GoPayna',
+        title: 'GopayNow',
         theme: _appSettings.lightTheme,
         darkTheme: _appSettings.darkTheme,
         themeMode: _appSettings.isDarkMode ? ThemeMode.dark : ThemeMode.light,
@@ -303,7 +303,7 @@ class _GoPaynaHomePageState extends State<GoPaynaHomePage>
                           // App Name - centered
                           Center(
                             child: Text(
-                              'GoPayna',
+                              'GopayNow',
                               style: TextStyle(
                                 fontSize: isTablet ? 32 : 28,
                                 fontWeight: FontWeight.w700,
@@ -330,7 +330,7 @@ class _GoPaynaHomePageState extends State<GoPaynaHomePage>
                         maxWidth: isTablet ? 350 : 280,
                       ),
                       child: Text(
-                        'Your best Payment in seconds',
+                        'Pay bills, Buy Digital Services',
                         style: TextStyle(
                           fontSize: isTablet ? 16 : 15,
                           fontWeight: FontWeight.w400,
@@ -340,6 +340,22 @@ class _GoPaynaHomePageState extends State<GoPaynaHomePage>
                         ),
                         textAlign: TextAlign.center,
                       ),
+                    ),
+                  ),
+                ),
+
+                SizedBox(height: isTablet ? 10 : 8),
+
+                FadeTransition(
+                  opacity: _fadeAnimation,
+                  child: Text(
+                    'by GOPAYNA TECHNOLOGIES LIMITED',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: isTablet ? 12 : 11,
+                      fontWeight: FontWeight.w400,
+                      color: Colors.white.withValues(alpha: 0.75),
+                      letterSpacing: 0.2,
                     ),
                   ),
                 ),

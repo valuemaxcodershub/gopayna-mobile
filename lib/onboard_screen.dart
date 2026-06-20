@@ -228,7 +228,7 @@ class _OnboardScreenState extends State<OnboardScreen>
                       child: FadeTransition(
                         opacity: _titleFade,
                         child: Text(
-                          'GoPayna',
+                          'GopayNow',
                           style: TextStyle(
                             fontSize: isTablet ? 42 : 36,
                             fontWeight: FontWeight.w800,
@@ -251,7 +251,7 @@ class _OnboardScreenState extends State<OnboardScreen>
                             maxWidth: isTablet ? 400 : 280,
                           ),
                           child: Text(
-                            'Nigeria\'s Trusted Fintech App',
+                            'Pay bills, Buy Digital Services',
                             style: TextStyle(
                               fontSize: isTablet ? 18 : 16,
                               fontWeight: FontWeight.w500,
@@ -260,6 +260,22 @@ class _OnboardScreenState extends State<OnboardScreen>
                             ),
                             textAlign: TextAlign.center,
                           ),
+                        ),
+                      ),
+                    ),
+
+                    SizedBox(height: isTablet ? 10 : 8),
+
+                    FadeTransition(
+                      opacity: _taglineFade,
+                      child: Text(
+                        'by GOPAYNA TECHNOLOGIES LIMITED',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: isTablet ? 13 : 12,
+                          fontWeight: FontWeight.w400,
+                          color: Colors.black45,
+                          letterSpacing: 0.2,
                         ),
                       ),
                     ),

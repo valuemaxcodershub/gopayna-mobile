@@ -12,9 +12,9 @@ workflows:
       cocoapods: default
       ios_signing:
         distribution_type: app_store
-        bundle_identifier: com.gopayna.app3
+        bundle_identifier: ng.gopaynow.app
       vars:
-        BUNDLE_ID: "com.gopayna.app3"
+        BUNDLE_ID: "ng.gopaynow.app"
         APPLE_TEAM_ID: "TQWXNLXN3C"
     cache:
       cache_paths:
@@ -118,9 +118,9 @@ workflows:
       cocoapods: default
       ios_signing:
         distribution_type: app_store
-        bundle_identifier: com.gopayna.app3
+        bundle_identifier: ng.gopaynow.app
       vars:
-        BUNDLE_ID: "com.gopayna.app3"
+        BUNDLE_ID: "ng.gopaynow.app"
         APPLE_TEAM_ID: "TQWXNLXN3C"
     cache:
       cache_paths:

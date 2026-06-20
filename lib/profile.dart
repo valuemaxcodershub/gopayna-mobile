@@ -200,7 +200,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       await _uploadProfileImage(File(picked.path));
     } on PlatformException {
       _showMessage(
-        'Permission denied. Please enable camera/gallery access.',
+        'Permission denied. Please enable camera or photo library access in device settings.',
         isError: true,
       );
     }

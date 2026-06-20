@@ -483,10 +483,17 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
                                         Navigator.pushReplacement(
                                           context,
                                           MaterialPageRoute(
-                                            builder: (context) => OtpVerificationScreen(
-                                              email: _emailController.text.trim(),
-                                              purpose: OtpPurpose.registration,
-                                            ),
+                                            builder: (context) {
+                                              final raw =
+                                                  _emailController.text.trim();
+                                              final contact = raw.contains('@')
+                                                  ? raw.toLowerCase()
+                                                  : raw;
+                                              return OtpVerificationScreen(
+                                                email: contact,
+                                                purpose: OtpPurpose.registration,
+                                              );
+                                            },
                                           ),
                                         );
                                       }

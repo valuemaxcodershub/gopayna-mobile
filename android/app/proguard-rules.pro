@@ -7,8 +7,8 @@
 -keep class io.flutter.plugins.**  { *; }
 
 ## Keep MainActivity (critical fix for ClassNotFoundException)
--keep class com.gopayna.app.MainActivity { *; }
--keep class com.gopayna.app.** { *; }
+-keep class ng.gopaynow.app.MainActivity { *; }
+-keep class ng.gopaynow.app.** { *; }
 
 ## Dart
 -keep class androidx.lifecycle.** { *; }

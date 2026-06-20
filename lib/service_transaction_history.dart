@@ -782,6 +782,15 @@ class ServiceTransaction {
       outcomeMessage = GoPaynaStrings.receiptBannerSuccess;
     }
 
+    final meterType = details?['meterType']?.toString() ?? '01';
+    final providerOrderId = details?['orderId']?.toString() ??
+        details?['providerOrderId']?.toString() ??
+        details?['nellobyteOrderId']?.toString();
+    final clubkonnectRequestId = details?['clubkonnectRequestId']?.toString();
+    final showProviderRequery = (sk == 'pending' || sk == 'processing') &&
+        serviceType == ServiceType.electricity &&
+        meterType == '01';
+
     return TransactionReceiptData(
       title: title,
       amountDisplay: '-₦${amount.toStringAsFixed(2)}',
@@ -795,6 +804,9 @@ class ServiceTransaction {
       extraDetails: extraDetails,
       outcome: outcome,
       outcomeMessage: outcomeMessage,
+      showProviderRequery: showProviderRequery,
+      providerOrderId: providerOrderId,
+      clubkonnectRequestId: clubkonnectRequestId,
     );
   }
 }

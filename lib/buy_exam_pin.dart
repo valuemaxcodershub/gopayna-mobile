@@ -6,7 +6,7 @@ import 'services/auth_token_storage.dart';
 import 'service_transaction_history.dart';
 import 'widgets/wallet_visibility_builder.dart';
 import 'widgets/themed_screen_helpers.dart';
-import 'widgets/pending_order_screen.dart';
+import 'widgets/purchase_navigation.dart';
 import 'design/gopayna_design.dart';
 
 String _educationRecentListStatusLabel(dynamic status) {
@@ -456,230 +456,29 @@ class _BuyEducationPinScreenState extends State<BuyEducationPinScreen>
       final payload = result['data'] as Map<String, dynamic>? ?? {};
       final data = payload['data'] as Map<String, dynamic>? ?? payload;
       final isPending = payload['pending'] == true || data['isPending'] == true;
-      if (isPending) {
-        final selectedProviderData = _providers.isNotEmpty
-            ? _providers.firstWhere((p) => p['id'] == _selectedProvider,
-                orElse: () => _providers.first)
-            : {'name': 'Exam'};
-        final selectedPackage =
-            _findSelectedPackage() ?? {'bundle': 'Package'};
-        final ref = data['reference']?.toString() ?? 'Unknown';
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => PendingOrderScreen(
-              reference: ref,
-              serviceTitle: 'Exam PIN',
-              summaryLine:
-                  '${selectedProviderData['name']} · ${selectedPackage['bundle']} · ${_emailController.text.trim()}',
-              orderId: data['orderId']?.toString() ?? data['orderid']?.toString(),
-              requestId:
-                  data['requestId']?.toString() ?? data['requestid']?.toString(),
-            ),
-          ),
-        );
-        return;
-      }
-      // Show PIN(s) in success dialog if returned
-      if (data['pin'] != null || data['pins'] != null) {
-        final pins = data['pins'] ?? (data['pin'] != null ? [data['pin']] : []);
-        final quantity = pins.length > 0 ? pins.length : 1;
-        _showSuccessDialogWithPins(pins, data['serial'] ?? '', quantity);
-      } else {
-        _showSuccessDialog();
-      }
+      final selectedProviderData = _providers.isNotEmpty
+          ? _providers.firstWhere((p) => p['id'] == _selectedProvider,
+              orElse: () => _providers.first)
+          : {'name': 'Exam'};
+      final selectedPackage = _findSelectedPackage() ?? {'bundle': 'Package'};
+      final ref = data['reference']?.toString() ?? 'Unknown';
+      final hasPins = data['pin'] != null || data['pins'] != null;
+      openPurchaseOutcome(
+        context,
+        reference: ref,
+        isPending: isPending,
+        summaryLine:
+            '${selectedProviderData['name']} · ${selectedPackage['bundle']} · ${_emailController.text.trim()}',
+        successMessage: isPending
+            ? null
+            : (hasPins
+                ? 'Your exam PIN is ready. Open your receipt below.'
+                : 'Your exam PIN purchase was successful. Open your receipt below.'),
+      );
     } else {
       _showErrorDialog(GoPaynaUxHelpers.augmentProviderError(
           result['error'] ?? 'Transaction failed. Please try again.'));
     }
-  }
-
-  void _showSuccessDialogWithPins(
-      List<dynamic> pins, String serial, int quantity) {
-    final selectedProviderData = _providers.isNotEmpty
-        ? _providers.firstWhere((p) => p['id'] == _selectedProvider,
-            orElse: () => _providers.first)
-        : {'name': 'Provider', 'color': const Color(0xFF0066CC)};
-    final selectedPackage =
-        _findSelectedPackage() ?? {'bundle': 'Package', 'price': 0};
-    final colorScheme = this.colorScheme;
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        return Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [colorScheme.primary, colorScheme.primaryContainer],
-              ),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    color: colorScheme.onPrimary.withValues(alpha: 0.2),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.check_circle,
-                    color: colorScheme.onPrimary,
-                    size: 50,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Text(
-                  'Purchase Successful!',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: colorScheme.onPrimary,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'You successfully purchased $quantity ${selectedPackage['bundle']}${quantity > 1 ? 's' : ''} for ${selectedProviderData['fullName']}. Your PIN${quantity > 1 ? 's are' : ' is'} also sent to your delivery email.',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: colorScheme.onPrimary,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                if (pins.isNotEmpty || serial.isNotEmpty) ...[
-                  const SizedBox(height: 16),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: colorScheme.onPrimary.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (serial.isNotEmpty) ...[
-                          Text(
-                            'Serial: $serial',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: colorScheme.onPrimary,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                        ],
-                        if (pins.isNotEmpty) ...[
-                          Text(
-                            quantity > 1 ? 'PINs:' : 'PIN:',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: colorScheme.onPrimary,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          ...pins.asMap().entries.map((entry) {
-                            final index = entry.key;
-                            final pin = entry.value.toString();
-                            return Padding(
-                              padding: EdgeInsets.only(
-                                  bottom: index < pins.length - 1 ? 4 : 0),
-                              child: Text(
-                                quantity > 1 ? '${index + 1}. $pin' : pin,
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: colorScheme.onPrimary,
-                                ),
-                              ),
-                            );
-                          }),
-                        ],
-                      ],
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 24),
-                if (pins.isNotEmpty) ...[
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton(
-                      onPressed: () {
-                        final pinText = pins.asMap().entries.map((entry) {
-                          final index = entry.key;
-                          final pin = entry.value.toString();
-                          return quantity > 1 ? '${index + 1}. $pin' : pin;
-                        }).join('\n');
-                        Clipboard.setData(ClipboardData(text: pinText));
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(quantity > 1
-                                ? 'PINs copied to clipboard'
-                                : 'PIN copied to clipboard'),
-                            duration: const Duration(seconds: 2),
-                          ),
-                        );
-                      },
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: colorScheme.onPrimary,
-                        side: BorderSide(color: colorScheme.onPrimary),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      child: Text(
-                        quantity > 1 ? 'Copy All PINs' : 'Copy PIN',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                ],
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                      Navigator.of(context).pop();
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: colorScheme.onPrimary,
-                      foregroundColor: colorScheme.primary,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: const Text(
-                      'Done',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
   }
 
   void _showErrorDialog(String message) {
@@ -728,101 +527,6 @@ class _BuyEducationPinScreenState extends State<BuyEducationPinScreen>
               child: const Text('OK'),
             ),
           ],
-        );
-      },
-    );
-  }
-
-  void _showSuccessDialog() {
-    final selectedProviderData = _providers.isNotEmpty
-        ? _providers.firstWhere((p) => p['id'] == _selectedProvider,
-            orElse: () => _providers.first)
-        : {'name': 'Provider', 'color': const Color(0xFF0066CC)};
-    final selectedPackage =
-        _findSelectedPackage() ?? {'bundle': 'Package', 'price': 0};
-    final colorScheme = this.colorScheme;
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        return Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [colorScheme.primary, colorScheme.primaryContainer],
-              ),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    color: colorScheme.onPrimary.withValues(alpha: 0.2),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.check_circle,
-                    color: colorScheme.onPrimary,
-                    size: 50,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Text(
-                  'Purchase Successful!',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: colorScheme.onPrimary,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'You successfully purchased ${selectedPackage['bundle']} for ${selectedProviderData['fullName']}. Your PIN details will be sent to your delivery email.',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: colorScheme.onPrimary,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 24),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                      Navigator.of(context).pop();
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: colorScheme.onPrimary,
-                      foregroundColor: colorScheme.primary,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: const Text(
-                      'Done',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
         );
       },
     );
@@ -1207,7 +911,7 @@ class _BuyEducationPinScreenState extends State<BuyEducationPinScreen>
                     keyboardType: TextInputType.emailAddress,
                     decoration: InputDecoration(
                       labelText: 'Delivery Email (required)',
-                      hintText: 'GoPayna sends your PINs to this email',
+                      hintText: 'GopayNow sends your PINs to this email',
                       prefixIcon: Icon(
                         Icons.email_outlined,
                         color: colorScheme.primary,
