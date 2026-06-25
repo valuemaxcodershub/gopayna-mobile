@@ -613,7 +613,11 @@ Map<String, String> _authorizedJsonHeaders(String token) => {
 ///   flutter run -d chrome --dart-define=APP_SIGNING_SECRET=your_secret_here
 ///
 /// No default: release builds must pass `--dart-define=APP_SIGNING_SECRET=...`
-const String _appSigningSecret = String.fromEnvironment('APP_SIGNING_SECRET');
+const String _appSigningSecretEnv =
+    String.fromEnvironment('APP_SIGNING_SECRET');
+
+/// Trim whitespace/newlines (Codemagic copy-paste or shell env can add these).
+String get _appSigningSecret => _appSigningSecretEnv.trim();
 
 /// App identifier for the mobile app
 const String _appId = 'gopayna_mobile_v1';

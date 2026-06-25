@@ -93,8 +93,13 @@ workflows:
             echo "Use the same value as server APP_SIGNING_SECRET and your local APK builds."
             exit 1
           fi
+          # Strip accidental newlines from UI copy-paste (do not print the secret).
+          APP_SIGNING_SECRET="$(printf '%s' "$APP_SIGNING_SECRET" | tr -d '\r\n')"
+          export APP_SIGNING_SECRET
+          echo "APP_SIGNING_SECRET length: ${#APP_SIGNING_SECRET} (compare with server .env)"
       - name: Build IPA for TestFlight
         script: |
+          APP_SIGNING_SECRET="$(printf '%s' "$APP_SIGNING_SECRET" | tr -d '\r\n')"
           flutter build ipa --release \
             --dart-define=APP_SIGNING_SECRET="$APP_SIGNING_SECRET" \
             --build-name=1.0.$BUILD_NUMBER \
@@ -217,8 +222,12 @@ workflows:
             echo "Use the same value as server APP_SIGNING_SECRET and your local APK builds."
             exit 1
           fi
+          APP_SIGNING_SECRET="$(printf '%s' "$APP_SIGNING_SECRET" | tr -d '\r\n')"
+          export APP_SIGNING_SECRET
+          echo "APP_SIGNING_SECRET length: ${#APP_SIGNING_SECRET} (compare with server .env)"
       - name: Build IPA for App Store
         script: |
+          APP_SIGNING_SECRET="$(printf '%s' "$APP_SIGNING_SECRET" | tr -d '\r\n')"
           flutter build ipa --release \
             --dart-define=APP_SIGNING_SECRET="$APP_SIGNING_SECRET" \
             --build-name=1.0.$BUILD_NUMBER \
