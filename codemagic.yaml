@@ -7,6 +7,8 @@ workflows:
     integrations:
       app_store_connect: codemagic Gopayna
     environment:
+      groups:
+        - ios-build
       flutter: stable
       xcode: latest
       cocoapods: default
@@ -16,6 +18,9 @@ workflows:
       vars:
         BUNDLE_ID: "com.gopayna.app3"
         APPLE_TEAM_ID: "TQWXNLXN3C"
+        # APP_SIGNING_SECRET: set in Codemagic UI (Environment variables, Secure)
+        # Must match server APP_SIGNING_SECRET — same value as local:
+        # flutter build apk --dart-define=APP_SIGNING_SECRET=...
     cache:
       cache_paths:
         - $FLUTTER_ROOT/.pub-cache
@@ -80,9 +85,18 @@ workflows:
           </plist>
           EOF
           echo "Using profile: $PROFILE_NAME ($PROFILE_UUID)"
+      - name: Verify APP_SIGNING_SECRET
+        script: |
+          if [ -z "$APP_SIGNING_SECRET" ]; then
+            echo "ERROR: APP_SIGNING_SECRET is not set."
+            echo "Add it in Codemagic → your app → Environment variables (mark as Secure)."
+            echo "Use the same value as server APP_SIGNING_SECRET and your local APK builds."
+            exit 1
+          fi
       - name: Build IPA for TestFlight
         script: |
           flutter build ipa --release \
+            --dart-define=APP_SIGNING_SECRET="$APP_SIGNING_SECRET" \
             --build-name=1.0.$BUILD_NUMBER \
             --build-number=$BUILD_NUMBER \
             --export-options-plist=$CM_BUILD_DIR/export_options.plist
@@ -113,6 +127,8 @@ workflows:
     integrations:
       app_store_connect: codemagic Gopayna
     environment:
+      groups:
+        - ios-build
       flutter: stable
       xcode: latest
       cocoapods: default
@@ -122,6 +138,9 @@ workflows:
       vars:
         BUNDLE_ID: "com.gopayna.app3"
         APPLE_TEAM_ID: "TQWXNLXN3C"
+        # APP_SIGNING_SECRET: set in Codemagic UI (Environment variables, Secure)
+        # Must match server APP_SIGNING_SECRET — same value as local:
+        # flutter build apk --dart-define=APP_SIGNING_SECRET=...
     cache:
       cache_paths:
         - $FLUTTER_ROOT/.pub-cache
@@ -190,9 +209,18 @@ workflows:
           </plist>
           EOF
           echo "Using profile: $PROFILE_NAME ($PROFILE_UUID)"
+      - name: Verify APP_SIGNING_SECRET
+        script: |
+          if [ -z "$APP_SIGNING_SECRET" ]; then
+            echo "ERROR: APP_SIGNING_SECRET is not set."
+            echo "Add it in Codemagic → your app → Environment variables (mark as Secure)."
+            echo "Use the same value as server APP_SIGNING_SECRET and your local APK builds."
+            exit 1
+          fi
       - name: Build IPA for App Store
         script: |
           flutter build ipa --release \
+            --dart-define=APP_SIGNING_SECRET="$APP_SIGNING_SECRET" \
             --build-name=1.0.$BUILD_NUMBER \
             --build-number=$BUILD_NUMBER \
             --export-options-plist=$CM_BUILD_DIR/export_options.plist

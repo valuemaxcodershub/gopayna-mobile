@@ -41,11 +41,20 @@ The `codemagic.yaml` file is already configured with:
 4. Or use automatic code signing (recommended)
 
 ### 4. Environment Variables
-Update the following encrypted variables in `codemagic.yaml`:
+
+**API request signing (required for purchases on iOS/Android release builds)**
+
+1. Codemagic → your app → **Environment variables**
+2. Add **`APP_SIGNING_SECRET`** with the **same value** as your server `.env` `APP_SIGNING_SECRET`
+3. Mark it **Secure** (do not commit the secret to git)
+4. Local Android builds use: `flutter build apk --dart-define=APP_SIGNING_SECRET=...`  
+   Codemagic iOS builds pass this automatically via `codemagic.yaml`
+
+**App Store Connect / bundle**
 
 ```yaml
 vars:
-   BUNDLE_ID: "com.gopayna.app3"  # GoPayna iOS bundle identifier (appeal branch)
+   BUNDLE_ID: "com.gopayna.app3"  # GoPayna iOS bundle identifier
   APP_STORE_CONNECT_ISSUER_ID: Encrypted(...)  # From App Store Connect API key
   APP_STORE_CONNECT_KEY_IDENTIFIER: Encrypted(...)  # Key ID
   APP_STORE_CONNECT_PRIVATE_KEY: Encrypted(...)  # Private key content
