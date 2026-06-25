@@ -975,7 +975,7 @@ class _BuyTVSubscriptionScreenState extends State<BuyTVSubscriptionScreen>
                     decoration: InputDecoration(
                       labelText: 'Delivery Email (required)',
                       hintText:
-                          'GopayNow sends subscription confirmation to this email',
+                          'GoPayna sends subscription confirmation to this email',
                       prefixIcon: Icon(
                         Icons.email,
                         color: colorScheme.primary,

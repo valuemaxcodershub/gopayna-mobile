@@ -16,8 +16,8 @@
     <string>TQWXNLXN3C</string>
     <key>provisioningProfiles</key>
     <dict>
-        <key>ng.gopaynow.app</key>
-        <string>match AppStore ng.gopaynow.app</string>
+        <key>com.gopayna.app3</key>
+        <string>match AppStore com.gopayna.app3</string>
     </dict>
 </dict>
 </plist>

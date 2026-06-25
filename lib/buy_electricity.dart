@@ -1954,7 +1954,7 @@ class _BuyElectricityScreenState extends State<BuyElectricityScreen>
                     decoration: InputDecoration(
                       labelText: 'Delivery Email (required)',
                       hintText:
-                          'GopayNow sends your token receipt to this email',
+                          'GoPayna sends your token receipt to this email',
                       labelStyle: TextStyle(color: muted),
                       prefixIcon: Icon(
                         Icons.email,

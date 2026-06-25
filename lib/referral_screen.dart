@@ -1173,14 +1173,14 @@ class _ReferrerPageState extends State<ReferrerPage>
 
     final normalizedCode = code.toUpperCase();
     final message =
-        'GopayNow referral: earn ₦6 per 3 sign-ups. Use code $normalizedCode when you register.';
+        'GoPayna referral: earn ₦6 per 3 sign-ups. Use code $normalizedCode when you register.';
 
     HapticFeedback.lightImpact();
     try {
       await SharePlus.instance.share(
         ShareParams(
           text: message,
-          subject: 'GopayNow referral code',
+          subject: 'GoPayna referral code',
         ),
       );
     } catch (_) {

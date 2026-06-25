@@ -32,7 +32,7 @@ Future<void> shareReceiptAsImage(GlobalKey boundaryKey) async {
           name: 'gopaynow-receipt.png',
         ),
       ],
-      subject: 'GopayNow receipt',
+      subject: 'GoPayna receipt',
     ),
   );
 }
@@ -95,7 +95,7 @@ class TransactionReceiptData {
 
   String buildShareMessage() {
     final buffer = StringBuffer()
-      ..writeln('GopayNow Transaction Receipt')
+      ..writeln('GoPayna Transaction Receipt')
       ..writeln('Type: $title')
       ..writeln('Amount: $amountDisplay')
       ..writeln('Status: $statusLabel')
@@ -109,7 +109,7 @@ class TransactionReceiptData {
       buffer.writeln('${field.label}: $fieldValue');
     }
 
-    buffer.writeln('\nShared via GopayNow');
+    buffer.writeln('\nShared via GoPayna');
     return buffer.toString();
   }
 }

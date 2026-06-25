@@ -1839,7 +1839,7 @@ class _SettingScreenState extends State<SettingScreen>
         ),
         title: const Text('Request Account Deletion'),
         content: const Text(
-          'This submits a deletion request for your GopayNow account. Support will verify your registered email or phone and process deletion within 30 days where permitted by law. Some transaction records may be retained as described at api.gopayna.com/account-deletion.',
+          'This submits a deletion request for your GoPayna account. Support will verify your registered email or phone and process deletion within 30 days where permitted by law. Some transaction records may be retained as described at api.gopayna.com/account-deletion.',
         ),
         actions: [
           TextButton(

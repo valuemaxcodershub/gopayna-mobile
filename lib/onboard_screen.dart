@@ -228,7 +228,7 @@ class _OnboardScreenState extends State<OnboardScreen>
                       child: FadeTransition(
                         opacity: _titleFade,
                         child: Text(
-                          'GopayNow',
+                          'GoPayna',
                           style: TextStyle(
                             fontSize: isTablet ? 42 : 36,
                             fontWeight: FontWeight.w800,

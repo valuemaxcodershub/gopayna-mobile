@@ -479,15 +479,15 @@ class _LegalScreenState extends State<LegalScreen>
   }
 
   String _getTermsOfService() {
-    return '''Welcome to GopayNow. By using our mobile application, you agree to be bound by these Terms of Service.
+    return '''Welcome to GoPayna. By using our mobile application, you agree to be bound by these Terms of Service.
 
-GopayNow is operated by GOPAYNA TECHNOLOGIES LIMITED.
+GoPayna is operated by GOPAYNA TECHNOLOGIES LIMITED.
 
 1. ACCEPTANCE OF TERMS
-By accessing and using GopayNow, you accept and agree to be bound by the terms and provision of this agreement.
+By accessing and using GoPayna, you accept and agree to be bound by the terms and provision of this agreement.
 
 2. SERVICE DESCRIPTION
-GopayNow is a mobile payment platform that allows users to fund a wallet and purchase airtime, data, electricity bills, TV subscriptions, and education pins.
+GoPayna is a mobile payment platform that allows users to fund a wallet and purchase airtime, data, electricity bills, TV subscriptions, and education pins.
 
 3. USER RESPONSIBILITIES
 - You must provide accurate and complete information
@@ -515,9 +515,9 @@ Last updated: May 2026''';
   }
 
   String _getPrivacyPolicy() {
-    return '''GopayNow is committed to protecting your privacy. This Privacy Policy explains how we collect, use, and protect your information.
+    return '''GoPayna is committed to protecting your privacy. This Privacy Policy explains how we collect, use, and protect your information.
 
-GopayNow is operated by GOPAYNA TECHNOLOGIES LIMITED.
+GoPayna is operated by GOPAYNA TECHNOLOGIES LIMITED.
 
 1. INFORMATION WE COLLECT
 - Personal information (name, phone number, email)
@@ -561,7 +561,7 @@ Last updated: May 2026''';
   }
 
   String _getAppStoragePolicy() {
-    return '''This App Storage Policy explains how GopayNow stores data on your device.
+    return '''This App Storage Policy explains how GoPayna stores data on your device.
 
 1. WHAT WE STORE ON YOUR DEVICE
 - Authentication session data (stored in secure storage where supported)
@@ -590,10 +590,10 @@ Last updated: May 2026''';
   String _getDisclaimer() {
     return '''IMPORTANT DISCLAIMER - PLEASE READ CAREFULLY
 
-GopayNow is operated by GOPAYNA TECHNOLOGIES LIMITED.
+GoPayna is operated by GOPAYNA TECHNOLOGIES LIMITED.
 
 1. GENERAL DISCLAIMER
-The information and services provided by GopayNow are on an "as is" basis. We make no warranties or guarantees about the accuracy, reliability, or availability of our services.
+The information and services provided by GoPayna are on an "as is" basis. We make no warranties or guarantees about the accuracy, reliability, or availability of our services.
 
 2. SERVICE AVAILABILITY
 - Services may be temporarily unavailable due to maintenance or technical issues
@@ -626,7 +626,7 @@ In no event shall GOPAYNA TECHNOLOGIES LIMITED be liable for any direct, indirec
 8. INDEMNIFICATION
 Users agree to indemnify and hold GOPAYNA TECHNOLOGIES LIMITED harmless from any claims arising from their use of our services.
 
-By using GopayNow, you acknowledge that you have read, understood, and agree to this disclaimer.
+By using GoPayna, you acknowledge that you have read, understood, and agree to this disclaimer.
 
 Last updated: May 2026''';
   }

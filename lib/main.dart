@@ -129,7 +129,7 @@ class _MyAppState extends State<MyApp> {
     return InactivityDetector(
       child: MaterialApp(
         navigatorKey: navigatorKey,
-        title: 'GopayNow',
+        title: 'GoPayna',
         theme: _appSettings.lightTheme,
         darkTheme: _appSettings.darkTheme,
         themeMode: _appSettings.isDarkMode ? ThemeMode.dark : ThemeMode.light,
@@ -303,7 +303,7 @@ class _GoPaynaHomePageState extends State<GoPaynaHomePage>
                           // App Name - centered
                           Center(
                             child: Text(
-                              'GopayNow',
+                              'GoPayna',
                               style: TextStyle(
                                 fontSize: isTablet ? 32 : 28,
                                 fontWeight: FontWeight.w700,

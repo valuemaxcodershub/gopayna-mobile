@@ -911,7 +911,7 @@ class _BuyEducationPinScreenState extends State<BuyEducationPinScreen>
                     keyboardType: TextInputType.emailAddress,
                     decoration: InputDecoration(
                       labelText: 'Delivery Email (required)',
-                      hintText: 'GopayNow sends your PINs to this email',
+                      hintText: 'GoPayna sends your PINs to this email',
                       prefixIcon: Icon(
                         Icons.email_outlined,
                         color: colorScheme.primary,

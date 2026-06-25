@@ -65,7 +65,7 @@ class _LoadingPageState extends State<LoadingPage>
               Align(
                 alignment: Alignment.centerRight,
                 child: Text(
-                  'GopayNow',
+                  'GoPayna',
                   style: TextStyle(
                     color: Colors.grey.shade600,
                     fontWeight: FontWeight.w600,
